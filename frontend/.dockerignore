@@ -9,5 +9,3 @@ README.md
 .env.local
 .env.*
 eslint.config.mjs
-postcss.config.mjs
-tailwind.config.ts
