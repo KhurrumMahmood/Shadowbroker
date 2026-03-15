@@ -20,6 +20,11 @@ DEFAULT_FEEDS = [
     {"name": "NHK", "url": "https://www3.nhk.or.jp/nhkworld/rss/world.xml", "weight": 3},
     {"name": "CNA", "url": "https://www.channelnewsasia.com/rssfeed/8395986", "weight": 3},
     {"name": "Mercopress", "url": "https://en.mercopress.com/rss/", "weight": 3},
+    {"name": "FocusTaiwan", "url": "https://focustaiwan.tw/rss", "weight": 5},
+    {"name": "Kyodo", "url": "https://english.kyodonews.net/rss/news.xml", "weight": 4},
+    {"name": "SCMP", "url": "https://www.scmp.com/rss/91/feed", "weight": 4},
+    {"name": "The Diplomat", "url": "https://thediplomat.com/feed/", "weight": 4},
+    {"name": "Stars and Stripes", "url": "https://www.stripes.com/feeds/pacific.rss", "weight": 4},
 ]
 
 

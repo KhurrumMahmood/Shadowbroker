@@ -33,6 +33,29 @@ _KEYWORD_COORDS = {
     "lebanon": (33.854, 35.862),
     "syria": (34.802, 38.996),
     "yemen": (15.552, 48.516),
+    # East Asia — specific locations (longer keywords matched first via _SORTED_KEYWORDS)
+    "taiwan strait": (24.0, 119.5),
+    "south china sea": (15.0, 115.0),
+    "east china sea": (28.0, 125.0),
+    "philippine sea": (20.0, 130.0),
+    "senkaku": (25.740, 123.474),
+    "diaoyu": (25.740, 123.474),
+    "ryukyu": (26.334, 127.800),
+    "okinawa": (26.334, 127.800),
+    "kadena": (26.351, 127.767),
+    "naha": (26.212, 127.679),
+    "yokosuka": (35.283, 139.671),
+    "sasebo": (33.159, 129.722),
+    "misawa": (40.682, 141.368),
+    "iwakuni": (34.144, 132.236),
+    "guam": (13.444, 144.793),
+    "taipei": (25.033, 121.565),
+    "kaohsiung": (22.616, 120.313),
+    "xiamen": (24.479, 118.089),
+    "fujian": (26.074, 119.296),
+    "guangdong": (23.379, 113.763),
+    "zhejiang": (29.141, 119.788),
+    "hainan": (19.200, 109.999),
     "china": (35.861, 104.195),
     "beijing": (39.904, 116.407),
     "taiwan": (23.697, 120.960),
@@ -90,6 +113,27 @@ _KEYWORD_COORDS = {
     "jakarta": (-6.208, 106.845),
 }
 
+# Immutable after module load — sort by descending keyword length so
+# specific locations ("taiwan strait") match before generic ones ("taiwan")
+_SORTED_KEYWORDS = sorted(_KEYWORD_COORDS.items(), key=lambda x: len(x[0]), reverse=True)
+
+
+def _resolve_coords(text: str) -> tuple[float, float] | None:
+    """Return (lat, lng) for the most specific keyword match, or None.
+
+    Longer keywords are tried first. Space-padded keywords (" us ", " uk ")
+    use substring matching on padded text; all others use word-boundary regex.
+    """
+    padded_text = f" {text} "
+    for kw, coords in _SORTED_KEYWORDS:
+        if kw.startswith(" ") or kw.endswith(" "):
+            if kw in padded_text:
+                return coords
+        else:
+            if re.search(r'\b' + re.escape(kw) + r'\b', text):
+                return coords
+    return None
+
 
 @with_retry(max_retries=1, base_delay=2)
 def fetch_news():
@@ -140,8 +184,6 @@ def fetch_news():
                         risk_score += 2
                 risk_score = min(10, risk_score)
 
-            keyword_coords = _KEYWORD_COORDS
-
             lat, lng = None, None
 
             if 'georss_point' in entry:
@@ -153,18 +195,10 @@ def fetch_news():
                 lat, lng = coords[1], coords[0]
 
             if lat is None:
-                # text may not be defined yet for GDACS path
                 text = (title + " " + summary).lower()
-                padded_text = f" {text} "
-                for kw, coords in keyword_coords.items():
-                    if kw.startswith(" ") or kw.endswith(" "):
-                        if kw in padded_text:
-                            lat, lng = coords
-                            break
-                    else:
-                        if re.search(r'\b' + re.escape(kw) + r'\b', text):
-                            lat, lng = coords
-                            break
+                result = _resolve_coords(text)
+                if result:
+                    lat, lng = result
 
             if lat is not None:
                 key = None
