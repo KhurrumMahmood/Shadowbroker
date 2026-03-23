@@ -1,6 +1,7 @@
 """LLM assistant service — OpenAI-compatible chat completions for OSINT queries.
 
-Uses env vars: LLM_API_KEY, LLM_BASE_URL, LLM_MODEL
+Supports multi-provider routing: Cerebras (fast, primary) → OpenRouter (fallback).
+Uses env vars: CEREBRAS_API_KEY/BASE_URL/MODEL, LLM_API_KEY/BASE_URL/MODEL
 """
 import os
 import re
@@ -20,9 +21,31 @@ class LLMConnectionError(Exception):
     """Raised when the LLM API is unreachable or returns a server error."""
     pass
 
-_API_KEY = os.environ.get("LLM_API_KEY", "")
-_BASE_URL = os.environ.get("LLM_BASE_URL", "https://api.openai.com/v1")
-_MODEL = os.environ.get("LLM_MODEL", "gpt-4o-mini")
+
+# Provider configs — tried in order. First available provider with a valid API key is used.
+def _build_providers() -> list[dict]:
+    providers = []
+    # Primary: Cerebras (fast inference)
+    cerebras_key = os.environ.get("CEREBRAS_API_KEY", "")
+    if cerebras_key:
+        providers.append({
+            "name": "cerebras",
+            "api_key": cerebras_key,
+            "base_url": os.environ.get("CEREBRAS_BASE_URL", "https://api.cerebras.ai/v1"),
+            "model": os.environ.get("CEREBRAS_MODEL", "zai-glm-4.7"),
+        })
+    # Fallback: OpenRouter / generic OpenAI-compatible
+    llm_key = os.environ.get("LLM_API_KEY", "")
+    if llm_key:
+        providers.append({
+            "name": "openrouter",
+            "api_key": llm_key,
+            "base_url": os.environ.get("LLM_BASE_URL", "https://api.openai.com/v1"),
+            "model": os.environ.get("LLM_MODEL", "gpt-4o-mini"),
+        })
+    return providers
+
+_PROVIDERS = _build_providers()
 
 # All data layers the frontend can control
 _LAYER_NAMES = [
@@ -729,27 +752,18 @@ def parse_llm_response(raw: str) -> dict:
     return result
 
 
-def call_llm(query: str, data_summary: dict, viewport: dict | None = None,
-             conversation: list | None = None,
-             search_results: dict | None = None,
-             live_data: dict | None = None) -> dict:
-    """Call the LLM with optional tool use and return a parsed structured response.
-
-    If *live_data* is provided, the LLM can call query_data / aggregate_data tools
-    to run structured queries against the live feed before producing its answer.
-
-    Raises RuntimeError if LLM is not configured.
-    """
-    if not _API_KEY:
-        raise RuntimeError("LLM not configured — set LLM_API_KEY environment variable")
-
+def _build_messages(query: str, data_summary: dict, viewport: dict | None,
+                     conversation: list | None, search_results: dict | None) -> list:
+    """Build the messages array for an LLM call (shared across providers)."""
     system_prompt = build_system_prompt(data_summary, search_results=search_results)
     if viewport:
-        system_prompt += f"\n\nThe user's current map viewport: south={viewport.get('south')}, west={viewport.get('west')}, north={viewport.get('north')}, east={viewport.get('east')}"
+        system_prompt += (
+            f"\n\nThe user's current map viewport: south={viewport.get('south')}, "
+            f"west={viewport.get('west')}, north={viewport.get('north')}, east={viewport.get('east')}"
+        )
 
     messages = [{"role": "system", "content": system_prompt}]
 
-    # Add conversation history if provided, excluding error exchanges.
     if conversation:
         _ERROR_MARKERS = ("Cannot reach", "LLM service unavailable", "Query filtered",
                           "Connection error", "Error:", "content_filter")
@@ -772,24 +786,36 @@ def call_llm(query: str, data_summary: dict, viewport: dict | None = None,
             messages.append({"role": msg["role"], "content": msg["content"]})
 
     messages.append({"role": "user", "content": query})
+    return messages
 
-    url = f"{_BASE_URL.rstrip('/')}/chat/completions"
+
+def _call_provider(provider: dict, messages: list, live_data: dict | None) -> dict:
+    """Run the tool-calling loop against a single provider. Returns parsed response.
+
+    Raises ContentFilterError, LLMConnectionError on failure.
+    """
+    url = f"{provider['base_url'].rstrip('/')}/chat/completions"
     headers = {
-        "Authorization": f"Bearer {_API_KEY}",
+        "Authorization": f"Bearer {provider['api_key']}",
         "Content-Type": "application/json",
     }
-    # --- LLM call with tool support ---
-    # Send tools parameter for providers that support it (OpenRouter, OpenAI).
-    # Also detect XML-style <tool_call> tags as fallback for providers that don't.
+    model = provider["model"]
+    pname = provider["name"]
     tools = _build_tools() if live_data else None
+    # Work on a copy of messages so tool-loop appends don't leak across providers
+    msgs = list(messages)
 
     for _round in range(3):
         payload: dict = {
-            "model": _MODEL,
-            "messages": messages,
+            "model": model,
+            "messages": msgs,
             "temperature": 0.3,
-            "max_tokens": 4096,
         }
+        # Cerebras renamed max_tokens → max_completion_tokens (includes reasoning tokens)
+        if pname == "cerebras":
+            payload["max_completion_tokens"] = 8192  # higher budget for interleaved thinking
+        else:
+            payload["max_tokens"] = 4096
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
@@ -800,60 +826,55 @@ def call_llm(query: str, data_summary: dict, viewport: dict | None = None,
         except httpx.HTTPStatusError as e:
             status = e.response.status_code
             body = e.response.text[:300]
-            logger.error(f"LLM API error: {status} — {body}")
-            # If tools caused a 400, retry without them
+            logger.error(f"[{pname}] LLM API error: {status} — {body}")
             if tools and status == 400:
-                logger.warning("Retrying without tools (provider may not support function calling)")
+                logger.warning(f"[{pname}] Retrying without tools")
                 tools = None
                 continue
             if status in (400, 422) and ("content" in body.lower() or "moderation" in body.lower() or "filter" in body.lower()):
                 raise ContentFilterError(f"The LLM provider rejected this query (HTTP {status}).")
-            raise LLMConnectionError(f"LLM API returned {status}")
+            raise LLMConnectionError(f"[{pname}] LLM API returned {status}")
         except httpx.TimeoutException:
-            logger.error("LLM API request timed out")
-            raise LLMConnectionError("LLM request timed out — try again.")
+            logger.error(f"[{pname}] LLM API request timed out")
+            raise LLMConnectionError(f"[{pname}] LLM request timed out")
         except (httpx.ConnectError, httpx.NetworkError, ConnectionError, OSError) as e:
-            logger.error(f"LLM connection failed: {e}")
-            raise LLMConnectionError(f"Cannot reach LLM API: {e}")
+            logger.error(f"[{pname}] LLM connection failed: {e}")
+            raise LLMConnectionError(f"[{pname}] Cannot reach LLM API: {e}")
         except Exception as e:
-            logger.error(f"LLM call failed: {e}")
-            raise LLMConnectionError(f"LLM call failed: {e}")
+            logger.error(f"[{pname}] LLM call failed: {e}")
+            raise LLMConnectionError(f"[{pname}] LLM call failed: {e}")
 
         resp_data = resp.json()
         choice = resp_data["choices"][0]
         message = choice.get("message", {})
 
-        # --- Check for structured tool_calls (OpenAI-native) ---
+        # --- Structured tool_calls (OpenAI-native) ---
         tool_calls = message.get("tool_calls")
         if tool_calls and live_data:
-            messages.append(message)
+            msgs.append(message)
             for tc in tool_calls:
                 fn_name = tc["function"]["name"]
                 try:
                     fn_args = json.loads(tc["function"]["arguments"])
                 except json.JSONDecodeError:
                     fn_args = {}
-                logger.info(f"Tool call (native): {fn_name}({json.dumps(fn_args)[:200]})")
+                logger.info(f"[{pname}] Tool call (native): {fn_name}({json.dumps(fn_args)[:200]})")
                 result_str = execute_tool_call(fn_name, fn_args, live_data)
-                messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result_str})
-            # After any tool round, stop offering tools to force a text response
+                msgs.append({"role": "tool", "tool_call_id": tc["id"], "content": result_str})
             tools = None
             continue
 
-        # --- Check for XML-style tool calls in text content ---
+        # --- XML-style tool calls in text content ---
         raw_content = message.get("content", "")
         inline_calls = _parse_inline_tool_calls(raw_content)
         if inline_calls and live_data and _round < 2:
-            # Execute each inline tool call
             tool_results = []
             for fn_name, fn_args in inline_calls:
-                logger.info(f"Tool call (inline XML): {fn_name}({json.dumps(fn_args)[:200]})")
+                logger.info(f"[{pname}] Tool call (inline XML): {fn_name}({json.dumps(fn_args)[:200]})")
                 result_str = execute_tool_call(fn_name, fn_args, live_data)
                 tool_results.append(f"[{fn_name}] {result_str}")
-
-            # Add the tool results as context and ask the LLM to produce a final answer
-            messages.append({"role": "assistant", "content": raw_content})
-            messages.append({
+            msgs.append({"role": "assistant", "content": raw_content})
+            msgs.append({
                 "role": "user",
                 "content": (
                     "Here are the results from the data queries you requested:\n\n"
@@ -872,21 +893,50 @@ def call_llm(query: str, data_summary: dict, viewport: dict | None = None,
         refusal = message.get("refusal")
         if refusal:
             raise ContentFilterError(refusal)
-
         if not raw_content:
             raise ContentFilterError("The LLM returned an empty response — the query may have been filtered.")
-
         if finish == "length":
-            logger.warning("LLM response truncated (finish_reason=length)")
+            logger.warning(f"[{pname}] LLM response truncated (finish_reason=length)")
+        logger.info(f"[{pname}] LLM responded successfully")
         return parse_llm_response(raw_content)
 
-    # Exhausted rounds — return whatever we have
-    logger.warning("Tool-calling loop exhausted without final text response")
+    logger.warning(f"[{pname}] Tool-calling loop exhausted")
     return {
         "summary": "The analysis is taking too long. Please try a simpler query.",
         "layers": None, "viewport": None,
         "highlight_entities": [], "result_entities": [], "filters": None,
     }
+
+
+def call_llm(query: str, data_summary: dict, viewport: dict | None = None,
+             conversation: list | None = None,
+             search_results: dict | None = None,
+             live_data: dict | None = None) -> dict:
+    """Call the LLM with optional tool use and return a parsed structured response.
+
+    Tries providers in order (Cerebras → OpenRouter). Falls back on connection/timeout
+    errors. Content-filter errors are NOT retried (they'll fail on any provider).
+
+    Raises RuntimeError if no LLM is configured.
+    """
+    if not _PROVIDERS:
+        raise RuntimeError("LLM not configured — set CEREBRAS_API_KEY or LLM_API_KEY")
+
+    messages = _build_messages(query, data_summary, viewport, conversation, search_results)
+
+    last_error = None
+    for provider in _PROVIDERS:
+        try:
+            return _call_provider(provider, messages, live_data)
+        except ContentFilterError:
+            raise  # don't retry content filters on another provider
+        except LLMConnectionError as e:
+            last_error = e
+            if len(_PROVIDERS) > 1:
+                logger.warning(f"[{provider['name']}] failed, falling back to next provider: {e}")
+            continue
+
+    raise LLMConnectionError(f"All LLM providers failed. Last error: {last_error}")
 
 
 # --- Viewport Briefing ---

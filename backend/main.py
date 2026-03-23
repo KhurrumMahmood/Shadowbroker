@@ -601,14 +601,15 @@ async def assistant_brief(request: Request, body: BriefRequest):
     # Try LLM-enhanced summary if available, otherwise return structured data with text summary
     try:
         import httpx as _httpx
-        from services.llm_assistant import _API_KEY, _BASE_URL, _MODEL
+        from services.llm_assistant import _PROVIDERS
 
-        if _API_KEY:
+        if _PROVIDERS:
+            provider = _PROVIDERS[0]  # use primary provider for briefings
             prompt = build_briefing_prompt(ctx)
-            url = f"{_BASE_URL.rstrip('/')}/chat/completions"
-            headers = {"Authorization": f"Bearer {_API_KEY}", "Content-Type": "application/json"}
+            url = f"{provider['base_url'].rstrip('/')}/chat/completions"
+            headers = {"Authorization": f"Bearer {provider['api_key']}", "Content-Type": "application/json"}
             payload = {
-                "model": _MODEL,
+                "model": provider["model"],
                 "messages": [
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": "Brief me on what's in view."},
@@ -618,8 +619,8 @@ async def assistant_brief(request: Request, body: BriefRequest):
             }
             resp = _httpx.post(url, json=payload, headers=headers, timeout=20.0)
             resp.raise_for_status()
-            llm_summary = resp.json()["choices"][0]["message"]["content"].strip()
-            ctx["summary"] = llm_summary
+            llm_summary = resp.json()["choices"][0]["message"].get("content", "").strip()
+            ctx["summary"] = llm_summary or ctx["summary_text"]
         else:
             ctx["summary"] = ctx["summary_text"]
     except Exception as e:
