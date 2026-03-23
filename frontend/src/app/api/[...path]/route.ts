@@ -41,25 +41,63 @@ async function proxy(req: NextRequest, path: string[]): Promise<NextResponse> {
   });
 
   const isBodyless = req.method === "GET" || req.method === "HEAD";
+
+  // For GET requests, buffer the response and retry once on socket errors.
+  // Railway's internal networking can drop sockets mid-stream on large responses
+  // (e.g. the 11MB /api/live-data/fast payload), causing "other side closed" errors
+  // when streaming. Buffering + retry eliminates these intermittent failures.
+  if (isBodyless) {
+    const maxAttempts = 2;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const upstream = await fetch(targetUrl.toString(), {
+          method: req.method,
+          headers: forwardHeaders,
+          signal: AbortSignal.timeout(30_000),
+        });
+
+        if (upstream.status === 304) {
+          const h = new Headers();
+          upstream.headers.forEach((v, k) => { if (!STRIP_RESPONSE.has(k.toLowerCase())) h.set(k, v); });
+          return new NextResponse(null, { status: 304, headers: h });
+        }
+
+        // Buffer the full body so a mid-stream socket close is caught here (and retried)
+        const body = await upstream.arrayBuffer();
+
+        const responseHeaders = new Headers();
+        upstream.headers.forEach((v, k) => { if (!STRIP_RESPONSE.has(k.toLowerCase())) responseHeaders.set(k, v); });
+        responseHeaders.set("content-length", String(body.byteLength));
+
+        return new NextResponse(body, { status: upstream.status, headers: responseHeaders });
+      } catch (err) {
+        if (attempt < maxAttempts) continue; // retry once
+        return new NextResponse(JSON.stringify({ error: "Backend unavailable" }), {
+          status: 502,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    }
+  }
+
+  // POST/PUT/DELETE — stream without retry (request bodies can't be replayed)
   let upstream: Response;
   try {
     upstream = await fetch(targetUrl.toString(), {
       method: req.method,
       headers: forwardHeaders,
-      body: isBodyless ? undefined : req.body,
-      // Required for streaming request bodies in Node.js fetch
+      body: req.body,
       // @ts-ignore
       duplex: "half",
+      signal: AbortSignal.timeout(30_000),
     });
   } catch (err) {
-    // Backend unreachable — return a clean 502 so the UI can handle it gracefully
     return new NextResponse(JSON.stringify({ error: "Backend unavailable" }), {
       status: 502,
       headers: { "Content-Type": "application/json" },
     });
   }
 
-  // Forward response headers
   const responseHeaders = new Headers();
   upstream.headers.forEach((value, key) => {
     if (!STRIP_RESPONSE.has(key.toLowerCase())) {
@@ -67,7 +105,6 @@ async function proxy(req: NextRequest, path: string[]): Promise<NextResponse> {
     }
   });
 
-  // 304 responses must have no body
   if (upstream.status === 304) {
     return new NextResponse(null, { status: 304, headers: responseHeaders });
   }
