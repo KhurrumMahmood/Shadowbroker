@@ -18,9 +18,13 @@ const STRIP_REQUEST = new Set([
 ]);
 
 // Headers that must not be forwarded back to the browser.
+// content-encoding and content-length are stripped because Node.js fetch()
+// automatically decompresses gzip/br responses — forwarding the compressed
+// content-length would cause browsers to truncate the decompressed body.
 const STRIP_RESPONSE = new Set([
   "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
   "te", "trailers", "transfer-encoding", "upgrade",
+  "content-encoding", "content-length",
 ]);
 
 async function proxy(req: NextRequest, path: string[]): Promise<NextResponse> {
@@ -43,11 +47,8 @@ async function proxy(req: NextRequest, path: string[]): Promise<NextResponse> {
       method: req.method,
       headers: forwardHeaders,
       body: isBodyless ? undefined : req.body,
-      // Disable automatic decompression so we can pass the raw compressed
-      // bytes + original content-encoding/content-length through to the
-      // browser untouched. This prevents size mismatches that cause truncation.
-      // @ts-ignore — compress is a Node.js fetch extension, duplex is for streaming bodies
-      compress: false,
+      // Required for streaming request bodies in Node.js fetch
+      // @ts-ignore
       duplex: "half",
     });
   } catch (err) {
