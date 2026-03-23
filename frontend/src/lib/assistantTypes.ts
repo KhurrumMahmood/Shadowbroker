@@ -107,3 +107,37 @@ export function validateAssistantResponse(raw: unknown): AssistantResponse {
 
   return { summary, layers, viewport, highlight_entities, result_entities, filters };
 }
+
+/**
+ * Extract actionable fields from an AssistantResponse into a StoredAction.
+ * Returns undefined if the response has no actionable content (summary-only).
+ */
+export function extractStoredAction(
+  resp: AssistantResponse,
+): import("@/types/aiConversation").StoredAction | undefined {
+  const action: import("@/types/aiConversation").StoredAction = {};
+  let hasAction = false;
+
+  if (resp.layers) {
+    action.layers = resp.layers;
+    hasAction = true;
+  }
+  if (resp.viewport) {
+    action.viewport = resp.viewport;
+    hasAction = true;
+  }
+  if (resp.filters !== null) {
+    action.filters = resp.filters;
+    hasAction = true;
+  }
+  if (resp.result_entities.length > 0) {
+    action.result_entities = resp.result_entities;
+    hasAction = true;
+  }
+  if (resp.highlight_entities.length > 0) {
+    action.highlight_entities = resp.highlight_entities;
+    hasAction = true;
+  }
+
+  return hasAction ? action : undefined;
+}

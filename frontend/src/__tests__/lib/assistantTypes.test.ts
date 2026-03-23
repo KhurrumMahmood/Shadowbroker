@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateAssistantResponse } from '@/lib/assistantTypes';
+import { validateAssistantResponse, extractStoredAction } from '@/lib/assistantTypes';
 
 describe('validateAssistantResponse', () => {
   it('accepts a valid full response', () => {
@@ -192,5 +192,99 @@ describe('validateAssistantResponse', () => {
     });
     expect(result.filters).toEqual({});
     expect(result.filters).not.toBeNull();
+  });
+});
+
+// ── extractStoredAction tests ──
+
+describe('extractStoredAction', () => {
+  it('returns undefined for summary-only response', () => {
+    const resp = validateAssistantResponse({ summary: "Just info." });
+    expect(extractStoredAction(resp)).toBeUndefined();
+  });
+
+  it('extracts layers', () => {
+    const resp = validateAssistantResponse({
+      summary: "test",
+      layers: { military: true, flights: false },
+    });
+    const action = extractStoredAction(resp);
+    expect(action).toBeDefined();
+    expect(action!.layers).toEqual({ military: true, flights: false });
+    expect(action!.viewport).toBeUndefined();
+  });
+
+  it('extracts viewport', () => {
+    const resp = validateAssistantResponse({
+      summary: "test",
+      viewport: { lat: 43, lng: 34, zoom: 6 },
+    });
+    const action = extractStoredAction(resp);
+    expect(action).toBeDefined();
+    expect(action!.viewport).toEqual({ lat: 43, lng: 34, zoom: 6 });
+  });
+
+  it('extracts filters', () => {
+    const resp = validateAssistantResponse({
+      summary: "test",
+      filters: { ship_type: ["tanker"] },
+    });
+    const action = extractStoredAction(resp);
+    expect(action).toBeDefined();
+    expect(action!.filters).toEqual({ ship_type: ["tanker"] });
+  });
+
+  it('extracts result_entities', () => {
+    const resp = validateAssistantResponse({
+      summary: "test",
+      result_entities: [{ type: "flight", id: "abc" }],
+    });
+    const action = extractStoredAction(resp);
+    expect(action).toBeDefined();
+    expect(action!.result_entities).toHaveLength(1);
+  });
+
+  it('extracts highlight_entities', () => {
+    const resp = validateAssistantResponse({
+      summary: "test",
+      highlight_entities: [{ type: "ship", id: 123 }],
+    });
+    const action = extractStoredAction(resp);
+    expect(action).toBeDefined();
+    expect(action!.highlight_entities).toHaveLength(1);
+  });
+
+  it('extracts multiple action fields at once', () => {
+    const resp = validateAssistantResponse({
+      summary: "test",
+      layers: { military: true },
+      viewport: { lat: 10, lng: 20, zoom: 5 },
+      result_entities: [{ type: "ship", id: 1 }],
+    });
+    const action = extractStoredAction(resp);
+    expect(action).toBeDefined();
+    expect(action!.layers).toBeDefined();
+    expect(action!.viewport).toBeDefined();
+    expect(action!.result_entities).toHaveLength(1);
+  });
+
+  it('treats clear-all filters ({}) as an action', () => {
+    const resp = validateAssistantResponse({
+      summary: "test",
+      filters: {},
+    });
+    const action = extractStoredAction(resp);
+    expect(action).toBeDefined();
+    expect(action!.filters).toEqual({});
+  });
+
+  it('ignores null layers/viewport/filters (no change)', () => {
+    const resp = validateAssistantResponse({
+      summary: "test",
+      layers: null,
+      viewport: null,
+      filters: null,
+    });
+    expect(extractStoredAction(resp)).toBeUndefined();
   });
 });
