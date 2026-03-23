@@ -36,18 +36,17 @@ describe('presets', () => {
     expect(DEFAULT_LAYERS).toEqual(PRESETS.OVERVIEW.layers);
   });
 
-  it('no preset enables gibs_imagery or highres_satellite by default', () => {
+  it('no preset enables gibs_imagery by default', () => {
     for (const [name, preset] of Object.entries(PRESETS)) {
       expect(preset.layers.gibs_imagery).toBe(false);
-      expect(preset.layers.highres_satellite).toBe(false);
     }
   });
 
-  it('OVERVIEW reduces information overload — commercial flights and cargo ships off', () => {
-    expect(PRESETS.OVERVIEW.layers.flights).toBe(false);
+  it('OVERVIEW enables commercial flights, high-res satellite, and key intel layers', () => {
+    expect(PRESETS.OVERVIEW.layers.flights).toBe(true);
+    expect(PRESETS.OVERVIEW.layers.highres_satellite).toBe(true);
     expect(PRESETS.OVERVIEW.layers.ships_cargo).toBe(false);
     expect(PRESETS.OVERVIEW.layers.ships_civilian).toBe(false);
-    // But key intel layers are on
     expect(PRESETS.OVERVIEW.layers.military).toBe(true);
     expect(PRESETS.OVERVIEW.layers.tracked).toBe(true);
     expect(PRESETS.OVERVIEW.layers.ships_military).toBe(true);

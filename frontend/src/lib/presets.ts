@@ -35,6 +35,7 @@ export const PRESETS: Record<PresetKey, { label: string; layers: ActiveLayers }>
     label: "OVERVIEW",
     layers: {
       ...OFF,
+      flights: true,
       jets: true,
       military: true,
       tracked: true,
@@ -46,6 +47,7 @@ export const PRESETS: Record<PresetKey, { label: string; layers: ActiveLayers }>
       global_incidents: true,
       day_night: true,
       gps_jamming: true,
+      highres_satellite: true,
     },
   },
   MARITIME: {
