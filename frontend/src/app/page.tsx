@@ -25,8 +25,12 @@ import { useDataPolling } from "@/hooks/useDataPolling";
 import { useReverseGeocode } from "@/hooks/useReverseGeocode";
 import { useRegionDossier } from "@/hooks/useRegionDossier";
 import { DEFAULT_LAYERS, PRESETS, type PresetKey } from "@/lib/presets";
-import { useCategoryCycler } from "@/hooks/useCategoryCycler";
+import { useCategoryCycler, toSelectedEntity } from "@/hooks/useCategoryCycler";
+import { useAIResultCycler, findEntityInData } from "@/hooks/useAIResultCycler";
 import BoxSelectSummary from "@/components/BoxSelectSummary";
+import AIAssistantPanel from "@/components/AIAssistantPanel";
+import ViewportBriefPanel from "@/components/ViewportBriefPanel";
+import type { BriefData } from "@/components/ViewportBriefPanel";
 import type { BoxSelectResult } from "@/components/map/hooks/useBoxSelect";
 
 // Use dynamic loads for Maplibre to avoid SSR window is not defined errors
@@ -171,7 +175,7 @@ export default function Dashboard() {
   };
 
   const [activeFilters, setActiveFilters] = useState<Record<string, string[]>>({});
-  const [flyToLocation, setFlyToLocation] = useState<{ lat: number, lng: number, ts: number } | null>(null);
+  const [flyToLocation, setFlyToLocation] = useState<{ lat: number; lng: number; zoom?: number; ts: number } | null>(null);
 
   // Preset handler — selecting a preset applies its layers; manual toggle clears indicator
   const handlePresetSelect = (key: PresetKey) => {
@@ -190,9 +194,22 @@ export default function Dashboard() {
     (lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() }),
   );
 
+  const aiCycler = useAIResultCycler(
+    data,
+    setSelectedEntity,
+    (lat, lng, zoom) => setFlyToLocation({ lat, lng, zoom, ts: Date.now() }),
+  );
+
   // Box selection
   const [boxSelectMode, setBoxSelectMode] = useState(false);
   const [boxSelectResult, setBoxSelectResult] = useState<BoxSelectResult | null>(null);
+
+  // AI assistant
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [briefOpen, setBriefOpen] = useState(false);
+  const [briefData, setBriefData] = useState<BriefData | null>(null);
+  const [briefLoading, setBriefLoading] = useState(false);
+  const viewBoundsRef = useRef<{ south: number; west: number; north: number; east: number } | null>(null);
 
   // Eavesdrop Mode State
   const [isEavesdropping, setIsEavesdropping] = useState(false);
@@ -202,6 +219,26 @@ export default function Dashboard() {
   // Onboarding & connection status
   const { showOnboarding, setShowOnboarding } = useOnboarding();
   const { showChangelog, setShowChangelog } = useChangelog();
+
+  const handleBrief = async () => {
+    if (briefOpen) { setBriefOpen(false); return; }
+    const vp = viewBoundsRef.current;
+    if (!vp) return;
+    setBriefOpen(true);
+    setBriefLoading(true);
+    setBriefData(null);
+    try {
+      const resp = await fetch("/api/assistant/brief", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(vp),
+      });
+      if (resp.ok) {
+        setBriefData(await resp.json());
+      }
+    } catch { /* ignore */ }
+    finally { setBriefLoading(false); }
+  };
 
   return (
     <DashboardDataProvider data={data} selectedEntity={selectedEntity} setSelectedEntity={setSelectedEntity}>
@@ -236,6 +273,8 @@ export default function Dashboard() {
           setTrackedSdr={setTrackedSdr}
           boxSelectMode={boxSelectMode}
           onBoxSelectResult={(result) => { setBoxSelectResult(result); setBoxSelectMode(false); }}
+          viewBoundsRef={viewBoundsRef}
+          aiResultIdSet={aiCycler.state.resultIdSet}
         />
       </ErrorBoundary>
 
@@ -429,6 +468,34 @@ export default function Dashboard() {
               {/* Divider */}
               <div className="w-px h-8 bg-[var(--border-primary)]" />
 
+              {/* AI Assistant toggle */}
+              <div
+                className="flex flex-col items-center cursor-pointer"
+                onClick={() => setAiPanelOpen(o => !o)}
+              >
+                <div className="text-[8px] text-[var(--text-muted)] font-mono tracking-[0.2em]">ANALYST</div>
+                <div className={`text-[11px] font-mono font-bold ${aiPanelOpen ? "text-cyan-400" : "text-[var(--text-secondary)]"}`}>
+                  {aiPanelOpen ? "OPEN" : "AI"}
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="w-px h-8 bg-[var(--border-primary)]" />
+
+              {/* Viewport Brief toggle */}
+              <div
+                className="flex flex-col items-center cursor-pointer"
+                onClick={handleBrief}
+              >
+                <div className="text-[8px] text-[var(--text-muted)] font-mono tracking-[0.2em]">VIEWPORT</div>
+                <div className={`text-[11px] font-mono font-bold ${briefOpen ? "text-cyan-400" : "text-[var(--text-secondary)]"}`}>
+                  {briefLoading ? "..." : briefOpen ? "OPEN" : "BRIEF"}
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="w-px h-8 bg-[var(--border-primary)]" />
+
               {/* Style preset (compact) */}
               <div className="flex flex-col items-center cursor-pointer" onClick={cycleStyle}>
                 <div className="text-[8px] text-[var(--text-muted)] font-mono tracking-[0.2em]">STYLE</div>
@@ -457,6 +524,58 @@ export default function Dashboard() {
       {/* BOX SELECT SUMMARY */}
       {boxSelectResult && (
         <BoxSelectSummary result={boxSelectResult} onClose={() => setBoxSelectResult(null)} />
+      )}
+
+      {/* AI ASSISTANT PANEL */}
+      <AIAssistantPanel
+        isOpen={aiPanelOpen}
+        onClose={() => setAiPanelOpen(false)}
+        onApplyLayers={(layers) => {
+          setActiveLayers((prev) => ({ ...prev, ...layers }));
+          setActivePreset(null);
+        }}
+        onFlyTo={(lat, lng, zoom) => setFlyToLocation({ lat, lng, zoom, ts: Date.now() })}
+        onSelectEntity={(e) => {
+          if (!e) return;
+          const found = findEntityInData(e.type, e.id, data);
+          if (found) {
+            setSelectedEntity(toSelectedEntity(found.item, found.entityType));
+          } else {
+            setSelectedEntity({ id: e.id, type: e.type });
+          }
+        }}
+        onApplyFilters={(filters) => setActiveFilters(filters)}
+        onSetAIResults={(entities) => aiCycler.setResults(entities)}
+        aiResultState={aiCycler.state}
+        onAIResultNext={aiCycler.next}
+        onAIResultPrev={aiCycler.prev}
+        onAIResultClear={aiCycler.clear}
+        viewport={viewBoundsRef.current}
+      />
+
+      {/* VIEWPORT BRIEFING PANEL */}
+      {briefOpen && (
+        <ViewportBriefPanel
+          data={briefData}
+          loading={briefLoading}
+          onClose={() => setBriefOpen(false)}
+          onEntityClick={(entity) => {
+            const found = findEntityInData(entity.type, entity.id, data);
+            if (found) {
+              setSelectedEntity(toSelectedEntity(found.item, found.entityType));
+              const item = found.item as Record<string, unknown>;
+              if (typeof item.lat === "number" && typeof item.lng === "number") {
+                setFlyToLocation({ lat: item.lat as number, lng: item.lng as number, zoom: 10, ts: Date.now() });
+              }
+            } else {
+              setSelectedEntity({ id: entity.id, type: entity.type, name: entity.name });
+            }
+          }}
+          onApplyLayers={(layers) => {
+            setActiveLayers((prev) => ({ ...prev, ...layers }));
+            setActivePreset(null);
+          }}
+        />
       )}
 
       {/* RESTORE UI BUTTON (If Hidden) */}

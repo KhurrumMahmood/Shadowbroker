@@ -1,0 +1,72 @@
+import { describe, it, expect } from "vitest";
+import { findEntityInData } from "@/hooks/useAIResultCycler";
+import type { DashboardData } from "@/types/dashboard";
+
+const MOCK_DATA = {
+  commercial_flights: [
+    { icao24: "abc123", callsign: "BA123", lat: 51.0, lng: -0.5, alt: 35000, origin_name: "LHR" },
+    { icao24: "def456", callsign: "AF789", lat: 48.8, lng: 2.3, alt: 38000, origin_name: "CDG" },
+  ],
+  ships: [
+    { mmsi: 222222, name: "FRONT ALTAIR", type: "tanker", lat: 26.5, lng: 56.3 },
+    { mmsi: 333333, name: "USS NIMITZ", type: "carrier", lat: 26.6, lng: 56.4 },
+  ],
+  military_flights: [
+    { icao24: "mil001", callsign: "RCH401", lat: 43.0, lng: 34.0, alt: 30000 },
+  ],
+  military_bases: [
+    { name: "Ramstein Air Base", country: "Germany", lat: 49.44, lng: 7.6 },
+  ],
+  earthquakes: [
+    { id: "eq001", place: "Near Tokyo", lat: 35.6, lng: 139.7, mag: 4.2 },
+  ],
+} as unknown as DashboardData;
+
+describe("findEntityInData", () => {
+  it("finds a flight by icao24", () => {
+    const found = findEntityInData("commercial_flight", "abc123", MOCK_DATA);
+    expect(found).not.toBeNull();
+    expect(found!.item.callsign).toBe("BA123");
+    expect(found!.entityType).toBe("commercial_flight");
+  });
+
+  it("finds a ship by mmsi", () => {
+    const found = findEntityInData("ship", 222222, MOCK_DATA);
+    expect(found).not.toBeNull();
+    expect(found!.item.name).toBe("FRONT ALTAIR");
+  });
+
+  it("finds a military flight", () => {
+    const found = findEntityInData("military_flight", "mil001", MOCK_DATA);
+    expect(found).not.toBeNull();
+    expect(found!.item.callsign).toBe("RCH401");
+  });
+
+  it("finds a military base by name", () => {
+    const found = findEntityInData("military_base", "Ramstein Air Base", MOCK_DATA);
+    expect(found).not.toBeNull();
+    expect(found!.item.country).toBe("Germany");
+  });
+
+  it("finds an earthquake by id", () => {
+    const found = findEntityInData("earthquake", "eq001", MOCK_DATA);
+    expect(found).not.toBeNull();
+    expect(found!.item.place).toBe("Near Tokyo");
+  });
+
+  it("returns null for unknown type", () => {
+    const found = findEntityInData("unknown_type", "abc", MOCK_DATA);
+    expect(found).toBeNull();
+  });
+
+  it("returns null for non-existent id", () => {
+    const found = findEntityInData("commercial_flight", "nonexistent", MOCK_DATA);
+    expect(found).toBeNull();
+  });
+
+  it("handles numeric id as string comparison", () => {
+    const found = findEntityInData("ship", "333333", MOCK_DATA);
+    expect(found).not.toBeNull();
+    expect(found!.item.name).toBe("USS NIMITZ");
+  });
+});

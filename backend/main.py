@@ -519,5 +519,107 @@ async def system_update(request: Request):
     threading.Timer(2.0, schedule_restart, args=[project_root]).start()
     return result
 
+# ---------------------------------------------------------------------------
+# AI Assistant
+# ---------------------------------------------------------------------------
+from pydantic import BaseModel, field_validator
+from services.llm_assistant import call_llm, search_entities, build_briefing_context, build_briefing_prompt
+
+class AssistantQuery(BaseModel):
+    query: str
+    viewport: dict | None = None
+    conversation: list | None = None
+
+    @field_validator("query")
+    @classmethod
+    def query_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("query must not be empty")
+        return v.strip()
+
+@app.post("/api/assistant/query")
+@limiter.limit("10/minute")
+async def assistant_query(request: Request, body: AssistantQuery):
+    """Ask the AI assistant a question about the current dashboard state."""
+    # Build data summary from current store
+    data = get_latest_data()
+    data_summary = {}
+    for key in ["commercial_flights", "private_flights", "private_jets",
+                "military_flights", "tracked_flights", "ships", "satellites",
+                "earthquakes", "firms_fires", "internet_outages", "gdelt",
+                "kiwisdr", "datacenters", "military_bases", "power_plants", "cctv"]:
+        items = data.get(key)
+        if items and isinstance(items, list):
+            data_summary[key] = len(items)
+
+    # Pre-search entities matching the query for LLM context
+    search_results = search_entities(body.query, data, viewport=body.viewport)
+
+    try:
+        result = call_llm(
+            query=body.query,
+            data_summary=data_summary,
+            viewport=body.viewport,
+            conversation=body.conversation,
+            search_results=search_results,
+        )
+        return result
+    except RuntimeError as e:
+        return Response(
+            content=json_mod.dumps({"error": str(e)}),
+            status_code=503,
+            media_type="application/json",
+        )
+
+class BriefRequest(BaseModel):
+    south: float
+    west: float
+    north: float
+    east: float
+
+@app.post("/api/assistant/brief")
+@limiter.limit("5/minute")
+async def assistant_brief(request: Request, body: BriefRequest):
+    """Generate a viewport briefing summarizing notable activity in the current view."""
+    data = get_latest_data()
+    viewport = {"south": body.south, "west": body.west, "north": body.north, "east": body.east}
+    ctx = build_briefing_context(data, viewport)
+
+    # Try LLM-enhanced summary if available, otherwise return structured data with text summary
+    try:
+        import httpx as _httpx
+        from services.llm_assistant import _API_KEY, _BASE_URL, _MODEL
+
+        if _API_KEY:
+            prompt = build_briefing_prompt(ctx)
+            url = f"{_BASE_URL.rstrip('/')}/chat/completions"
+            headers = {"Authorization": f"Bearer {_API_KEY}", "Content-Type": "application/json"}
+            payload = {
+                "model": _MODEL,
+                "messages": [
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": "Brief me on what's in view."},
+                ],
+                "temperature": 0.3,
+                "max_tokens": 512,
+            }
+            resp = _httpx.post(url, json=payload, headers=headers, timeout=20.0)
+            resp.raise_for_status()
+            llm_summary = resp.json()["choices"][0]["message"]["content"].strip()
+            ctx["summary"] = llm_summary
+        else:
+            ctx["summary"] = ctx["summary_text"]
+    except Exception as e:
+        logger.warning(f"Briefing LLM call failed, using text summary: {e}")
+        ctx["summary"] = ctx["summary_text"]
+
+    return {
+        "summary": ctx["summary"],
+        "notable_entities": ctx["notable"][:20],
+        "suggested_layers": ctx["suggested_layers"],
+        "counts": ctx["counts"],
+    }
+
+
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
