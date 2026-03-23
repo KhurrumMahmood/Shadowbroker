@@ -18,13 +18,9 @@ const STRIP_REQUEST = new Set([
 ]);
 
 // Headers that must not be forwarded back to the browser.
-// content-encoding and content-length are stripped because Node.js fetch()
-// automatically decompresses gzip/br responses — forwarding the compressed
-// content-length would cause browsers to truncate the decompressed body.
 const STRIP_RESPONSE = new Set([
   "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
   "te", "trailers", "transfer-encoding", "upgrade",
-  "content-encoding", "content-length",
 ]);
 
 async function proxy(req: NextRequest, path: string[]): Promise<NextResponse> {
@@ -39,6 +35,11 @@ async function proxy(req: NextRequest, path: string[]): Promise<NextResponse> {
       forwardHeaders.set(key, value);
     }
   });
+  // Force uncompressed responses from the backend. Node.js fetch()
+  // auto-decompresses gzip/br but doesn't update content-length, which causes
+  // browsers to truncate large streamed responses. By requesting identity
+  // encoding, the backend sends raw bytes and content-length stays accurate.
+  forwardHeaders.set("accept-encoding", "identity");
 
   const isBodyless = req.method === "GET" || req.method === "HEAD";
   let upstream: Response;
@@ -72,13 +73,7 @@ async function proxy(req: NextRequest, path: string[]): Promise<NextResponse> {
     return new NextResponse(null, { status: 304, headers: responseHeaders });
   }
 
-  // Buffer the response so Next.js can set the correct content-length.
-  // Node.js fetch() auto-decompresses gzip/br, so the upstream content-length
-  // (which we strip) reflects compressed size. Without buffering, large
-  // responses (e.g. 11MB live-data) get truncated on platforms like Railway
-  // because neither chunked transfer-encoding nor content-length is set.
-  const body = await upstream.arrayBuffer();
-  return new NextResponse(body, {
+  return new NextResponse(upstream.body, {
     status: upstream.status,
     headers: responseHeaders,
   });
