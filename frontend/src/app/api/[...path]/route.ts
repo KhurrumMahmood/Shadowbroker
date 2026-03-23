@@ -19,8 +19,8 @@ const STRIP_REQUEST = new Set([
 
 // Headers that must not be forwarded back to the browser.
 // content-encoding and content-length are stripped because Node.js fetch()
-// automatically decompresses gzip/br responses — forwarding these headers
-// would cause ERR_CONTENT_DECODING_FAILED in the browser.
+// automatically decompresses gzip/br responses — forwarding the compressed
+// content-length would cause browsers to truncate the decompressed body.
 const STRIP_RESPONSE = new Set([
   "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
   "te", "trailers", "transfer-encoding", "upgrade",
@@ -72,7 +72,13 @@ async function proxy(req: NextRequest, path: string[]): Promise<NextResponse> {
     return new NextResponse(null, { status: 304, headers: responseHeaders });
   }
 
-  return new NextResponse(upstream.body, {
+  // Buffer the response so Next.js can set the correct content-length.
+  // Node.js fetch() auto-decompresses gzip/br, so the upstream content-length
+  // (which we strip) reflects compressed size. Without buffering, large
+  // responses (e.g. 11MB live-data) get truncated on platforms like Railway
+  // because neither chunked transfer-encoding nor content-length is set.
+  const body = await upstream.arrayBuffer();
+  return new NextResponse(body, {
     status: upstream.status,
     headers: responseHeaders,
   });
