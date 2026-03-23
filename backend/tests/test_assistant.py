@@ -119,3 +119,24 @@ class TestLLMAssistantService:
             assert -90 <= vp["lat"] <= 90
             assert -180 <= vp["lng"] <= 180
             assert 1 <= vp["zoom"] <= 20
+
+    def test_parse_llm_response_preserves_empty_filters_as_clear(self):
+        """filters: {} means 'clear all', distinct from null (no change)."""
+        from services.llm_assistant import parse_llm_response
+        raw = json.dumps({
+            "summary": "Clearing filters.",
+            "filters": {},
+        })
+        result = parse_llm_response(raw)
+        assert result["filters"] == {}, "Empty dict should be preserved as clear-all signal"
+        assert result["filters"] is not None
+
+    def test_parse_llm_response_filters_null_means_no_change(self):
+        """filters: null or absent means no change."""
+        from services.llm_assistant import parse_llm_response
+        raw = json.dumps({
+            "summary": "No filter change.",
+            "filters": None,
+        })
+        result = parse_llm_response(raw)
+        assert result["filters"] is None

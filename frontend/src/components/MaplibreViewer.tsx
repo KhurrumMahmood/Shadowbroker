@@ -669,9 +669,14 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
         kiwisdrGeoJSON && 'kiwisdr-clusters',
         kiwisdrGeoJSON && 'kiwisdr-layer',
         internetOutagesGeoJSON && 'internet-outages-layer',
+        dataCentersGeoJSON && 'datacenters-clusters',
+        dataCentersGeoJSON && 'datacenters-cluster-count',
         dataCentersGeoJSON && 'datacenters-layer',
+        powerPlantsGeoJSON && 'power-plants-clusters',
+        powerPlantsGeoJSON && 'power-plants-cluster-count',
         powerPlantsGeoJSON && 'power-plants-layer',
         militaryBasesGeoJSON && 'military-bases-layer',
+        firmsGeoJSON && 'firms-clusters',
         firmsGeoJSON && 'firms-viirs-layer'
     ].filter(Boolean) as string[];
 
@@ -742,7 +747,7 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                     const props = e.features[0].properties || {};
                     if (props.cluster) return;
                     const typeLabels: Record<string, string> = {
-                        commercial_flight: 'FLIGHT', private_ga: 'PRIVATE', private_flight: 'PRIVATE',
+                        flight: 'FLIGHT', private_ga: 'PRIVATE', private_flight: 'PRIVATE',
                         private_jet: 'JET', military_flight: 'MILITARY', tracked_flight: 'TRACKED',
                         ship: 'VESSEL', satellite: 'SATELLITE', uav: 'UAV', earthquake: 'EARTHQUAKE',
                         gdelt: 'CONFLICT', liveuamap: 'EVENT', cctv: 'CCTV', kiwisdr: 'SDR',

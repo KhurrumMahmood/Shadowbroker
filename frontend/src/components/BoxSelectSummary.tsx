@@ -5,7 +5,7 @@ import { X } from "lucide-react";
 import type { BoxSelectResult } from "@/components/map/hooks/useBoxSelect";
 
 const TYPE_LABELS: Record<string, { label: string; color: string }> = {
-  commercial_flight: { label: "Commercial Flights", color: "#67e8f9" },
+  flight: { label: "Commercial Flights", color: "#67e8f9" },
   private_flight: { label: "Private Flights", color: "#94a3b8" },
   private_jet: { label: "Private Jets", color: "#c084fc" },
   military_flight: { label: "Military Flights", color: "#f87171" },
@@ -15,7 +15,7 @@ const TYPE_LABELS: Record<string, { label: string; color: string }> = {
   carrier: { label: "Carriers", color: "#f87171" },
   satellite: { label: "Satellites", color: "#67e8f9" },
   earthquake: { label: "Earthquakes", color: "#facc15" },
-  gdelt_incident: { label: "Incidents", color: "#fb923c" },
+  gdelt: { label: "Incidents", color: "#fb923c" },
   liveuamap: { label: "Conflict Events", color: "#ef4444" },
   cctv: { label: "CCTV Cameras", color: "#a3e635" },
   kiwisdr: { label: "SDR Receivers", color: "#fbbf24" },
