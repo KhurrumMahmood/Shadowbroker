@@ -373,9 +373,20 @@ def parse_llm_response(raw: str) -> dict:
     try:
         result = json.loads(text)
     except json.JSONDecodeError:
+        # Truncated JSON — try to salvage the summary field
+        summary_match = re.search(r'"summary"\s*:\s*"((?:[^"\\]|\\.)*)"', text)
+        if summary_match:
+            return {
+                "summary": summary_match.group(1),
+                "layers": None,
+                "viewport": None,
+                "highlight_entities": [],
+                "result_entities": [],
+                "filters": None,
+            }
         # Fallback: return the raw text as summary
         return {
-            "summary": raw.strip(),
+            "summary": raw.strip()[:500],
             "layers": None,
             "viewport": None,
             "highlight_entities": [],
@@ -447,11 +458,31 @@ def call_llm(query: str, data_summary: dict, viewport: dict | None = None,
 
     messages = [{"role": "system", "content": system_prompt}]
 
-    # Add conversation history if provided
+    # Add conversation history if provided, excluding error exchanges.
+    # Error messages (from refused queries or backend failures) poison the
+    # context and can cause self-reinforcing refusals.
     if conversation:
-        for msg in conversation[-10:]:  # Last 10 messages max
-            if msg.get("role") in ("user", "assistant") and msg.get("content"):
-                messages.append({"role": msg["role"], "content": msg["content"]})
+        _ERROR_MARKERS = ("Cannot reach", "LLM service unavailable", "Query filtered",
+                          "Connection error", "Error:", "content_filter")
+        cleaned = []
+        skip_prior_user = False
+        # Walk backwards to pair assistant errors with their user prompts
+        for msg in reversed(conversation[-12:]):
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            if not role or not content:
+                continue
+            if role == "assistant" and any(m in content for m in _ERROR_MARKERS):
+                skip_prior_user = True  # also drop the user msg that triggered this
+                continue
+            if role == "user" and skip_prior_user:
+                skip_prior_user = False
+                continue
+            skip_prior_user = False
+            cleaned.append(msg)
+        # Restore chronological order and limit
+        for msg in reversed(cleaned[-10:]):
+            messages.append({"role": msg["role"], "content": msg["content"]})
 
     messages.append({"role": "user", "content": query})
 
@@ -464,7 +495,7 @@ def call_llm(query: str, data_summary: dict, viewport: dict | None = None,
         "model": _MODEL,
         "messages": messages,
         "temperature": 0.3,
-        "max_tokens": 2048,
+        "max_tokens": 4096,
     }
 
     try:
@@ -481,9 +512,14 @@ def call_llm(query: str, data_summary: dict, viewport: dict | None = None,
         if refusal:
             raise ContentFilterError(refusal)
 
-        raw_content = choice["message"]["content"]
+        raw_content = choice.get("message", {}).get("content", "")
         if not raw_content:
             raise ContentFilterError("The LLM returned an empty response — the query may have been filtered.")
+
+        # If the LLM hit the token limit, the JSON is likely truncated.
+        # Try to parse what we have; parse_llm_response falls back to summary-only.
+        if finish == "length":
+            logger.warning("LLM response truncated (finish_reason=length)")
         return parse_llm_response(raw_content)
     except ContentFilterError:
         raise  # re-raise without wrapping

@@ -145,10 +145,21 @@ export default function AIAssistantPanel({
     setLoading(true);
 
     try {
-      const conversation = messages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
+      // Filter out error exchanges — sending them back to the LLM causes
+      // self-reinforcing refusals. Drop both the error and the user msg that caused it.
+      const ERROR_MARKERS = ["Cannot reach", "LLM service unavailable", "Query filtered", "Connection error"];
+      const conversation: { role: string; content: string }[] = [];
+      for (let i = 0; i < messages.length; i++) {
+        const m = messages[i];
+        if (m.role === "assistant" && ERROR_MARKERS.some((e) => m.content.includes(e))) {
+          // Also remove the preceding user message if it exists
+          if (conversation.length > 0 && conversation[conversation.length - 1].role === "user") {
+            conversation.pop();
+          }
+          continue;
+        }
+        conversation.push({ role: m.role, content: m.content });
+      }
 
       const resp = await fetch("/api/assistant/query", {
         method: "POST",
