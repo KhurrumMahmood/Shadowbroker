@@ -7,6 +7,11 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import Hls from 'hls.js';
 import WikiImage from '@/components/WikiImage';
 import type { DashboardData, SelectedEntity, RegionDossier } from "@/types/dashboard";
+import {
+    SatelliteDetailPanel, UavDetailPanel, EarthquakeDetailPanel, KiwisdrDetailPanel,
+    FireDetailPanel, InternetOutageDetailPanel, DatacenterDetailPanel, MilitaryBaseDetailPanel,
+    PowerPlantDetailPanel
+} from "@/components/EntityDetailPanels";
 
 // HLS video player — uses hls.js on Chrome/Firefox, native on Safari
 function HlsVideo({ url, className }: { url: string; className?: string }) {
@@ -936,6 +941,23 @@ function NewsFeedInner({ data, selectedEntity, regionDossier, regionDossierLoadi
                 </div>
             </motion.div>
         );
+    }
+
+    // ── Entity detail panels for types that were previously missing ──
+    const entityPanelMap: Record<string, React.FC<{ entity: SelectedEntity; data: DashboardData }>> = {
+        satellite: SatelliteDetailPanel,
+        uav: UavDetailPanel,
+        earthquake: EarthquakeDetailPanel,
+        kiwisdr: KiwisdrDetailPanel,
+        firms_fire: FireDetailPanel,
+        internet_outage: InternetOutageDetailPanel,
+        datacenter: DatacenterDetailPanel,
+        military_base: MilitaryBaseDetailPanel,
+        power_plant: PowerPlantDetailPanel,
+    };
+    if (selectedEntity && entityPanelMap[selectedEntity.type]) {
+        const Panel = entityPanelMap[selectedEntity.type];
+        return <Panel entity={selectedEntity} data={data} />;
     }
 
     return (

@@ -509,4 +509,6 @@ export interface MaplibreViewerProps {
   viewBoundsRef?: React.RefObject<{ south: number; west: number; north: number; east: number } | null>;
   trackedSdr?: KiwiSDR | null;
   setTrackedSdr?: (sdr: KiwiSDR | null) => void;
+  boxSelectMode?: boolean;
+  onBoxSelectResult?: (result: any) => void;
 }

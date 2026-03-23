@@ -24,6 +24,10 @@ import { NOMINATIM_DEBOUNCE_MS } from "@/lib/constants";
 import { useDataPolling } from "@/hooks/useDataPolling";
 import { useReverseGeocode } from "@/hooks/useReverseGeocode";
 import { useRegionDossier } from "@/hooks/useRegionDossier";
+import { DEFAULT_LAYERS, PRESETS, type PresetKey } from "@/lib/presets";
+import { useCategoryCycler } from "@/hooks/useCategoryCycler";
+import BoxSelectSummary from "@/components/BoxSelectSummary";
+import type { BoxSelectResult } from "@/components/map/hooks/useBoxSelect";
 
 // Use dynamic loads for Maplibre to avoid SSR window is not defined errors
 const MaplibreViewer = dynamic(() => import('@/components/MaplibreViewer'), { ssr: false });
@@ -138,33 +142,8 @@ export default function Dashboard() {
   const [measureMode, setMeasureMode] = useState(false);
   const [measurePoints, setMeasurePoints] = useState<{ lat: number; lng: number }[]>([]);
 
-  const [activeLayers, setActiveLayers] = useState({
-    flights: true,
-    private: true,
-    jets: true,
-    military: true,
-    tracked: true,
-    satellites: true,
-    ships_military: true,
-    ships_cargo: true,
-    ships_civilian: false,
-    ships_passenger: true,
-    ships_tracked_yachts: true,
-    earthquakes: true,
-    cctv: false,
-    ukraine_frontline: true,
-    global_incidents: true,
-    day_night: true,
-    gps_jamming: true,
-    gibs_imagery: false,
-    highres_satellite: false,
-    kiwisdr: false,
-    firms: false,
-    internet_outages: false,
-    datacenters: false,
-    military_bases: false,
-    power_plants: false,
-  });
+  const [activeLayers, setActiveLayers] = useState(DEFAULT_LAYERS);
+  const [activePreset, setActivePreset] = useState<PresetKey | null>("OVERVIEW");
 
   // NASA GIBS satellite imagery state
   const [gibsDate, setGibsDate] = useState<string>(() => {
@@ -193,6 +172,27 @@ export default function Dashboard() {
 
   const [activeFilters, setActiveFilters] = useState<Record<string, string[]>>({});
   const [flyToLocation, setFlyToLocation] = useState<{ lat: number, lng: number, ts: number } | null>(null);
+
+  // Preset handler — selecting a preset applies its layers; manual toggle clears indicator
+  const handlePresetSelect = (key: PresetKey) => {
+    setActiveLayers(PRESETS[key].layers);
+    setActivePreset(key);
+  };
+  const handleManualLayerToggle: typeof setActiveLayers = (updater) => {
+    setActiveLayers(updater);
+    setActivePreset(null); // manual change clears preset
+  };
+
+  // Category cycler
+  const cycler = useCategoryCycler(
+    data,
+    setSelectedEntity,
+    (lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() }),
+  );
+
+  // Box selection
+  const [boxSelectMode, setBoxSelectMode] = useState(false);
+  const [boxSelectResult, setBoxSelectResult] = useState<BoxSelectResult | null>(null);
 
   // Eavesdrop Mode State
   const [isEavesdropping, setIsEavesdropping] = useState(false);
@@ -234,6 +234,8 @@ export default function Dashboard() {
           measurePoints={measurePoints}
           trackedSdr={trackedSdr}
           setTrackedSdr={setTrackedSdr}
+          boxSelectMode={boxSelectMode}
+          onBoxSelectResult={(result) => { setBoxSelectResult(result); setBoxSelectMode(false); }}
         />
       </ErrorBoundary>
 
@@ -281,7 +283,7 @@ export default function Dashboard() {
           >
             {/* LEFT PANEL - DATA LAYERS */}
             <ErrorBoundary name="WorldviewLeftPanel">
-              <WorldviewLeftPanel data={data} activeLayers={activeLayers} setActiveLayers={setActiveLayers} onSettingsClick={() => setSettingsOpen(true)} onLegendClick={() => setLegendOpen(true)} gibsDate={gibsDate} setGibsDate={setGibsDate} gibsOpacity={gibsOpacity} setGibsOpacity={setGibsOpacity} onEntityClick={setSelectedEntity} onFlyTo={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} trackedSdr={trackedSdr} setTrackedSdr={setTrackedSdr} />
+              <WorldviewLeftPanel data={data} activeLayers={activeLayers} setActiveLayers={handleManualLayerToggle} activePreset={activePreset} onPresetSelect={handlePresetSelect} cyclerState={cycler.state} onCycleStart={cycler.startCycling} onCycleNext={cycler.next} onCyclePrev={cycler.prev} onSettingsClick={() => setSettingsOpen(true)} onLegendClick={() => setLegendOpen(true)} gibsDate={gibsDate} setGibsDate={setGibsDate} gibsOpacity={gibsOpacity} setGibsOpacity={setGibsOpacity} onEntityClick={setSelectedEntity} onFlyTo={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} trackedSdr={trackedSdr} setTrackedSdr={setTrackedSdr} />
             </ErrorBoundary>
           </motion.div>
 
@@ -413,6 +415,20 @@ export default function Dashboard() {
               {/* Divider */}
               <div className="w-px h-8 bg-[var(--border-primary)]" />
 
+              {/* Box Select toggle */}
+              <div
+                className={`flex flex-col items-center cursor-pointer ${boxSelectMode ? "text-cyan-400" : ""}`}
+                onClick={() => { setBoxSelectMode(m => !m); setBoxSelectResult(null); }}
+              >
+                <div className="text-[8px] text-[var(--text-muted)] font-mono tracking-[0.2em]">AREA</div>
+                <div className={`text-[11px] font-mono font-bold ${boxSelectMode ? "text-cyan-400" : "text-[var(--text-secondary)]"}`}>
+                  {boxSelectMode ? "ACTIVE" : "SELECT"}
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="w-px h-8 bg-[var(--border-primary)]" />
+
               {/* Style preset (compact) */}
               <div className="flex flex-col items-center cursor-pointer" onClick={cycleStyle}>
                 <div className="text-[8px] text-[var(--text-muted)] font-mono tracking-[0.2em]">STYLE</div>
@@ -436,6 +452,11 @@ export default function Dashboard() {
             </div>
           </motion.div>}
         </>
+      )}
+
+      {/* BOX SELECT SUMMARY */}
+      {boxSelectResult && (
+        <BoxSelectSummary result={boxSelectResult} onClose={() => setBoxSelectResult(null)} />
       )}
 
       {/* RESTORE UI BUTTON (If Hidden) */}

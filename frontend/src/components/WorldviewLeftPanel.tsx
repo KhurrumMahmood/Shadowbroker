@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plane, AlertTriangle, Activity, Satellite, Cctv, ChevronDown, ChevronUp, Ship, Eye, Anchor, Settings, Sun, Moon, BookOpen, Radio, Play, Pause, Globe, Flame, Wifi, Server, Shield, Zap, ToggleLeft, ToggleRight, Palette } from "lucide-react";
+import { Plane, AlertTriangle, Activity, Satellite, Cctv, ChevronDown, ChevronUp, Ship, Eye, Anchor, Settings, Sun, Moon, BookOpen, Radio, Play, Pause, Globe, Flame, Wifi, Server, Shield, Zap, ToggleLeft, ToggleRight, Palette, ChevronLeftIcon, ChevronRightIcon, Crosshair } from "lucide-react";
 import packageJson from "../../package.json";
 import { useTheme } from "@/lib/ThemeContext";
 
@@ -62,8 +62,10 @@ const POTUS_ICAOS: Record<string, { label: string; type: string }> = {
     'AE5E79': { label: 'Marine One (VH-92A)', type: 'M1' },
 };
 import type { DashboardData, ActiveLayers, SelectedEntity, KiwiSDR } from "@/types/dashboard";
+import { PRESETS, type PresetKey } from "@/lib/presets";
+import type { CyclerState } from "@/hooks/useCategoryCycler";
 
-const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, activeLayers, setActiveLayers, onSettingsClick, onLegendClick, gibsDate, setGibsDate, gibsOpacity, setGibsOpacity, onEntityClick, onFlyTo, trackedSdr, setTrackedSdr }: { data: DashboardData; activeLayers: ActiveLayers; setActiveLayers: React.Dispatch<React.SetStateAction<ActiveLayers>>; onSettingsClick?: () => void; onLegendClick?: () => void; gibsDate?: string; setGibsDate?: (d: string) => void; gibsOpacity?: number; setGibsOpacity?: (o: number) => void; onEntityClick?: (entity: SelectedEntity) => void; onFlyTo?: (lat: number, lng: number) => void; trackedSdr?: KiwiSDR | null; setTrackedSdr?: (sdr: KiwiSDR | null) => void }) {
+const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, activeLayers, setActiveLayers, activePreset, onPresetSelect, cyclerState, onCycleStart, onCycleNext, onCyclePrev, onSettingsClick, onLegendClick, gibsDate, setGibsDate, gibsOpacity, setGibsOpacity, onEntityClick, onFlyTo, trackedSdr, setTrackedSdr }: { data: DashboardData; activeLayers: ActiveLayers; setActiveLayers: React.Dispatch<React.SetStateAction<ActiveLayers>>; activePreset: PresetKey | null; onPresetSelect: (key: PresetKey) => void; cyclerState: CyclerState; onCycleStart: (layerId: string) => void; onCycleNext: () => void; onCyclePrev: () => void; onSettingsClick?: () => void; onLegendClick?: () => void; gibsDate?: string; setGibsDate?: (d: string) => void; gibsOpacity?: number; setGibsOpacity?: (o: number) => void; onEntityClick?: (entity: SelectedEntity) => void; onFlyTo?: (lat: number, lng: number) => void; trackedSdr?: KiwiSDR | null; setTrackedSdr?: (sdr: KiwiSDR | null) => void }) {
     const [isMinimized, setIsMinimized] = useState(false);
     const { theme, toggleTheme, hudColor, cycleHudColor } = useTheme();
     const [gibsPlaying, setGibsPlaying] = useState(false);
@@ -167,7 +169,7 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                 <div className="text-[10px] text-[var(--text-secondary)] font-mono tracking-widest mb-1">TOP SECRET // SI-TK // NOFORN</div>
                 <div className="text-[10px] text-[var(--text-muted)] font-mono tracking-widest mb-4">KH11-4094 OPS-4168</div>
                 <div className="flex items-center gap-3">
-                    <h1 className="text-2xl font-bold tracking-[0.2em] text-[var(--text-heading)]">FLIR</h1>
+                    <h1 className="text-2xl font-bold tracking-[0.2em] text-[var(--text-heading)]">WORLDVIEW</h1>
                     <button
                         onClick={toggleTheme}
                         className={`w-7 h-7 rounded-lg border border-[var(--border-primary)] hover:border-cyan-500/50 flex items-center justify-center ${theme === 'dark' ? 'text-cyan-400' : 'text-[var(--text-muted)]'} hover:text-cyan-300 transition-all hover:bg-[var(--hover-accent)]`}
@@ -210,9 +212,26 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
             {/* Data Layers Box */}
             <div className="bg-[var(--bg-primary)]/40 backdrop-blur-md border border-[var(--border-primary)] rounded-xl pointer-events-auto shadow-[0_4px_30px_rgba(0,0,0,0.2)] flex flex-col relative overflow-hidden max-h-full">
 
+                {/* Preset Buttons */}
+                <div className="flex items-center gap-1 px-3 pt-3 pb-1">
+                    {(Object.keys(PRESETS) as PresetKey[]).map((key) => (
+                        <button
+                            key={key}
+                            onClick={() => onPresetSelect(key)}
+                            className={`flex-1 text-[7px] font-mono tracking-[0.15em] py-1.5 rounded border transition-all ${
+                                activePreset === key
+                                    ? "border-cyan-500/60 text-cyan-400 bg-cyan-950/40 shadow-[0_0_8px_rgba(34,211,238,0.15)]"
+                                    : "border-[var(--border-primary)] text-[var(--text-muted)] hover:text-cyan-400 hover:border-cyan-800/50"
+                            }`}
+                        >
+                            {PRESETS[key].label}
+                        </button>
+                    ))}
+                </div>
+
                 {/* Header / Toggle */}
                 <div
-                    className="flex justify-between items-center p-4 cursor-pointer hover:bg-[var(--bg-secondary)]/50 transition-colors border-b border-[var(--border-primary)]/50"
+                    className="flex justify-between items-center p-4 pt-2 cursor-pointer hover:bg-[var(--bg-secondary)]/50 transition-colors border-b border-[var(--border-primary)]/50"
                 >
                     <span className="text-[10px] text-[var(--text-muted)] font-mono tracking-widest" onClick={() => setIsMinimized(!isMinimized)}>DATA LAYERS</span>
                     <div className="flex items-center gap-2">
@@ -358,6 +377,8 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                                 {layers.map((layer, idx) => {
                                     const Icon = layer.icon;
                                     const active = activeLayers[layer.id as keyof typeof activeLayers] || false;
+                                    const isCycling = cyclerState.active && cyclerState.layerId === layer.id;
+                                    const canCycle = active && (layer.count ?? 0) > 0;
 
                                     return (
                                         <div key={idx} className="flex flex-col">
@@ -379,7 +400,20 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                                                         })() : 'OFF'}</span>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-3">
+                                                <div className="flex items-center gap-2">
+                                                    {canCycle && (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); onCycleStart(layer.id); }}
+                                                            className={`p-1 rounded border transition-all ${
+                                                                isCycling
+                                                                    ? "border-cyan-500/50 text-cyan-400 bg-cyan-950/30"
+                                                                    : "border-transparent text-[var(--text-muted)] opacity-0 group-hover:opacity-100 hover:text-cyan-400 hover:border-cyan-800/50"
+                                                            }`}
+                                                            title="Browse items"
+                                                        >
+                                                            <Crosshair size={12} />
+                                                        </button>
+                                                    )}
                                                     {active && (layer.count ?? 0) > 0 && (
                                                         <span className="text-[10px] text-gray-300 font-mono">{(layer.count ?? 0).toLocaleString()}</span>
                                                     )}
@@ -391,6 +425,32 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                                                     </div>
                                                 </div>
                                             </div>
+                                            {/* Cycling controls */}
+                                            {isCycling && (
+                                                <div className="ml-7 mt-2 flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                                                    <button
+                                                        onClick={onCyclePrev}
+                                                        className="w-6 h-6 flex items-center justify-center rounded border border-cyan-500/30 text-cyan-400 hover:bg-cyan-950/30 transition-colors"
+                                                    >
+                                                        <ChevronLeftIcon size={12} />
+                                                    </button>
+                                                    <span className="text-[9px] text-cyan-400 font-mono tracking-wider min-w-[60px] text-center">
+                                                        {cyclerState.total > 0 ? `${cyclerState.index + 1} / ${cyclerState.total.toLocaleString()}` : "0 / 0"}
+                                                    </span>
+                                                    <button
+                                                        onClick={onCycleNext}
+                                                        className="w-6 h-6 flex items-center justify-center rounded border border-cyan-500/30 text-cyan-400 hover:bg-cyan-950/30 transition-colors"
+                                                    >
+                                                        <ChevronRightIcon size={12} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => onCycleStart(layer.id)}
+                                                        className="text-[8px] font-mono text-[var(--text-muted)] hover:text-red-400 border border-[var(--border-primary)] hover:border-red-400/40 rounded px-1.5 py-0.5 transition-colors ml-auto"
+                                                    >
+                                                        STOP
+                                                    </button>
+                                                </div>
+                                            )}
                                             {/* GIBS Imagery inline controls: time slider + play/pause + opacity */}
                                             {active && layer.id === 'gibs_imagery' && gibsDate && setGibsDate && setGibsOpacity && (
                                                 <div className="ml-7 mt-2 flex flex-col gap-2" onClick={e => e.stopPropagation()}>
