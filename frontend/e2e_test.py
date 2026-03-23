@@ -92,18 +92,16 @@ def run_tests():
 
         # ─── PHASE 2A: DEFAULT LAYERS (OVERVIEW preset) ───────────────
         print("\n--- Phase 2A: Default layers ---")
-        # In OVERVIEW, commercial flights should be OFF
-        # Look for the flights layer row — find "Commercial Flights" text then its ON/OFF badge
+        # In OVERVIEW, commercial flights should be ON
         flights_row = page.locator("text=Commercial Flights").first
         if flights_row.count() > 0:
-            # The ON/OFF badge is a sibling in the same row
             parent = flights_row.locator("xpath=ancestor::div[contains(@class, 'cursor-pointer')]").first
-            badge = parent.locator("text=OFF").first
-            report("Commercial Flights defaults to OFF in OVERVIEW",
-                   badge.count() > 0,
-                   "Expected OFF badge")
+            on_badge = parent.locator("text=ON").first
+            report("Commercial Flights defaults to ON in OVERVIEW",
+                   on_badge.count() > 0,
+                   "Expected ON badge")
         else:
-            report("Commercial Flights defaults to OFF in OVERVIEW", False, "row not found")
+            report("Commercial Flights defaults to ON in OVERVIEW", False, "row not found")
 
         # Military should be ON
         mil_row = page.locator("text=Military Flights").first
@@ -258,16 +256,16 @@ def run_tests():
 
         # ─── LAYER TOGGLE TEST ─────────────────────────────────────────
         print("\n--- Layer toggle ---")
-        # Click Commercial Flights to toggle ON, verify badge changes
+        # Click Commercial Flights to toggle OFF (defaults ON), verify badge changes
         flights_row_2 = page.locator("text=Commercial Flights").first
         if flights_row_2.count() > 0:
             parent2 = flights_row_2.locator("xpath=ancestor::div[contains(@class, 'cursor-pointer')]").first
             parent2.click()
             page.wait_for_timeout(500)
-            on_badge = parent2.locator("text=ON").first
-            report("Toggling Commercial Flights switches badge to ON",
-                   on_badge.count() > 0,
-                   "ON badge not found after toggle")
+            off_badge = parent2.locator("text=OFF").first
+            report("Toggling Commercial Flights switches badge to OFF",
+                   off_badge.count() > 0,
+                   "OFF badge not found after toggle")
             # Preset indicator should clear (since we manually toggled)
             overview_btn = page.locator("button:has-text('OVERVIEW')").first
             overview_classes = overview_btn.get_attribute("class") or ""
