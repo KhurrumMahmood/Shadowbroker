@@ -35,11 +35,6 @@ async function proxy(req: NextRequest, path: string[]): Promise<NextResponse> {
       forwardHeaders.set(key, value);
     }
   });
-  // Force uncompressed responses from the backend. Node.js fetch()
-  // auto-decompresses gzip/br but doesn't update content-length, which causes
-  // browsers to truncate large streamed responses. By requesting identity
-  // encoding, the backend sends raw bytes and content-length stays accurate.
-  forwardHeaders.set("accept-encoding", "identity");
 
   const isBodyless = req.method === "GET" || req.method === "HEAD";
   let upstream: Response;
@@ -48,8 +43,11 @@ async function proxy(req: NextRequest, path: string[]): Promise<NextResponse> {
       method: req.method,
       headers: forwardHeaders,
       body: isBodyless ? undefined : req.body,
-      // Required for streaming request bodies in Node.js fetch
-      // @ts-ignore
+      // Disable automatic decompression so we can pass the raw compressed
+      // bytes + original content-encoding/content-length through to the
+      // browser untouched. This prevents size mismatches that cause truncation.
+      // @ts-ignore — compress is a Node.js fetch extension, duplex is for streaming bodies
+      compress: false,
       duplex: "half",
     });
   } catch (err) {
