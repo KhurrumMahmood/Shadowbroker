@@ -268,24 +268,25 @@ export default function AIAssistantPanel({
     <div className="mt-1.5 pt-1.5 border-t border-cyan-800/30 flex flex-wrap gap-1">
       {action.viewport && (
         <button
-          onClick={() => onFlyTo(action.viewport!.lat, action.viewport!.lng, action.viewport!.zoom)}
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onFlyTo(action.viewport!.lat, action.viewport!.lng, action.viewport!.zoom); }}
           className={chipClass}
         >
           FLY TO {action.viewport.lat.toFixed(1)}, {action.viewport.lng.toFixed(1)}
         </button>
       )}
       {action.layers && (
-        <button onClick={() => onApplyLayers(action.layers!)} className={chipClass}>
+        <button type="button" onClick={(e) => { e.stopPropagation(); onApplyLayers(action.layers!); }} className={chipClass}>
           APPLY LAYERS
         </button>
       )}
       {action.filters && (
-        <button onClick={() => onApplyFilters?.(action.filters!)} className={chipClass}>
+        <button type="button" onClick={(e) => { e.stopPropagation(); onApplyFilters?.(action.filters!); }} className={chipClass}>
           {Object.keys(action.filters).length === 0 ? "CLEAR FILTERS" : "APPLY FILTERS"}
         </button>
       )}
       {action.result_entities && action.result_entities.length > 0 && (
-        <button onClick={() => onSetAIResults?.(action.result_entities!)} className={chipClass}>
+        <button type="button" onClick={(e) => { e.stopPropagation(); onSetAIResults?.(action.result_entities!); }} className={chipClass}>
           SHOW {action.result_entities.length} RESULTS
         </button>
       )}
@@ -293,8 +294,9 @@ export default function AIAssistantPanel({
         const key = `${e.type}:${e.id}`;
         return (
           <button
+            type="button"
             key={i}
-            onClick={() => handleTrackEntity(e.type, e.id)}
+            onClick={(ev) => { ev.stopPropagation(); handleTrackEntity(e.type, e.id); }}
             className={`${chipClass} ${flashEntity === key ? "border-red-500/60 text-red-400" : ""}`}
           >
             {flashEntity === key ? "NOT IN RANGE" : `${e.type.toUpperCase()} ${e.id}`}
@@ -570,28 +572,29 @@ export default function AIAssistantPanel({
                       <div className="mt-1.5 flex flex-wrap gap-1">
                         {msg.action.viewport && (
                           <button
-                            onClick={() => onFlyTo(msg.action!.viewport!.lat, msg.action!.viewport!.lng, msg.action!.viewport!.zoom)}
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onFlyTo(msg.action!.viewport!.lat, msg.action!.viewport!.lng, msg.action!.viewport!.zoom); }}
                             className={chipClass}
                           >
                             FLY TO {msg.action.viewport.lat.toFixed(1)}, {msg.action.viewport.lng.toFixed(1)}
                           </button>
                         )}
                         {msg.action.layers && (
-                          <button onClick={() => onApplyLayers(msg.action!.layers!)} className={chipClass}>
+                          <button type="button" onClick={(e) => { e.stopPropagation(); onApplyLayers(msg.action!.layers!); }} className={chipClass}>
                             APPLY LAYERS
                           </button>
                         )}
                         {msg.action.filters && (
-                          <button onClick={() => onApplyFilters?.(msg.action!.filters!)} className={chipClass}>
+                          <button type="button" onClick={(e) => { e.stopPropagation(); onApplyFilters?.(msg.action!.filters!); }} className={chipClass}>
                             {Object.keys(msg.action.filters).length === 0 ? "CLEAR FILTERS" : "APPLY FILTERS"}
                           </button>
                         )}
                         {msg.action.result_entities && msg.action.result_entities.length > 0 && (
-                          <button onClick={() => onSetAIResults?.(msg.action!.result_entities!)} className={chipClass}>
+                          <button type="button" onClick={(e) => { e.stopPropagation(); onSetAIResults?.(msg.action!.result_entities!); }} className={chipClass}>
                             SHOW {msg.action.result_entities.length} RESULTS
                           </button>
                         )}
-                        <button onClick={() => applyAction(msg.action!)} className={`${chipClass} border-cyan-600/50 text-cyan-300`}>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); applyAction(msg.action!); }} className={`${chipClass} border-cyan-600/50 text-cyan-300`}>
                           REPLAY ALL
                         </button>
                       </div>
