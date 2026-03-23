@@ -40,6 +40,13 @@ def client(_suppress_background_services):
             async with AsyncClient(transport=self._transport, base_url="http://test") as ac:
                 return await ac.get(url, **kw)
 
+        def post(self, url, **kw):
+            return self._loop.run_until_complete(self._post(url, **kw))
+
+        async def _post(self, url, **kw):
+            async with AsyncClient(transport=self._transport, base_url="http://test") as ac:
+                return await ac.post(url, **kw)
+
         def put(self, url, **kw):
             return self._loop.run_until_complete(self._put(url, **kw))
 

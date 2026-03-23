@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from "react";
 import type { DashboardData, SelectedEntity } from "@/types/dashboard";
 
 /** Maps a layer ID to its entity array + entity-type string for SelectedEntity */
-function getEntities(layerId: string, data: DashboardData): { items: any[]; entityType: string } {
+export function getEntities(layerId: string, data: DashboardData): { items: any[]; entityType: string } {
   switch (layerId) {
     case "flights":
       return { items: data.commercial_flights ?? [], entityType: "commercial_flight" };
@@ -68,7 +68,7 @@ function getEntities(layerId: string, data: DashboardData): { items: any[]; enti
 }
 
 /** Build a SelectedEntity from a raw data item + entity type */
-function toSelectedEntity(item: any, entityType: string): SelectedEntity {
+export function toSelectedEntity(item: any, entityType: string): SelectedEntity {
   const id = item.icao24 || item.mmsi || item.id || item.name || `${item.lat}-${item.lng}`;
   const name =
     item.callsign || item.name || item.tracked_name || item.yacht_name ||

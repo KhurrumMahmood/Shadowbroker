@@ -58,7 +58,7 @@ import {
     type FlightLayerConfig,
 } from "@/components/map/geoJSONBuilders";
 
-const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyToLocation, selectedEntity, onMouseCoords, onRightClick, regionDossier, regionDossierLoading, onViewStateChange, measureMode, onMeasureClick, measurePoints, gibsDate, gibsOpacity, viewBoundsRef, setTrackedSdr, boxSelectMode, onBoxSelectResult }: MaplibreViewerProps) => {
+const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyToLocation, selectedEntity, onMouseCoords, onRightClick, regionDossier, regionDossierLoading, onViewStateChange, measureMode, onMeasureClick, measurePoints, gibsDate, gibsOpacity, viewBoundsRef, setTrackedSdr, boxSelectMode, onBoxSelectResult, aiResultIdSet }: MaplibreViewerProps) => {
     const mapRef = useRef<MapRef>(null);
     const [mapReady, setMapReady] = useState(false);
     const { theme } = useTheme();
@@ -258,7 +258,7 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
         if (flyToLocation && mapRef.current) {
             mapRef.current.flyTo({
                 center: [flyToLocation.lng, flyToLocation.lat],
-                zoom: 8,
+                zoom: (flyToLocation as any).zoom ?? 8,
                 duration: 1500
             });
         }
@@ -691,9 +691,25 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
         if (onMouseCoords) onMouseCoords({ lat: evt.lngLat.lat, lng: evt.lngLat.lng });
     }, [onMouseCoords]);
 
-    const opacityFilter: any = selectedEntity
-        ? ['case', ['all', ['==', ['get', 'type'], selectedEntity.type], ['==', ['get', 'id'], selectedEntity.id]], 1.0, 0.0]
-        : 1.0;
+    const opacityFilter: any = useMemo(() => {
+        if (selectedEntity && aiResultIdSet && aiResultIdSet.size > 0) {
+            // Three-tier: focused entity = 1.0, result set members = 0.7, others = 0.15
+            const idArray = Array.from(aiResultIdSet);
+            return [
+                'case',
+                ['all', ['==', ['get', 'type'], selectedEntity.type], ['==', ['to-string', ['get', 'id']], String(selectedEntity.id)]],
+                1.0,
+                ['in', ['concat', ['get', 'type'], ':', ['to-string', ['get', 'id']]], ['literal', idArray]],
+                0.7,
+                0.15,
+            ];
+        }
+        if (selectedEntity) {
+            // Single selection: selected = 1.0, others = 0.0 (existing behavior)
+            return ['case', ['all', ['==', ['get', 'type'], selectedEntity.type], ['==', ['get', 'id'], selectedEntity.id]], 1.0, 0.0];
+        }
+        return 1.0;
+    }, [selectedEntity, aiResultIdSet]);
 
     return (
         <div className={`relative h-full w-full z-0 isolate ${selectedEntity && ['region_dossier', 'gdelt', 'liveuamap', 'news'].includes(selectedEntity.type) ? 'map-focus-active' : ''}`}>

@@ -511,4 +511,5 @@ export interface MaplibreViewerProps {
   setTrackedSdr?: (sdr: KiwiSDR | null) => void;
   boxSelectMode?: boolean;
   onBoxSelectResult?: (result: any) => void;
+  aiResultIdSet?: Set<string>;
 }
