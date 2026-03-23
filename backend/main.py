@@ -562,6 +562,7 @@ async def assistant_query(request: Request, body: AssistantQuery):
             viewport=body.viewport,
             conversation=body.conversation,
             search_results=search_results,
+            live_data=data,
         )
         return result
     except ContentFilterError as e:

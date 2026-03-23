@@ -140,7 +140,22 @@ GUIDELINES:
 - When showing results, also enable the relevant layer and set viewport to the area of interest.
 - For broad queries ("what's happening here"), summarize notable activity and suggest key entities.
 - Keep responses factual — describe what the data shows, not speculation.
-- Lat must be -90 to 90, lng -180 to 180, zoom 2 to 14."""
+- Lat must be -90 to 90, lng -180 to 180, zoom 2 to 14.
+
+TOOLS — you have query_data and aggregate_data functions:
+- Use query_data to filter entities by specific field values (case-insensitive substring match) and/or \
+by geographic proximity. Prefer this over the SEARCH RESULTS when the query needs precise field matching \
+(e.g. origin vs destination), or when results above show UNKNOWN fields.
+- Use aggregate_data to count/group entities (e.g. "how many airlines fly from London", "top destination \
+countries"). Returns grouped counts.
+- You may call multiple tools in parallel to gather data, then produce the final JSON response.
+- For simple queries, the SEARCH RESULTS above may be sufficient — use tools when you need precision.
+
+QUERYABLE FIELDS PER CATEGORY:
+{chr(10).join(f"- {{k}}: {{', '.join(v)}}" for k, v in _QUERYABLE_FIELDS.items())}
+
+origin_name / dest_name format: "IATA: Airport Name" (e.g. "LHR: London Heathrow", "JFK: John F Kennedy Intl")
+Filter with substrings: {{"origin_name": "london"}} matches any origin containing "london"."""
 
 
 _STOP_WORDS = frozenset([
@@ -288,6 +303,192 @@ _SEARCH_CONFIG = {
 }
 
 _MAX_PER_CATEGORY = 100
+
+# ---------------------------------------------------------------------------
+# Tool calling — structured data queries the LLM can invoke
+# ---------------------------------------------------------------------------
+
+# Fields the LLM can filter/group on per category
+_QUERYABLE_FIELDS = {
+    "commercial_flights": ["callsign", "icao24", "origin_name", "dest_name",
+                           "airline_code", "country", "model", "aircraft_category"],
+    "military_flights": ["callsign", "icao24", "country", "model",
+                         "military_type", "origin_name", "dest_name"],
+    "tracked_flights": ["callsign", "icao24", "tracked_name",
+                        "alert_category", "alert_operator", "country", "model"],
+    "private_flights": ["callsign", "icao24", "country", "model"],
+    "private_jets": ["callsign", "icao24", "country", "model"],
+    "ships": ["name", "mmsi", "type", "destination", "country", "callsign"],
+    "military_bases": ["name", "country", "branch"],
+    "datacenters": ["name", "company", "country"],
+    "power_plants": ["name", "country", "fuel_type"],
+    "earthquakes": ["place", "id", "mag"],
+}
+
+
+def _build_tools() -> list:
+    """Build OpenAI-compatible function calling tool definitions."""
+    categories = list(_QUERYABLE_FIELDS.keys())
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": "query_data",
+                "description": (
+                    "Search and filter live entities by field values and/or location. "
+                    "Returns matching entities with full details. Use for finding specific "
+                    "entities (e.g. flights with origin_name containing 'london')."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "category": {
+                            "type": "string",
+                            "enum": categories,
+                        },
+                        "filters": {
+                            "type": "object",
+                            "description": (
+                                "Field filters (AND logic). Keys = field names, "
+                                "values = match strings (case-insensitive substring). "
+                                "Example: {\"origin_name\": \"london\", \"dest_name\": \"kennedy\"}"
+                            ),
+                            "additionalProperties": {"type": "string"},
+                        },
+                        "near": {
+                            "type": "object",
+                            "properties": {
+                                "lat": {"type": "number"},
+                                "lng": {"type": "number"},
+                                "radius_km": {"type": "number"},
+                            },
+                            "required": ["lat", "lng"],
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max results (1-100, default 50)",
+                        },
+                    },
+                    "required": ["category"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "aggregate_data",
+                "description": (
+                    "Count entities grouped by a field. Use for questions like "
+                    "'how many flights per airline' or 'top destination countries'."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "category": {
+                            "type": "string",
+                            "enum": categories,
+                        },
+                        "group_by": {
+                            "type": "string",
+                            "description": "Field to group by (e.g. 'airline_code', 'country', 'model', 'dest_name')",
+                        },
+                        "filters": {
+                            "type": "object",
+                            "description": "Optional pre-filters (same syntax as query_data)",
+                            "additionalProperties": {"type": "string"},
+                        },
+                        "near": {
+                            "type": "object",
+                            "properties": {
+                                "lat": {"type": "number"},
+                                "lng": {"type": "number"},
+                                "radius_km": {"type": "number"},
+                            },
+                            "required": ["lat", "lng"],
+                        },
+                        "top_n": {
+                            "type": "integer",
+                            "description": "Top N groups to return (default 20)",
+                        },
+                    },
+                    "required": ["category", "group_by"],
+                },
+            },
+        },
+    ]
+
+
+def _apply_filters(items: list, filters: dict | None, near: dict | None) -> list:
+    """Apply field filters (AND, case-insensitive contains) and geo filter."""
+    from services.geo_gazetteer import entities_in_radius
+
+    result = items
+    if filters:
+        for field, match_val in filters.items():
+            ml = str(match_val).lower()
+            result = [e for e in result if ml in str(e.get(field, "")).lower()]
+    if near:
+        result = entities_in_radius(
+            result, near.get("lat", 0), near.get("lng", 0),
+            near.get("radius_km", 200),
+        )
+    return result
+
+
+def _exec_query_data(args: dict, data: dict) -> str:
+    """Execute a query_data tool call against live data."""
+    category = args.get("category", "")
+    config = _SEARCH_CONFIG.get(category)
+    if not config:
+        return json.dumps({"error": f"Unknown category: {category}", "total": 0, "results": []})
+
+    items = data.get(category)
+    if not items or not isinstance(items, list):
+        return json.dumps({"total": 0, "showing": 0, "results": []})
+
+    filtered = _apply_filters(items, args.get("filters"), args.get("near"))
+    limit = min(max(args.get("limit", 50), 1), 100)
+    compact = config["compact"]
+    results = [compact(e) for e in filtered[:limit]]
+
+    return json.dumps({"total": len(filtered), "showing": len(results), "results": results})
+
+
+def _exec_aggregate_data(args: dict, data: dict) -> str:
+    """Execute an aggregate_data tool call against live data."""
+    category = args.get("category", "")
+    if category not in _SEARCH_CONFIG:
+        return json.dumps({"error": f"Unknown category: {category}"})
+
+    items = data.get(category)
+    if not items or not isinstance(items, list):
+        return json.dumps({"total_items": 0, "groups": {}})
+
+    filtered = _apply_filters(items, args.get("filters"), args.get("near"))
+    group_by = args.get("group_by", "")
+
+    counts: dict[str, int] = {}
+    for e in filtered:
+        val = str(e.get(group_by, "UNKNOWN")).strip() or "UNKNOWN"
+        counts[val] = counts.get(val, 0) + 1
+
+    top_n = min(args.get("top_n", 20), 50)
+    sorted_groups = dict(sorted(counts.items(), key=lambda x: -x[1])[:top_n])
+
+    return json.dumps({
+        "total_items": len(filtered),
+        "unique_values": len(counts),
+        "top_groups": sorted_groups,
+    })
+
+
+def execute_tool_call(name: str, args: dict, data: dict) -> str:
+    """Route a tool call to the right handler."""
+    if name == "query_data":
+        return _exec_query_data(args, data)
+    elif name == "aggregate_data":
+        return _exec_aggregate_data(args, data)
+    return json.dumps({"error": f"Unknown tool: {name}"})
 
 
 def _parse_directional_hints(query: str) -> dict:
@@ -499,8 +700,12 @@ def parse_llm_response(raw: str) -> dict:
 
 def call_llm(query: str, data_summary: dict, viewport: dict | None = None,
              conversation: list | None = None,
-             search_results: dict | None = None) -> dict:
-    """Call the LLM and return a parsed structured response.
+             search_results: dict | None = None,
+             live_data: dict | None = None) -> dict:
+    """Call the LLM with optional tool use and return a parsed structured response.
+
+    If *live_data* is provided, the LLM can call query_data / aggregate_data tools
+    to run structured queries against the live feed before producing its answer.
 
     Raises RuntimeError if LLM is not configured.
     """
@@ -514,28 +719,24 @@ def call_llm(query: str, data_summary: dict, viewport: dict | None = None,
     messages = [{"role": "system", "content": system_prompt}]
 
     # Add conversation history if provided, excluding error exchanges.
-    # Error messages (from refused queries or backend failures) poison the
-    # context and can cause self-reinforcing refusals.
     if conversation:
         _ERROR_MARKERS = ("Cannot reach", "LLM service unavailable", "Query filtered",
                           "Connection error", "Error:", "content_filter")
         cleaned = []
         skip_prior_user = False
-        # Walk backwards to pair assistant errors with their user prompts
         for msg in reversed(conversation[-12:]):
             role = msg.get("role", "")
             content = msg.get("content", "")
             if not role or not content:
                 continue
             if role == "assistant" and any(m in content for m in _ERROR_MARKERS):
-                skip_prior_user = True  # also drop the user msg that triggered this
+                skip_prior_user = True
                 continue
             if role == "user" and skip_prior_user:
                 skip_prior_user = False
                 continue
             skip_prior_user = False
             cleaned.append(msg)
-        # Restore chronological order and limit
         for msg in reversed(cleaned[-10:]):
             messages.append({"role": msg["role"], "content": msg["content"]})
 
@@ -546,55 +747,95 @@ def call_llm(query: str, data_summary: dict, viewport: dict | None = None,
         "Authorization": f"Bearer {_API_KEY}",
         "Content-Type": "application/json",
     }
-    payload = {
-        "model": _MODEL,
-        "messages": messages,
-        "temperature": 0.3,
-        "max_tokens": 4096,
-    }
+    tools = _build_tools() if live_data else None
 
-    try:
-        resp = httpx.post(url, json=payload, headers=headers, timeout=30.0)
-        resp.raise_for_status()
-        data = resp.json()
-        choice = data["choices"][0]
+    # Tool-calling loop: up to 3 rounds (initial + 2 tool rounds)
+    for _round in range(3):
+        payload: dict = {
+            "model": _MODEL,
+            "messages": messages,
+            "temperature": 0.3,
+            "max_tokens": 4096,
+        }
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
 
-        # Check for content filter refusal
+        try:
+            resp = httpx.post(url, json=payload, headers=headers, timeout=30.0)
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            status = e.response.status_code
+            body = e.response.text[:300]
+            logger.error(f"LLM API error: {status} — {body}")
+            # If tools caused the error (provider doesn't support them), retry without
+            if tools and status == 400:
+                logger.warning("Retrying without tools (provider may not support function calling)")
+                tools = None
+                continue
+            if status in (400, 422) and ("content" in body.lower() or "moderation" in body.lower() or "filter" in body.lower()):
+                raise ContentFilterError(f"The LLM provider rejected this query (HTTP {status}).")
+            raise LLMConnectionError(f"LLM API returned {status}")
+        except httpx.TimeoutException:
+            logger.error("LLM API request timed out")
+            raise LLMConnectionError("LLM request timed out — try again.")
+        except (httpx.ConnectError, httpx.NetworkError, ConnectionError, OSError) as e:
+            logger.error(f"LLM connection failed: {e}")
+            raise LLMConnectionError(f"Cannot reach LLM API: {e}")
+        except Exception as e:
+            logger.error(f"LLM call failed: {e}")
+            raise LLMConnectionError(f"LLM call failed: {e}")
+
+        resp_data = resp.json()
+        choice = resp_data["choices"][0]
+        message = choice.get("message", {})
+
+        # --- Handle tool calls ---
+        tool_calls = message.get("tool_calls")
+        if tool_calls and live_data:
+            # Append the assistant's tool-call message to the conversation
+            messages.append(message)
+            for tc in tool_calls:
+                fn_name = tc["function"]["name"]
+                try:
+                    fn_args = json.loads(tc["function"]["arguments"])
+                except json.JSONDecodeError:
+                    fn_args = {}
+                logger.info(f"Tool call: {fn_name}({json.dumps(fn_args)[:200]})")
+                result_str = execute_tool_call(fn_name, fn_args, live_data)
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc["id"],
+                    "content": result_str,
+                })
+            # Don't send tools on the final round — force a text response
+            if _round >= 1:
+                tools = None
+            continue  # next round with tool results
+
+        # --- Normal text response ---
         finish = choice.get("finish_reason", "")
         if finish == "content_filter":
             raise ContentFilterError("The query was filtered by the LLM provider's content policy.")
-        refusal = choice.get("message", {}).get("refusal")
+        refusal = message.get("refusal")
         if refusal:
             raise ContentFilterError(refusal)
 
-        raw_content = choice.get("message", {}).get("content", "")
+        raw_content = message.get("content", "")
         if not raw_content:
             raise ContentFilterError("The LLM returned an empty response — the query may have been filtered.")
 
-        # If the LLM hit the token limit, the JSON is likely truncated.
-        # Try to parse what we have; parse_llm_response falls back to summary-only.
         if finish == "length":
             logger.warning("LLM response truncated (finish_reason=length)")
         return parse_llm_response(raw_content)
-    except ContentFilterError:
-        raise  # re-raise without wrapping
-    except httpx.HTTPStatusError as e:
-        status = e.response.status_code
-        body = e.response.text[:300]
-        logger.error(f"LLM API error: {status} — {body}")
-        # 400/422 with content_filter or moderation in the body → refusal
-        if status in (400, 422) and ("content" in body.lower() or "moderation" in body.lower() or "filter" in body.lower()):
-            raise ContentFilterError(f"The LLM provider rejected this query (HTTP {status}).")
-        raise LLMConnectionError(f"LLM API returned {status}")
-    except httpx.TimeoutException:
-        logger.error("LLM API request timed out")
-        raise LLMConnectionError("LLM request timed out — try again.")
-    except (httpx.ConnectError, httpx.NetworkError, ConnectionError, OSError) as e:
-        logger.error(f"LLM connection failed: {e}")
-        raise LLMConnectionError(f"Cannot reach LLM API: {e}")
-    except Exception as e:
-        logger.error(f"LLM call failed: {e}")
-        raise LLMConnectionError(f"LLM call failed: {e}")
+
+    # Exhausted rounds — return whatever we have
+    logger.warning("Tool-calling loop exhausted without final text response")
+    return {
+        "summary": "The analysis is taking too long. Please try a simpler query.",
+        "layers": None, "viewport": None,
+        "highlight_entities": [], "result_entities": [], "filters": None,
+    }
 
 
 # --- Viewport Briefing ---
