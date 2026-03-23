@@ -552,6 +552,7 @@ export default function Dashboard() {
         onAIResultPrev={aiCycler.prev}
         onAIResultClear={aiCycler.clear}
         viewport={viewBoundsRef.current}
+        data={data}
       />
 
       {/* VIEWPORT BRIEFING PANEL */}

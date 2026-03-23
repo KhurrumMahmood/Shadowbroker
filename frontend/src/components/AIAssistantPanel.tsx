@@ -1,17 +1,33 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Send, Bot, User, Loader2 } from "lucide-react";
-import { validateAssistantResponse, type AssistantResponse } from "@/lib/assistantTypes";
-import type { ActiveLayers } from "@/types/dashboard";
+import { X, Send, Bot, User, Loader2, ChevronLeft, ChevronRight, XCircle, Plus, Trash2, ArrowLeft, Zap } from "lucide-react";
+import { validateAssistantResponse, extractStoredAction, type AssistantResponse } from "@/lib/assistantTypes";
+import type { DashboardData } from "@/types/dashboard";
 import type { AIResultState } from "@/hooks/useAIResultCycler";
-import { ChevronLeft, ChevronRight, XCircle } from "lucide-react";
+import { findEntityInData } from "@/hooks/useAIResultCycler";
+import { toSelectedEntity } from "@/hooks/useCategoryCycler";
+import {
+  useConversationStore,
+  saveConversation as saveConv,
+} from "@/hooks/useConversationStore";
+import type { StoredMessage, StoredAction, StoredConversation } from "@/types/aiConversation";
 
-interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-  response?: AssistantResponse;
+function generateId(): string {
+  return crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function relativeTime(ts: number): string {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days === 1) return "yesterday";
+  return `${days}d ago`;
 }
 
 interface AIAssistantPanelProps {
@@ -27,7 +43,10 @@ interface AIAssistantPanelProps {
   onAIResultPrev?: () => void;
   onAIResultClear?: () => void;
   viewport?: { south: number; west: number; north: number; east: number } | null;
+  data: DashboardData;
 }
+
+type PanelMode = "chat" | "history" | "actions";
 
 export default function AIAssistantPanel({
   isOpen,
@@ -42,20 +61,61 @@ export default function AIAssistantPanel({
   onAIResultPrev,
   onAIResultClear,
   viewport,
+  data,
 }: AIAssistantPanelProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<StoredMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<PanelMode>("chat");
+  const [conversationId, setConversationId] = useState<string>(generateId);
+  const [flashEntity, setFlashEntity] = useState<string | null>(null);
+  const [prevMode, setPrevMode] = useState<PanelMode>("chat");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const store = useConversationStore();
 
   useEffect(() => {
-    if (isOpen) inputRef.current?.focus();
-  }, [isOpen]);
+    if (isOpen && mode === "chat") inputRef.current?.focus();
+  }, [isOpen, mode]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
+
+  // Save conversation to localStorage whenever messages change
+  const saveCurrentConversation = useCallback(
+    (msgs: StoredMessage[]) => {
+      if (msgs.length === 0) return;
+      const firstUserMsg = msgs.find((m) => m.role === "user");
+      const title = firstUserMsg
+        ? firstUserMsg.content.slice(0, 60)
+        : "New conversation";
+      const now = Date.now();
+      store.save({
+        id: conversationId,
+        title,
+        messages: msgs,
+        createdAt: msgs[0]?.timestamp ?? now,
+        updatedAt: now,
+      });
+    },
+    [conversationId, store],
+  );
+
+  const applyAction = useCallback(
+    (action: StoredAction) => {
+      if (action.layers) onApplyLayers(action.layers);
+      if (action.viewport) onFlyTo(action.viewport.lat, action.viewport.lng, action.viewport.zoom);
+      if (action.filters && onApplyFilters) onApplyFilters(action.filters);
+      if (action.result_entities && action.result_entities.length > 0 && onSetAIResults) {
+        onSetAIResults(action.result_entities);
+      } else if (action.highlight_entities && action.highlight_entities.length > 0) {
+        onAIResultClear?.();
+        onSelectEntity(action.highlight_entities[0]);
+      }
+    },
+    [onApplyLayers, onFlyTo, onSelectEntity, onApplyFilters, onSetAIResults, onAIResultClear],
+  );
 
   const applyResponse = useCallback(
     (resp: AssistantResponse) => {
@@ -63,11 +123,9 @@ export default function AIAssistantPanel({
       if (resp.viewport) onFlyTo(resp.viewport.lat, resp.viewport.lng, resp.viewport.zoom);
       if (resp.filters && onApplyFilters) onApplyFilters(resp.filters);
 
-      // If AI returned a result set, use that for cycling (takes priority over highlight_entities)
       if (resp.result_entities?.length > 0 && onSetAIResults) {
         onSetAIResults(resp.result_entities);
       } else {
-        // Clear any stale result set from a previous query
         onAIResultClear?.();
         if (resp.highlight_entities?.length > 0) {
           onSelectEntity(resp.highlight_entities[0]);
@@ -81,13 +139,15 @@ export default function AIAssistantPanel({
     const query = input.trim();
     if (!query || loading) return;
     setInput("");
-    setMessages((prev) => [...prev, { role: "user", content: query }]);
+    const userMsg: StoredMessage = { role: "user", content: query, timestamp: Date.now() };
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
     setLoading(true);
 
     try {
       const conversation = messages.map((m) => ({
         role: m.role,
-        content: m.role === "assistant" ? (m.response?.summary || m.content) : m.content,
+        content: m.content,
       }));
 
       const resp = await fetch("/api/assistant/query", {
@@ -98,31 +158,166 @@ export default function AIAssistantPanel({
 
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ error: "Request failed" }));
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: err.error || `Error: ${resp.status}` },
-        ]);
+        const errMsg: StoredMessage = {
+          role: "assistant",
+          content: err.error || `Error: ${resp.status}`,
+          timestamp: Date.now(),
+        };
+        const updated = [...newMessages, errMsg];
+        setMessages(updated);
+        saveCurrentConversation(updated);
         return;
       }
 
       const raw = await resp.json();
       const validated = validateAssistantResponse(raw);
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: validated.summary, response: validated },
-      ]);
+      const action = extractStoredAction(validated);
+      const assistantMsg: StoredMessage = {
+        role: "assistant",
+        content: validated.summary,
+        action,
+        timestamp: Date.now(),
+      };
+      const updated = [...newMessages, assistantMsg];
+      setMessages(updated);
+      saveCurrentConversation(updated);
       applyResponse(validated);
-    } catch (e) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "Connection error — is the backend running?" },
-      ]);
+    } catch {
+      const errMsg: StoredMessage = {
+        role: "assistant",
+        content: "Connection error — is the backend running?",
+        timestamp: Date.now(),
+      };
+      const updated = [...newMessages, errMsg];
+      setMessages(updated);
+      saveCurrentConversation(updated);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleClear = useCallback(() => {
+    if (messages.length > 0) {
+      saveCurrentConversation(messages);
+    }
+    setConversationId(generateId());
+    setMessages([]);
+    onAIResultClear?.();
+  }, [messages, saveCurrentConversation, onAIResultClear]);
+
+  const handleLoadConversation = useCallback(
+    (id: string) => {
+      const conv = store.load(id);
+      if (!conv) return;
+      // Save current conversation before switching
+      if (messages.length > 0) {
+        saveCurrentConversation(messages);
+      }
+      setConversationId(conv.id);
+      setMessages(conv.messages);
+      setMode("chat");
+      onAIResultClear?.();
+    },
+    [store, messages, saveCurrentConversation, onAIResultClear],
+  );
+
+  const handleNewChat = useCallback(() => {
+    if (messages.length > 0) {
+      saveCurrentConversation(messages);
+    }
+    setConversationId(generateId());
+    setMessages([]);
+    setMode("chat");
+    onAIResultClear?.();
+  }, [messages, saveCurrentConversation, onAIResultClear]);
+
+  const handleTrackEntity = useCallback(
+    (type: string, id: string | number) => {
+      const found = findEntityInData(type, id, data);
+      if (found) {
+        const entity = toSelectedEntity(found.item, found.entityType);
+        const lat = found.item.lat ?? found.item.geometry?.coordinates?.[1];
+        const lng = found.item.lng ?? found.item.lon ?? found.item.geometry?.coordinates?.[0];
+        if (lat != null && lng != null) onFlyTo(lat, lng);
+        onSelectEntity(entity);
+      } else {
+        const key = `${type}:${id}`;
+        setFlashEntity(key);
+        setTimeout(() => setFlashEntity(null), 1500);
+      }
+    },
+    [data, onFlyTo, onSelectEntity],
+  );
+
+  const hasActions = useMemo(
+    () => messages.some((m) => m.action),
+    [messages],
+  );
+
+  const actionMessages = useMemo(
+    () => messages.filter((m) => m.action),
+    [messages],
+  );
+
   if (!isOpen) return null;
+
+  const chipClass =
+    "text-[9px] font-mono px-2 py-0.5 rounded border border-cyan-800/40 text-cyan-400 hover:bg-cyan-950/30 cursor-pointer transition-colors inline-flex items-center gap-1";
+
+  const renderActionChips = (action: StoredAction) => (
+    <div className="mt-1.5 pt-1.5 border-t border-cyan-800/30 flex flex-wrap gap-1">
+      {action.viewport && (
+        <button
+          onClick={() => onFlyTo(action.viewport!.lat, action.viewport!.lng, action.viewport!.zoom)}
+          className={chipClass}
+        >
+          FLY TO {action.viewport.lat.toFixed(1)}, {action.viewport.lng.toFixed(1)}
+        </button>
+      )}
+      {action.layers && (
+        <button onClick={() => onApplyLayers(action.layers!)} className={chipClass}>
+          APPLY LAYERS
+        </button>
+      )}
+      {action.filters && (
+        <button onClick={() => onApplyFilters?.(action.filters!)} className={chipClass}>
+          {Object.keys(action.filters).length === 0 ? "CLEAR FILTERS" : "APPLY FILTERS"}
+        </button>
+      )}
+      {action.result_entities && action.result_entities.length > 0 && (
+        <button onClick={() => onSetAIResults?.(action.result_entities!)} className={chipClass}>
+          SHOW {action.result_entities.length} RESULTS
+        </button>
+      )}
+      {action.highlight_entities?.map((e, i) => {
+        const key = `${e.type}:${e.id}`;
+        return (
+          <button
+            key={i}
+            onClick={() => handleTrackEntity(e.type, e.id)}
+            className={`${chipClass} ${flashEntity === key ? "border-red-500/60 text-red-400" : ""}`}
+          >
+            {flashEntity === key ? "NOT IN RANGE" : `${e.type.toUpperCase()} ${e.id}`}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const slideVariants = {
+    enter: (dir: number) => ({ x: dir > 0 ? 80 : -80, opacity: 0 }),
+    center: { x: 0, opacity: 1 },
+    exit: (dir: number) => ({ x: dir > 0 ? -80 : 80, opacity: 0 }),
+  };
+
+  // Direction for transitions: history < chat < actions
+  const modeOrder: Record<PanelMode, number> = { history: 0, chat: 1, actions: 2 };
+  const direction = modeOrder[mode] - modeOrder[prevMode];
+
+  const switchMode = (next: PanelMode) => {
+    setPrevMode(mode);
+    setMode(next);
+  };
 
   return (
     <motion.div
@@ -135,111 +330,278 @@ export default function AIAssistantPanel({
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-cyan-800/40">
           <div className="flex items-center gap-2">
+            {mode === "chat" && (
+              <button
+                onClick={() => switchMode("history")}
+                className="text-[var(--text-muted)] hover:text-cyan-400 transition-colors"
+                title="Conversation history"
+              >
+                <ArrowLeft size={14} />
+              </button>
+            )}
+            {mode === "actions" && (
+              <button
+                onClick={() => switchMode("chat")}
+                className="text-[var(--text-muted)] hover:text-cyan-400 transition-colors"
+              >
+                <ArrowLeft size={14} />
+              </button>
+            )}
             <Bot size={14} className="text-cyan-400" />
             <span className="text-[10px] text-cyan-400 font-mono tracking-[0.2em] font-bold">
-              AI ANALYST
+              {mode === "actions" ? "ACTIONS" : "AI ANALYST"}
             </span>
           </div>
-          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-cyan-400 transition-colors">
-            <X size={14} />
-          </button>
+          <div className="flex items-center gap-1.5">
+            {mode === "chat" && hasActions && (
+              <button
+                onClick={() => switchMode("actions")}
+                className="text-[9px] font-mono px-2 py-0.5 rounded border border-cyan-800/40 text-cyan-500/70 hover:text-cyan-400 hover:bg-cyan-950/30 transition-colors"
+                title="View past actions"
+              >
+                <Zap size={10} />
+              </button>
+            )}
+            {mode === "chat" && messages.length > 0 && (
+              <button
+                onClick={handleClear}
+                className="text-[9px] font-mono px-2 py-0.5 rounded border border-cyan-800/40 text-cyan-500/70 hover:text-cyan-400 hover:bg-cyan-950/30 transition-colors"
+              >
+                CLEAR
+              </button>
+            )}
+            {mode === "history" && (
+              <button
+                onClick={handleNewChat}
+                className="text-[var(--text-muted)] hover:text-cyan-400 transition-colors"
+                title="New chat"
+              >
+                <Plus size={14} />
+              </button>
+            )}
+            <button onClick={onClose} className="text-[var(--text-muted)] hover:text-cyan-400 transition-colors">
+              <X size={14} />
+            </button>
+          </div>
         </div>
 
-        {/* Messages */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto styled-scrollbar px-4 py-3 space-y-3 min-h-[200px] max-h-[350px]">
-          {messages.length === 0 && (
-            <div className="text-[10px] text-[var(--text-muted)] font-mono text-center py-8">
-              Ask me about anything on the dashboard.
-              <br />
-              <span className="text-cyan-500/60">
-                "Show military flights near Ukraine"
-                <br />
-                "What ships are in the Mediterranean?"
-                <br />
-                "Brief me on current hotspots"
-              </span>
-            </div>
-          )}
-          {messages.map((msg, i) => (
-            <div key={i} className={`flex gap-2 ${msg.role === "user" ? "justify-end" : ""}`}>
-              {msg.role === "assistant" && (
-                <Bot size={12} className="text-cyan-400 mt-1 flex-shrink-0" />
-              )}
-              <div
-                className={`text-[10px] font-mono leading-relaxed max-w-[85%] px-3 py-2 rounded-lg ${
-                  msg.role === "user"
-                    ? "bg-cyan-950/40 border border-cyan-800/40 text-[var(--text-secondary)]"
-                    : "bg-[var(--bg-secondary)]/60 border border-[var(--border-primary)] text-[var(--text-primary)]"
-                }`}
-              >
-                {msg.content}
-                {msg.response?.layers && (
-                  <div className="mt-1.5 pt-1.5 border-t border-cyan-800/30 text-[9px] text-cyan-500/70">
-                    Layers updated: {Object.entries(msg.response.layers).map(([k, v]) => `${k}:${v ? "ON" : "OFF"}`).join(", ")}
+        {/* Content area with mode transitions */}
+        <AnimatePresence mode="wait" custom={direction}>
+          {mode === "chat" && (
+            <motion.div
+              key="chat"
+              custom={direction}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.15 }}
+              className="flex flex-col flex-1 min-h-0"
+            >
+              {/* Messages */}
+              <div ref={scrollRef} className="flex-1 overflow-y-auto styled-scrollbar px-4 py-3 space-y-3 min-h-[200px] max-h-[350px]">
+                {messages.length === 0 && (
+                  <div className="text-[10px] text-[var(--text-muted)] font-mono text-center py-8">
+                    Ask me about anything on the dashboard.
+                    <br />
+                    <span className="text-cyan-500/60">
+                      &quot;Show military flights near Ukraine&quot;
+                      <br />
+                      &quot;What ships are in the Mediterranean?&quot;
+                      <br />
+                      &quot;Brief me on current hotspots&quot;
+                    </span>
                   </div>
                 )}
-                {msg.response?.viewport && (
-                  <div className="text-[9px] text-cyan-500/70">
-                    Camera: {msg.response.viewport.lat.toFixed(1)}, {msg.response.viewport.lng.toFixed(1)} z{msg.response.viewport.zoom}
+                {messages.map((msg, i) => (
+                  <div key={i} className={`flex gap-2 ${msg.role === "user" ? "justify-end" : ""}`}>
+                    {msg.role === "assistant" && (
+                      <Bot size={12} className="text-cyan-400 mt-1 flex-shrink-0" />
+                    )}
+                    <div
+                      className={`text-[10px] font-mono leading-relaxed max-w-[85%] px-3 py-2 rounded-lg ${
+                        msg.role === "user"
+                          ? "bg-cyan-950/40 border border-cyan-800/40 text-[var(--text-secondary)]"
+                          : "bg-[var(--bg-secondary)]/60 border border-[var(--border-primary)] text-[var(--text-primary)]"
+                      }`}
+                    >
+                      {msg.content}
+                      {msg.action && renderActionChips(msg.action)}
+                    </div>
+                    {msg.role === "user" && (
+                      <User size={12} className="text-[var(--text-muted)] mt-1 flex-shrink-0" />
+                    )}
+                  </div>
+                ))}
+                {loading && (
+                  <div className="flex gap-2 items-center">
+                    <Bot size={12} className="text-cyan-400" />
+                    <Loader2 size={12} className="text-cyan-400 animate-spin" />
+                    <span className="text-[9px] text-cyan-400/60 font-mono">Analyzing...</span>
                   </div>
                 )}
               </div>
-              {msg.role === "user" && (
-                <User size={12} className="text-[var(--text-muted)] mt-1 flex-shrink-0" />
+
+              {/* AI Result Navigation Bar */}
+              {aiResultState?.active && (
+                <div className="px-3 py-2 border-t border-cyan-800/40 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] text-cyan-400 font-mono tracking-wider">RESULTS</span>
+                    <button onClick={onAIResultPrev} className="p-0.5 text-cyan-400 hover:text-cyan-300">
+                      <ChevronLeft size={12} />
+                    </button>
+                    <span className="text-[10px] text-[var(--text-primary)] font-mono">
+                      {aiResultState.index + 1} / {aiResultState.total}
+                    </span>
+                    <button onClick={onAIResultNext} className="p-0.5 text-cyan-400 hover:text-cyan-300">
+                      <ChevronRight size={12} />
+                    </button>
+                  </div>
+                  <button onClick={onAIResultClear} className="p-0.5 text-[var(--text-muted)] hover:text-cyan-400">
+                    <XCircle size={12} />
+                  </button>
+                </div>
               )}
-            </div>
-          ))}
-          {loading && (
-            <div className="flex gap-2 items-center">
-              <Bot size={12} className="text-cyan-400" />
-              <Loader2 size={12} className="text-cyan-400 animate-spin" />
-              <span className="text-[9px] text-cyan-400/60 font-mono">Analyzing...</span>
-            </div>
+
+              {/* Input */}
+              <div className="px-3 py-2.5 border-t border-cyan-800/40">
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={inputRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }}
+                    placeholder="Ask the analyst..."
+                    disabled={loading}
+                    className="flex-1 bg-transparent text-[10px] text-[var(--text-primary)] font-mono tracking-wider outline-none placeholder:text-[var(--text-muted)] disabled:opacity-50"
+                  />
+                  <button
+                    onClick={handleSend}
+                    disabled={loading || !input.trim()}
+                    className="p-1.5 rounded border border-cyan-800/40 text-cyan-400 hover:bg-cyan-950/30 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <Send size={12} />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
           )}
-        </div>
 
-        {/* AI Result Navigation Bar */}
-        {aiResultState?.active && (
-          <div className="px-3 py-2 border-t border-cyan-800/40 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-[9px] text-cyan-400 font-mono tracking-wider">RESULTS</span>
-              <button onClick={onAIResultPrev} className="p-0.5 text-cyan-400 hover:text-cyan-300">
-                <ChevronLeft size={12} />
-              </button>
-              <span className="text-[10px] text-[var(--text-primary)] font-mono">
-                {aiResultState.index + 1} / {aiResultState.total}
-              </span>
-              <button onClick={onAIResultNext} className="p-0.5 text-cyan-400 hover:text-cyan-300">
-                <ChevronRight size={12} />
-              </button>
-            </div>
-            <button onClick={onAIResultClear} className="p-0.5 text-[var(--text-muted)] hover:text-cyan-400">
-              <XCircle size={12} />
-            </button>
-          </div>
-        )}
-
-        {/* Input */}
-        <div className="px-3 py-2.5 border-t border-cyan-800/40">
-          <div className="flex items-center gap-2">
-            <input
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }}
-              placeholder="Ask the analyst..."
-              disabled={loading}
-              className="flex-1 bg-transparent text-[10px] text-[var(--text-primary)] font-mono tracking-wider outline-none placeholder:text-[var(--text-muted)] disabled:opacity-50"
-            />
-            <button
-              onClick={handleSend}
-              disabled={loading || !input.trim()}
-              className="p-1.5 rounded border border-cyan-800/40 text-cyan-400 hover:bg-cyan-950/30 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          {mode === "history" && (
+            <motion.div
+              key="history"
+              custom={direction}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.15 }}
+              className="flex-1 overflow-y-auto styled-scrollbar min-h-[200px] max-h-[400px]"
             >
-              <Send size={12} />
-            </button>
-          </div>
-        </div>
+              {store.index.length === 0 ? (
+                <div className="text-[10px] text-[var(--text-muted)] font-mono text-center py-12">
+                  No past conversations.
+                </div>
+              ) : (
+                <div className="py-1">
+                  {store.index.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className={`group flex items-center justify-between px-4 py-2.5 cursor-pointer hover:bg-cyan-950/20 transition-colors border-b border-cyan-800/20 ${
+                        entry.id === conversationId ? "bg-cyan-950/30" : ""
+                      }`}
+                      onClick={() => handleLoadConversation(entry.id)}
+                    >
+                      <div className="flex-1 min-w-0 mr-3">
+                        <div className="text-[10px] font-mono text-[var(--text-primary)] truncate">
+                          {entry.title}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[8px] font-mono text-[var(--text-muted)]">
+                            {relativeTime(entry.updatedAt)}
+                          </span>
+                          <span className="text-[8px] font-mono text-cyan-500/50">
+                            {entry.messageCount} msgs
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          store.remove(entry.id);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-400 transition-all p-1"
+                        title="Delete conversation"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {mode === "actions" && (
+            <motion.div
+              key="actions"
+              custom={direction}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.15 }}
+              className="flex-1 overflow-y-auto styled-scrollbar px-4 py-3 space-y-2 min-h-[200px] max-h-[400px]"
+            >
+              {actionMessages.length === 0 ? (
+                <div className="text-[10px] text-[var(--text-muted)] font-mono text-center py-12">
+                  No actions in this conversation.
+                </div>
+              ) : (
+                actionMessages.map((msg, i) => (
+                  <div
+                    key={i}
+                    className="bg-[var(--bg-secondary)]/40 border border-cyan-800/30 rounded-lg px-3 py-2"
+                  >
+                    <div className="text-[10px] font-mono text-[var(--text-primary)] leading-relaxed line-clamp-2">
+                      {msg.content}
+                    </div>
+                    {msg.action && (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {msg.action.viewport && (
+                          <button
+                            onClick={() => onFlyTo(msg.action!.viewport!.lat, msg.action!.viewport!.lng, msg.action!.viewport!.zoom)}
+                            className={chipClass}
+                          >
+                            FLY TO {msg.action.viewport.lat.toFixed(1)}, {msg.action.viewport.lng.toFixed(1)}
+                          </button>
+                        )}
+                        {msg.action.layers && (
+                          <button onClick={() => onApplyLayers(msg.action!.layers!)} className={chipClass}>
+                            APPLY LAYERS
+                          </button>
+                        )}
+                        {msg.action.filters && (
+                          <button onClick={() => onApplyFilters?.(msg.action!.filters!)} className={chipClass}>
+                            {Object.keys(msg.action.filters).length === 0 ? "CLEAR FILTERS" : "APPLY FILTERS"}
+                          </button>
+                        )}
+                        {msg.action.result_entities && msg.action.result_entities.length > 0 && (
+                          <button onClick={() => onSetAIResults?.(msg.action!.result_entities!)} className={chipClass}>
+                            SHOW {msg.action.result_entities.length} RESULTS
+                          </button>
+                        )}
+                        <button onClick={() => applyAction(msg.action!)} className={`${chipClass} border-cyan-600/50 text-cyan-300`}>
+                          REPLAY ALL
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   );
