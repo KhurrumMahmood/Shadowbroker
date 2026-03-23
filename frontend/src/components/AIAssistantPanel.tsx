@@ -158,9 +158,19 @@ export default function AIAssistantPanel({
 
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ error: "Request failed" }));
+        let errorContent: string;
+        if (resp.status === 502) {
+          errorContent = "Cannot reach the backend server.";
+        } else if (err.error_type === "content_filter") {
+          errorContent = `Query filtered: ${err.error || "The LLM provider declined this request."}`;
+        } else if (err.error_type === "connection" || resp.status === 503) {
+          errorContent = `LLM service unavailable: ${err.error || "Try again in a moment."}`;
+        } else {
+          errorContent = err.error || `Error: ${resp.status}`;
+        }
         const errMsg: StoredMessage = {
           role: "assistant",
-          content: err.error || `Error: ${resp.status}`,
+          content: errorContent,
           timestamp: Date.now(),
         };
         const updated = [...newMessages, errMsg];

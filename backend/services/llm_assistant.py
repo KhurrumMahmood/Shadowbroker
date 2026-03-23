@@ -10,6 +10,16 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+
+class ContentFilterError(Exception):
+    """Raised when the LLM refuses a query due to content policy."""
+    pass
+
+
+class LLMConnectionError(Exception):
+    """Raised when the LLM API is unreachable or returns a server error."""
+    pass
+
 _API_KEY = os.environ.get("LLM_API_KEY", "")
 _BASE_URL = os.environ.get("LLM_BASE_URL", "https://api.openai.com/v1")
 _MODEL = os.environ.get("LLM_MODEL", "gpt-4o-mini")
@@ -75,11 +85,13 @@ def build_system_prompt(data_summary: dict, search_results: dict | None = None) 
         if parts:
             search_section = "\n\nSEARCH RESULTS (pre-filtered from live data matching the user's query):\n" + "\n\n".join(parts)
 
-    return f"""You are the ShadowBroker analyst — an open-source intelligence (OSINT) monitoring assistant \
-embedded in a real-time global situational awareness dashboard. All data shown is publicly available: \
-ADS-B aircraft transponder broadcasts, AIS maritime transponder data, USGS seismic records, \
-CelesTrak satellite TLEs, and open incident reports. Your role is to help analysts navigate, filter, \
-and understand this public data efficiently.
+    return f"""You are a helpful data query assistant for a public data visualization dashboard. \
+The dashboard aggregates publicly available open data feeds and displays them on an interactive map. \
+Your job is to help users navigate, filter, and understand the data. All data sources are public: \
+ADS-B aircraft transponder broadcasts (like flightradar24), AIS maritime transponder data (like \
+marinetraffic), USGS earthquake records, CelesTrak satellite orbital elements, NASA FIRMS fire \
+detections, and public news/incident aggregators. You are essentially a search and filter interface \
+for these public datasets.
 
 AVAILABLE LAYERS (toggle on/off):
 {', '.join(_LAYER_NAMES)}
@@ -459,14 +471,39 @@ def call_llm(query: str, data_summary: dict, viewport: dict | None = None,
         resp = httpx.post(url, json=payload, headers=headers, timeout=30.0)
         resp.raise_for_status()
         data = resp.json()
-        raw_content = data["choices"][0]["message"]["content"]
+        choice = data["choices"][0]
+
+        # Check for content filter refusal
+        finish = choice.get("finish_reason", "")
+        if finish == "content_filter":
+            raise ContentFilterError("The query was filtered by the LLM provider's content policy.")
+        refusal = choice.get("message", {}).get("refusal")
+        if refusal:
+            raise ContentFilterError(refusal)
+
+        raw_content = choice["message"]["content"]
+        if not raw_content:
+            raise ContentFilterError("The LLM returned an empty response — the query may have been filtered.")
         return parse_llm_response(raw_content)
+    except ContentFilterError:
+        raise  # re-raise without wrapping
     except httpx.HTTPStatusError as e:
-        logger.error(f"LLM API error: {e.response.status_code} — {e.response.text[:200]}")
-        raise RuntimeError(f"LLM API returned {e.response.status_code}")
+        status = e.response.status_code
+        body = e.response.text[:300]
+        logger.error(f"LLM API error: {status} — {body}")
+        # 400/422 with content_filter or moderation in the body → refusal
+        if status in (400, 422) and ("content" in body.lower() or "moderation" in body.lower() or "filter" in body.lower()):
+            raise ContentFilterError(f"The LLM provider rejected this query (HTTP {status}).")
+        raise LLMConnectionError(f"LLM API returned {status}")
+    except httpx.TimeoutException:
+        logger.error("LLM API request timed out")
+        raise LLMConnectionError("LLM request timed out — try again.")
+    except (httpx.ConnectError, httpx.NetworkError, ConnectionError, OSError) as e:
+        logger.error(f"LLM connection failed: {e}")
+        raise LLMConnectionError(f"Cannot reach LLM API: {e}")
     except Exception as e:
         logger.error(f"LLM call failed: {e}")
-        raise RuntimeError(f"LLM call failed: {e}")
+        raise LLMConnectionError(f"LLM call failed: {e}")
 
 
 # --- Viewport Briefing ---
@@ -651,7 +688,7 @@ def build_briefing_prompt(briefing_context: dict) -> str:
             lines.append(f"  - [{n['type']}] {n['name']}: {n['why']}")
         notable_section = "\nNOTABLE ITEMS:\n" + "\n".join(lines)
 
-    return f"""You are the ShadowBroker analyst providing a viewport briefing. All data is publicly available \
+    return f"""You are a data summary assistant for a public data visualization dashboard. All data is publicly available \
 (ADS-B transponders, AIS maritime data, USGS seismic, CelesTrak TLEs, open incident reports).
 
 Provide a concise situational summary of what the user is looking at. Focus on:

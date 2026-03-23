@@ -523,7 +523,7 @@ async def system_update(request: Request):
 # AI Assistant
 # ---------------------------------------------------------------------------
 from pydantic import BaseModel, field_validator
-from services.llm_assistant import call_llm, search_entities, build_briefing_context, build_briefing_prompt
+from services.llm_assistant import call_llm, search_entities, build_briefing_context, build_briefing_prompt, ContentFilterError, LLMConnectionError
 
 class AssistantQuery(BaseModel):
     query: str
@@ -564,9 +564,21 @@ async def assistant_query(request: Request, body: AssistantQuery):
             search_results=search_results,
         )
         return result
+    except ContentFilterError as e:
+        return Response(
+            content=json_mod.dumps({"error": str(e), "error_type": "content_filter"}),
+            status_code=422,
+            media_type="application/json",
+        )
+    except LLMConnectionError as e:
+        return Response(
+            content=json_mod.dumps({"error": str(e), "error_type": "connection"}),
+            status_code=503,
+            media_type="application/json",
+        )
     except RuntimeError as e:
         return Response(
-            content=json_mod.dumps({"error": str(e)}),
+            content=json_mod.dumps({"error": str(e), "error_type": "connection"}),
             status_code=503,
             media_type="application/json",
         )
