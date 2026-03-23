@@ -290,8 +290,40 @@ _SEARCH_CONFIG = {
 _MAX_PER_CATEGORY = 100
 
 
+def _parse_directional_hints(query: str) -> dict:
+    """Extract origin/destination hints from natural language.
+
+    Recognises patterns like:
+      "from London to New York"
+      "flights out of Heathrow"
+      "going to JFK"
+      "departing Tokyo heading to Sydney"
+      "ships bound for Rotterdam"
+
+    Returns {"origin_terms": [...], "dest_terms": [...]} — lowercase token lists.
+    """
+    q = query.lower()
+    origin_terms: list[str] = []
+    dest_terms: list[str] = []
+
+    # "from X" / "out of X" / "departing X" / "leaving X" → origin
+    for m in re.finditer(r'(?:from|out of|departing|leaving)\s+([a-z][a-z\s]{1,40}?)(?=\s+(?:to|toward|towards|heading|going|bound|into)\b|$)', q):
+        origin_terms.extend(t for t in m.group(1).split() if t not in _STOP_WORDS and len(t) > 1)
+
+    # "to X" / "heading to X" / "going to X" / "bound for X" / "into X" → dest
+    for m in re.finditer(r'(?:to|toward|towards|heading to|going to|bound for|into|arriving|landing)\s+([a-z][a-z\s]{1,40}?)(?=\s*$|[,.])', q):
+        dest_terms.extend(t for t in m.group(1).split() if t not in _STOP_WORDS and len(t) > 1)
+
+    return {"origin_terms": origin_terms, "dest_terms": dest_terms}
+
+
+# Fields that represent origin vs destination for directional scoring
+_ORIGIN_FIELDS = {"origin_name", "origin_country"}
+_DEST_FIELDS = {"dest_name", "destination", "dest_country"}
+
+
 def search_entities(query: str, data: dict, viewport: dict | None = None) -> dict:
-    """Search entity data using keyword + geographic matching.
+    """Search entity data using keyword + geographic + directional matching.
 
     Returns dict with category keys mapping to compact entity lists,
     plus '_totals' with full match counts per category.
@@ -303,6 +335,10 @@ def search_entities(query: str, data: dict, viewport: dict | None = None) -> dic
 
     # Tokenize query
     tokens = [t for t in query.lower().split() if t not in _STOP_WORDS and len(t) > 1]
+
+    # Parse directional hints ("from X to Y")
+    hints = _parse_directional_hints(query)
+    has_direction = bool(hints["origin_terms"] or hints["dest_terms"])
 
     # Geographic filter: check if query references a known location
     geo_loc = find_location(query.lower())
@@ -323,12 +359,31 @@ def search_entities(query: str, data: dict, viewport: dict | None = None) -> dic
             )
             geo_set = set(id(e) for e in geo_filtered) if geo_filtered else set()
 
-        # Score each entity by keyword + geo match
+        # Score each entity by keyword + geo + directional match
         scored = []
         for entity in items:
             score = 0
 
-            # Keyword scoring
+            # Directional scoring — boost origin/dest field matches heavily
+            if has_direction:
+                for field_name in config["fields"]:
+                    val = str(entity.get(field_name, "")).lower()
+                    if not val:
+                        continue
+                    is_origin_field = field_name in _ORIGIN_FIELDS
+                    is_dest_field = field_name in _DEST_FIELDS
+                    for token in hints["origin_terms"]:
+                        if is_origin_field and token in val:
+                            score += 20  # strong origin match
+                        elif not is_dest_field and token in val:
+                            score += 2   # weak match in non-dest field
+                    for token in hints["dest_terms"]:
+                        if is_dest_field and token in val:
+                            score += 20  # strong dest match
+                        elif not is_origin_field and token in val:
+                            score += 2   # weak match in non-origin field
+
+            # General keyword scoring
             for field_name in config["fields"]:
                 val = str(entity.get(field_name, "")).lower()
                 if not val:
