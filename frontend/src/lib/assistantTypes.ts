@@ -102,7 +102,7 @@ export function validateAssistantResponse(raw: unknown): AssistantResponse {
         filters[k] = v.map(String);
       }
     }
-    if (Object.keys(filters).length === 0) filters = null;
+    // {} means "clear all filters" — preserve it as distinct from null ("no change")
   }
 
   return { summary, layers, viewport, highlight_entities, result_entities, filters };

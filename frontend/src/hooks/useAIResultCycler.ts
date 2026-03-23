@@ -4,7 +4,7 @@ import { toSelectedEntity } from "./useCategoryCycler";
 
 /** Entity type → data key mapping for lookup */
 const TYPE_TO_DATA_KEY: Record<string, string> = {
-  commercial_flight: "commercial_flights",
+  flight: "commercial_flights",
   private_flight: "private_flights",
   private_jet: "private_jets",
   military_flight: "military_flights",
@@ -13,7 +13,7 @@ const TYPE_TO_DATA_KEY: Record<string, string> = {
   ship: "ships",
   earthquake: "earthquakes",
   cctv: "cctv",
-  gdelt_incident: "gdelt",
+  gdelt: "gdelt",
   kiwisdr: "kiwisdr",
   firms_fire: "firms_fires",
   internet_outage: "internet_outages",

@@ -24,10 +24,10 @@ const MOCK_DATA = {
 
 describe("findEntityInData", () => {
   it("finds a flight by icao24", () => {
-    const found = findEntityInData("commercial_flight", "abc123", MOCK_DATA);
+    const found = findEntityInData("flight", "abc123", MOCK_DATA);
     expect(found).not.toBeNull();
     expect(found!.item.callsign).toBe("BA123");
-    expect(found!.entityType).toBe("commercial_flight");
+    expect(found!.entityType).toBe("flight");
   });
 
   it("finds a ship by mmsi", () => {
@@ -60,7 +60,7 @@ describe("findEntityInData", () => {
   });
 
   it("returns null for non-existent id", () => {
-    const found = findEntityInData("commercial_flight", "nonexistent", MOCK_DATA);
+    const found = findEntityInData("flight", "nonexistent", MOCK_DATA);
     expect(found).toBeNull();
   });
 

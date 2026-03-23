@@ -152,7 +152,7 @@ _SEARCH_CONFIG = {
     "commercial_flights": {
         "fields": ["callsign", "icao24", "registration", "origin_name", "dest_name",
                     "airline_code", "country", "model"],
-        "entity_type": "commercial_flight",
+        "entity_type": "flight",
         "compact": lambda f: {
             "icao24": f.get("icao24", ""),
             "callsign": f.get("callsign", ""),
@@ -412,7 +412,7 @@ def parse_llm_response(raw: str) -> dict:
         for k, v in filters.items():
             if k in _FILTER_KEYS and isinstance(v, list):
                 validated_filters[k] = [str(x) for x in v]
-        result["filters"] = validated_filters if validated_filters else None
+        result["filters"] = validated_filters  # {} means clear all, non-empty means set
     else:
         result["filters"] = None
 
@@ -475,7 +475,7 @@ def call_llm(query: str, data_summary: dict, viewport: dict | None = None,
 _BRIEF_CONFIG = {
     "commercial_flights": {
         "layer": "flights",
-        "entity_type": "commercial_flight",
+        "entity_type": "flight",
         "id_key": "icao24",
         "name_key": "callsign",
     },

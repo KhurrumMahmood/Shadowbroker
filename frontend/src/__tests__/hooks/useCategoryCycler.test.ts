@@ -32,7 +32,7 @@ describe('getEntities', () => {
 
   it('maps "flights" to commercial_flights with correct entity type', () => {
     const result = getEntities('flights', data);
-    expect(result.entityType).toBe('commercial_flight');
+    expect(result.entityType).toBe('flight');
     expect(result.items).toHaveLength(1);
     expect(result.items[0].callsign).toBe('UAL123');
   });
@@ -96,11 +96,11 @@ describe('toSelectedEntity', () => {
   it('uses icao24 as ID for flights', () => {
     const entity = toSelectedEntity(
       { icao24: 'abc123', callsign: 'UAL123', lat: 40, lng: -74 },
-      'commercial_flight',
+      'flight',
     );
     expect(entity.id).toBe('abc123');
     expect(entity.name).toBe('UAL123');
-    expect(entity.type).toBe('commercial_flight');
+    expect(entity.type).toBe('flight');
     expect(entity.extra).toHaveProperty('icao24', 'abc123');
   });
 

@@ -192,6 +192,7 @@ export default function Dashboard() {
     data,
     setSelectedEntity,
     (lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() }),
+    activeFilters,
   );
 
   const aiCycler = useAIResultCycler(

@@ -9,7 +9,7 @@ export interface BoxSelectResult {
 
 /** Maps MapLibre layer IDs to friendly entity type names */
 const LAYER_TYPE_MAP: Record<string, string> = {
-  "commercial-flights-layer": "commercial_flight",
+  "commercial-flights-layer": "flight",
   "private-flights-layer": "private_flight",
   "private-jets-layer": "private_jet",
   "military-flights-layer": "military_flight",
@@ -19,7 +19,7 @@ const LAYER_TYPE_MAP: Record<string, string> = {
   "carriers-layer": "carrier",
   "satellites-layer": "satellite",
   "earthquakes-layer": "earthquake",
-  "gdelt-layer": "gdelt_incident",
+  "gdelt-layer": "gdelt",
   "liveuamap-layer": "liveuamap",
   "cctv-layer": "cctv",
   "kiwisdr-layer": "kiwisdr",
@@ -38,29 +38,42 @@ export function useBoxSelect(
   const [drawing, setDrawing] = useState(false);
   const [box, setBox] = useState<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
   const startRef = useRef<{ x: number; y: number } | null>(null);
+  const canvasRectRef = useRef<DOMRect | null>(null);
+
+  /** Convert window clientX/Y to canvas-relative coordinates */
+  const toCanvasCoords = useCallback((e: MouseEvent) => {
+    const rect = canvasRectRef.current;
+    if (!rect) return { x: e.offsetX, y: e.offsetY };
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }, []);
 
   const handleMouseDown = useCallback(
     (e: MouseEvent) => {
       if (!enabled) return;
       e.preventDefault();
-      startRef.current = { x: e.offsetX, y: e.offsetY };
+      // Capture canvas rect once at drag start — stable for the whole drag
+      const canvas = mapRef?.getMap()?.getCanvas();
+      canvasRectRef.current = canvas?.getBoundingClientRect() ?? null;
+      const { x, y } = toCanvasCoords(e);
+      startRef.current = { x, y };
       setDrawing(true);
-      setBox({ startX: e.offsetX, startY: e.offsetY, endX: e.offsetX, endY: e.offsetY });
+      setBox({ startX: x, startY: y, endX: x, endY: y });
     },
-    [enabled],
+    [enabled, mapRef, toCanvasCoords],
   );
 
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
       if (!drawing || !startRef.current) return;
+      const { x, y } = toCanvasCoords(e);
       setBox({
         startX: startRef.current.x,
         startY: startRef.current.y,
-        endX: e.offsetX,
-        endY: e.offsetY,
+        endX: x,
+        endY: y,
       });
     },
-    [drawing],
+    [drawing, toCanvasCoords],
   );
 
   const handleMouseUp = useCallback(
@@ -71,10 +84,11 @@ export function useBoxSelect(
         return;
       }
       const map = mapRef.getMap();
-      const minX = Math.min(startRef.current.x, e.offsetX);
-      const minY = Math.min(startRef.current.y, e.offsetY);
-      const maxX = Math.max(startRef.current.x, e.offsetX);
-      const maxY = Math.max(startRef.current.y, e.offsetY);
+      const { x: endX, y: endY } = toCanvasCoords(e);
+      const minX = Math.min(startRef.current.x, endX);
+      const minY = Math.min(startRef.current.y, endY);
+      const maxX = Math.max(startRef.current.x, endX);
+      const maxY = Math.max(startRef.current.y, endY);
 
       // Ignore tiny drags (likely accidental clicks)
       if (maxX - minX < 10 && maxY - minY < 10) {
@@ -109,8 +123,9 @@ export function useBoxSelect(
       setDrawing(false);
       setBox(null);
       startRef.current = null;
+      canvasRectRef.current = null;
     },
-    [drawing, mapRef, onResult],
+    [drawing, mapRef, onResult, toCanvasCoords],
   );
 
   useEffect(() => {

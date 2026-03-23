@@ -5,7 +5,7 @@ import type { DashboardData, SelectedEntity } from "@/types/dashboard";
 export function getEntities(layerId: string, data: DashboardData): { items: any[]; entityType: string } {
   switch (layerId) {
     case "flights":
-      return { items: data.commercial_flights ?? [], entityType: "commercial_flight" };
+      return { items: data.commercial_flights ?? [], entityType: "flight" };
     case "private":
       return { items: data.private_flights ?? [], entityType: "private_flight" };
     case "jets":
@@ -49,7 +49,7 @@ export function getEntities(layerId: string, data: DashboardData): { items: any[
     case "cctv":
       return { items: data.cctv ?? [], entityType: "cctv" };
     case "global_incidents":
-      return { items: data.gdelt ?? [], entityType: "gdelt_incident" };
+      return { items: data.gdelt ?? [], entityType: "gdelt" };
     case "kiwisdr":
       return { items: data.kiwisdr ?? [], entityType: "kiwisdr" };
     case "firms":
@@ -83,18 +83,75 @@ export interface CyclerState {
   total: number;
 }
 
+/** Apply active filters to an entity list for a given layer */
+function applyFilters(items: any[], layerId: string, filters?: Record<string, string[]>): any[] {
+  if (!filters || !Object.values(filters).some(v => v.length > 0)) return items;
+  switch (layerId) {
+    case "flights": {
+      const dep = filters.commercial_departure || [];
+      const arr = filters.commercial_arrival || [];
+      const air = filters.commercial_airline || [];
+      if (!dep.length && !arr.length && !air.length) return items;
+      return items.filter(f => {
+        if (dep.length && !dep.includes(f.origin_name || "")) return false;
+        if (arr.length && !arr.includes(f.dest_name || "")) return false;
+        if (air.length && !air.includes(f.airline_code || "")) return false;
+        return true;
+      });
+    }
+    case "military": {
+      const mc = filters.military_country || [];
+      const mt = filters.military_aircraft_type || [];
+      if (!mc.length && !mt.length) return items;
+      return items.filter(f => {
+        if (mc.length && !mc.includes(f.country || "")) return false;
+        if (mt.length && !mt.includes(f.military_type || "")) return false;
+        return true;
+      });
+    }
+    case "tracked": {
+      const tc = filters.tracked_category || [];
+      const to = filters.tracked_owner || [];
+      if (!tc.length && !to.length) return items;
+      return items.filter(f => {
+        if (tc.length && !tc.includes(f.alert_category || "")) return false;
+        if (to.length && !to.includes(f.alert_operator || "")) return false;
+        return true;
+      });
+    }
+    case "ships_military":
+    case "ships_cargo":
+    case "ships_civilian":
+    case "ships_passenger":
+    case "ships_tracked_yachts": {
+      const sn = filters.ship_name || [];
+      const st = filters.ship_type || [];
+      if (!sn.length && !st.length) return items;
+      return items.filter(s => {
+        if (sn.length && !sn.includes(s.name || "")) return false;
+        if (st.length && !st.includes(s.type || "")) return false;
+        return true;
+      });
+    }
+    default:
+      return items;
+  }
+}
+
 export function useCategoryCycler(
   data: DashboardData,
   onSelect: (entity: SelectedEntity | null) => void,
   onFlyTo: (lat: number, lng: number) => void,
+  activeFilters?: Record<string, string[]>,
 ) {
   const [activeLayer, setActiveLayer] = useState<string | null>(null);
   const [index, setIndex] = useState(0);
 
   const entities = useMemo(() => {
     if (!activeLayer) return { items: [], entityType: "" };
-    return getEntities(activeLayer, data);
-  }, [activeLayer, data]);
+    const raw = getEntities(activeLayer, data);
+    return { items: applyFilters(raw.items, activeLayer, activeFilters), entityType: raw.entityType };
+  }, [activeLayer, data, activeFilters]);
 
   const flyToItem = useCallback(
     (item: any, entityType: string) => {
@@ -115,10 +172,11 @@ export function useCategoryCycler(
         onSelect(null);
         return;
       }
-      const { items, entityType } = getEntities(layerId, data);
+      const raw = getEntities(layerId, data);
+      const items = applyFilters(raw.items, layerId, activeFilters);
       setActiveLayer(layerId);
       setIndex(0);
-      if (items.length > 0) flyToItem(items[0], entityType);
+      if (items.length > 0) flyToItem(items[0], raw.entityType);
     },
     [activeLayer, data, flyToItem, onSelect],
   );

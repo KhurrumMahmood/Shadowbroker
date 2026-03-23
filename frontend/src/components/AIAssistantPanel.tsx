@@ -66,11 +66,15 @@ export default function AIAssistantPanel({
       // If AI returned a result set, use that for cycling (takes priority over highlight_entities)
       if (resp.result_entities?.length > 0 && onSetAIResults) {
         onSetAIResults(resp.result_entities);
-      } else if (resp.highlight_entities?.length > 0) {
-        onSelectEntity(resp.highlight_entities[0]);
+      } else {
+        // Clear any stale result set from a previous query
+        onAIResultClear?.();
+        if (resp.highlight_entities?.length > 0) {
+          onSelectEntity(resp.highlight_entities[0]);
+        }
       }
     },
-    [onApplyLayers, onFlyTo, onSelectEntity, onApplyFilters, onSetAIResults],
+    [onApplyLayers, onFlyTo, onSelectEntity, onApplyFilters, onSetAIResults, onAIResultClear],
   );
 
   const handleSend = async () => {
