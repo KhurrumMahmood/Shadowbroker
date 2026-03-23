@@ -3,6 +3,7 @@ import json
 import pytest
 from services.llm_assistant import (
     _parse_directional_hints,
+    _parse_inline_tool_calls,
     search_entities,
     parse_llm_response,
     _exec_query_data,
@@ -288,3 +289,49 @@ class TestExecuteToolCall:
     def test_unknown_tool(self):
         raw = execute_tool_call("bogus_tool", {}, SAMPLE_DATA)
         assert "error" in json.loads(raw)
+
+
+class TestParseInlineToolCalls:
+    """Parse XML-style tool calls that some LLMs emit as text."""
+
+    def test_single_query(self):
+        text = '<tool_call>query_data<arg_key>category</arg_key><arg_value>commercial_flights</arg_value><arg_key>limit</arg_key><arg_value>10</arg_value></tool_call>'
+        calls = _parse_inline_tool_calls(text)
+        assert len(calls) == 1
+        assert calls[0][0] == "query_data"
+        assert calls[0][1]["category"] == "commercial_flights"
+        assert calls[0][1]["limit"] == 10  # parsed as int
+
+    def test_aggregate_call(self):
+        text = 'None<tool_call>aggregate_data<arg_key>category</arg_key><arg_value>military_flights</arg_value><arg_key>group_by</arg_key><arg_value>country</arg_value></tool_call>'
+        calls = _parse_inline_tool_calls(text)
+        assert len(calls) == 1
+        assert calls[0][0] == "aggregate_data"
+        assert calls[0][1]["group_by"] == "country"
+
+    def test_filters_as_json(self):
+        text = '<tool_call>query_data<arg_key>category</arg_key><arg_value>commercial_flights</arg_value><arg_key>filters</arg_key><arg_value>{"origin_name": "london"}</arg_value></tool_call>'
+        calls = _parse_inline_tool_calls(text)
+        assert len(calls) == 1
+        assert calls[0][1]["filters"] == {"origin_name": "london"}
+
+    def test_no_tool_calls(self):
+        text = '{"summary": "Here are some flights.", "layers": {"flights": true}}'
+        calls = _parse_inline_tool_calls(text)
+        assert len(calls) == 0
+
+    def test_unknown_function_ignored(self):
+        text = '<tool_call>evil_function<arg_key>x</arg_key><arg_value>y</arg_value></tool_call>'
+        calls = _parse_inline_tool_calls(text)
+        assert len(calls) == 0
+
+    def test_multiple_calls(self):
+        text = (
+            '<tool_call>query_data<arg_key>category</arg_key><arg_value>commercial_flights</arg_value></tool_call>'
+            'some text'
+            '<tool_call>aggregate_data<arg_key>category</arg_key><arg_value>ships</arg_value><arg_key>group_by</arg_key><arg_value>type</arg_value></tool_call>'
+        )
+        calls = _parse_inline_tool_calls(text)
+        assert len(calls) == 2
+        assert calls[0][0] == "query_data"
+        assert calls[1][0] == "aggregate_data"

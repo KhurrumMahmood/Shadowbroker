@@ -482,6 +482,37 @@ def _exec_aggregate_data(args: dict, data: dict) -> str:
     })
 
 
+def _parse_inline_tool_calls(text: str) -> list[tuple[str, dict]]:
+    """Parse XML-style tool calls that some models emit as plain text.
+
+    Detects patterns like:
+      <tool_call>query_data<arg_key>category</arg_key><arg_value>commercial_flights</arg_value>...</tool_call>
+
+    Returns list of (function_name, args_dict) tuples.
+    """
+    calls = []
+    for m in re.finditer(r'<tool_call>(.*?)</tool_call>', text, re.DOTALL):
+        block = m.group(1).strip()
+        # First token is the function name
+        parts = re.split(r'<arg_key>', block, maxsplit=1)
+        fn_name = parts[0].strip()
+        if not fn_name or fn_name not in ("query_data", "aggregate_data"):
+            continue
+
+        # Parse key-value pairs
+        args: dict = {}
+        for kv in re.finditer(r'<arg_key>(.*?)</arg_key>\s*<arg_value>(.*?)</arg_value>', block, re.DOTALL):
+            key = kv.group(1).strip()
+            val = kv.group(2).strip()
+            # Try to parse JSON values (dicts, numbers)
+            try:
+                args[key] = json.loads(val)
+            except (json.JSONDecodeError, ValueError):
+                args[key] = val
+        calls.append((fn_name, args))
+    return calls
+
+
 def execute_tool_call(name: str, args: dict, data: dict) -> str:
     """Route a tool call to the right handler."""
     if name == "query_data":
@@ -747,9 +778,11 @@ def call_llm(query: str, data_summary: dict, viewport: dict | None = None,
         "Authorization": f"Bearer {_API_KEY}",
         "Content-Type": "application/json",
     }
+    # --- LLM call with tool support ---
+    # Send tools parameter for providers that support it (OpenRouter, OpenAI).
+    # Also detect XML-style <tool_call> tags as fallback for providers that don't.
     tools = _build_tools() if live_data else None
 
-    # Tool-calling loop: up to 3 rounds (initial + 2 tool rounds)
     for _round in range(3):
         payload: dict = {
             "model": _MODEL,
@@ -762,13 +795,13 @@ def call_llm(query: str, data_summary: dict, viewport: dict | None = None,
             payload["tool_choice"] = "auto"
 
         try:
-            resp = httpx.post(url, json=payload, headers=headers, timeout=30.0)
+            resp = httpx.post(url, json=payload, headers=headers, timeout=60.0)
             resp.raise_for_status()
         except httpx.HTTPStatusError as e:
             status = e.response.status_code
             body = e.response.text[:300]
             logger.error(f"LLM API error: {status} — {body}")
-            # If tools caused the error (provider doesn't support them), retry without
+            # If tools caused a 400, retry without them
             if tools and status == 400:
                 logger.warning("Retrying without tools (provider may not support function calling)")
                 tools = None
@@ -790,10 +823,9 @@ def call_llm(query: str, data_summary: dict, viewport: dict | None = None,
         choice = resp_data["choices"][0]
         message = choice.get("message", {})
 
-        # --- Handle tool calls ---
+        # --- Check for structured tool_calls (OpenAI-native) ---
         tool_calls = message.get("tool_calls")
         if tool_calls and live_data:
-            # Append the assistant's tool-call message to the conversation
             messages.append(message)
             for tc in tool_calls:
                 fn_name = tc["function"]["name"]
@@ -801,17 +833,37 @@ def call_llm(query: str, data_summary: dict, viewport: dict | None = None,
                     fn_args = json.loads(tc["function"]["arguments"])
                 except json.JSONDecodeError:
                     fn_args = {}
-                logger.info(f"Tool call: {fn_name}({json.dumps(fn_args)[:200]})")
+                logger.info(f"Tool call (native): {fn_name}({json.dumps(fn_args)[:200]})")
                 result_str = execute_tool_call(fn_name, fn_args, live_data)
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc["id"],
-                    "content": result_str,
-                })
-            # Don't send tools on the final round — force a text response
-            if _round >= 1:
-                tools = None
-            continue  # next round with tool results
+                messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result_str})
+            # After any tool round, stop offering tools to force a text response
+            tools = None
+            continue
+
+        # --- Check for XML-style tool calls in text content ---
+        raw_content = message.get("content", "")
+        inline_calls = _parse_inline_tool_calls(raw_content)
+        if inline_calls and live_data and _round < 2:
+            # Execute each inline tool call
+            tool_results = []
+            for fn_name, fn_args in inline_calls:
+                logger.info(f"Tool call (inline XML): {fn_name}({json.dumps(fn_args)[:200]})")
+                result_str = execute_tool_call(fn_name, fn_args, live_data)
+                tool_results.append(f"[{fn_name}] {result_str}")
+
+            # Add the tool results as context and ask the LLM to produce a final answer
+            messages.append({"role": "assistant", "content": raw_content})
+            messages.append({
+                "role": "user",
+                "content": (
+                    "Here are the results from the data queries you requested:\n\n"
+                    + "\n\n".join(tool_results)
+                    + "\n\nNow produce the final JSON response using these results. "
+                    "Remember: respond ONLY with the JSON object containing summary, layers, "
+                    "viewport, result_entities, etc. Do NOT output any tool calls."
+                ),
+            })
+            continue
 
         # --- Normal text response ---
         finish = choice.get("finish_reason", "")
@@ -821,7 +873,6 @@ def call_llm(query: str, data_summary: dict, viewport: dict | None = None,
         if refusal:
             raise ContentFilterError(refusal)
 
-        raw_content = message.get("content", "")
         if not raw_content:
             raise ContentFilterError("The LLM returned an empty response — the query may have been filtered.")
 
