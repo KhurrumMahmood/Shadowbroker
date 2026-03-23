@@ -47,6 +47,7 @@ import type { MaplibreViewerProps } from "@/types/dashboard";
 import { INTERP_TICK_MS, ALERT_BOX_WIDTH_PX, ALERT_MAX_OFFSET_PX } from "@/lib/constants";
 import { useInterpolation } from "@/components/map/hooks/useInterpolation";
 import { useClusterLabels } from "@/components/map/hooks/useClusterLabels";
+import { useBoxSelect } from "@/components/map/hooks/useBoxSelect";
 import { spreadAlertItems } from "@/utils/alertSpread";
 import {
     buildEarthquakesGeoJSON, buildJammingGeoJSON, buildCctvGeoJSON, buildKiwisdrGeoJSON,
@@ -57,11 +58,80 @@ import {
     type FlightLayerConfig,
 } from "@/components/map/geoJSONBuilders";
 
-const MaplibreViewer = ({ data, activeLayers, onEntityClick, flyToLocation, selectedEntity, onMouseCoords, onRightClick, regionDossier, regionDossierLoading, onViewStateChange, measureMode, onMeasureClick, measurePoints, gibsDate, gibsOpacity, viewBoundsRef, setTrackedSdr }: MaplibreViewerProps) => {
+const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyToLocation, selectedEntity, onMouseCoords, onRightClick, regionDossier, regionDossierLoading, onViewStateChange, measureMode, onMeasureClick, measurePoints, gibsDate, gibsOpacity, viewBoundsRef, setTrackedSdr, boxSelectMode, onBoxSelectResult }: MaplibreViewerProps) => {
     const mapRef = useRef<MapRef>(null);
     const [mapReady, setMapReady] = useState(false);
     const { theme } = useTheme();
     const mapThemeStyle = useMemo(() => theme === 'light' ? lightStyle : darkStyle, [theme]);
+
+    // Box selection
+    const { drawing: boxDrawing, box: boxRect } = useBoxSelect(
+        mapReady ? mapRef.current : null,
+        !!boxSelectMode,
+        (result) => onBoxSelectResult?.(result),
+    );
+
+    // Hover tooltip state
+    const [hoverInfo, setHoverInfo] = useState<{ x: number; y: number; name: string; type: string } | null>(null);
+
+    // Apply active filters to data
+    const filteredData = useMemo(() => {
+        if (!activeFilters || !Object.values(activeFilters).some(v => v.length > 0)) return data;
+        const fd = { ...data };
+        const depF = activeFilters.commercial_departure || [];
+        const arrF = activeFilters.commercial_arrival || [];
+        const airF = activeFilters.commercial_airline || [];
+        if (depF.length || arrF.length || airF.length) {
+            fd.commercial_flights = (data.commercial_flights || []).filter((f: any) => {
+                if (depF.length && !depF.includes(f.origin_name || '')) return false;
+                if (arrF.length && !arrF.includes(f.dest_name || '')) return false;
+                if (airF.length && !airF.includes(f.airline_code || '')) return false;
+                return true;
+            });
+        }
+        const privCS = activeFilters.private_callsign || [];
+        const privT = activeFilters.private_aircraft_type || [];
+        if (privCS.length || privT.length) {
+            fd.private_flights = (data.private_flights || []).filter((f: any) => {
+                if (privCS.length && !privCS.includes(f.callsign || '') && !privCS.includes(f.registration || '')) return false;
+                if (privT.length && !privT.includes(f.model || '')) return false;
+                return true;
+            });
+            fd.private_jets = (data.private_jets || []).filter((f: any) => {
+                if (privCS.length && !privCS.includes(f.callsign || '') && !privCS.includes(f.registration || '')) return false;
+                if (privT.length && !privT.includes(f.model || '')) return false;
+                return true;
+            });
+        }
+        const milC = activeFilters.military_country || [];
+        const milT = activeFilters.military_aircraft_type || [];
+        if (milC.length || milT.length) {
+            fd.military_flights = (data.military_flights || []).filter((f: any) => {
+                if (milC.length && !milC.includes(f.country || '') && !milC.includes(f.registration || '')) return false;
+                if (milT.length && !milT.includes(f.military_type || '')) return false;
+                return true;
+            });
+        }
+        const tCat = activeFilters.tracked_category || [];
+        const tOwn = activeFilters.tracked_owner || [];
+        if (tCat.length || tOwn.length) {
+            fd.tracked_flights = (data.tracked_flights || []).filter((f: any) => {
+                if (tCat.length && !tCat.includes(f.alert_category || '')) return false;
+                if (tOwn.length && !tOwn.includes(f.alert_operator || '') && !tOwn.includes(f.alert_tags || '')) return false;
+                return true;
+            });
+        }
+        const sName = activeFilters.ship_name || [];
+        const sType = activeFilters.ship_type || [];
+        if (sName.length || sType.length) {
+            fd.ships = (data.ships || []).filter((s: any) => {
+                if (sName.length && !sName.includes(s.name || '')) return false;
+                if (sType.length && !sType.includes(s.type || '')) return false;
+                return true;
+            });
+        }
+        return fd;
+    }, [data, activeFilters]);
 
     const [viewState, setViewState] = useState<ViewState>({
         longitude: 0,
@@ -398,32 +468,32 @@ const MaplibreViewer = ({ data, activeLayers, onEntityClick, flyToLocation, sele
     const milConfig: FlightLayerConfig = { colorMap: COLOR_MAP_MILITARY, groundedMap: GROUNDED_ICON_MAP, typeLabel: 'military_flight', idPrefix: 'mflight-', milSpecialMap: MIL_SPECIAL_MAP };
 
     const commFlightsGeoJSON = useMemo(() =>
-        activeLayers.flights ? buildFlightLayerGeoJSON(data?.commercial_flights, commConfig, flightHelpers) : null,
-        [activeLayers.flights, data?.commercial_flights, flightHelpers]);
+        activeLayers.flights ? buildFlightLayerGeoJSON(filteredData?.commercial_flights, commConfig, flightHelpers) : null,
+        [activeLayers.flights, filteredData?.commercial_flights, flightHelpers]);
 
     const privFlightsGeoJSON = useMemo(() =>
-        activeLayers.private ? buildFlightLayerGeoJSON(data?.private_flights, privConfig, flightHelpers) : null,
-        [activeLayers.private, data?.private_flights, flightHelpers]);
+        activeLayers.private ? buildFlightLayerGeoJSON(filteredData?.private_flights, privConfig, flightHelpers) : null,
+        [activeLayers.private, filteredData?.private_flights, flightHelpers]);
 
     const privJetsGeoJSON = useMemo(() =>
-        activeLayers.jets ? buildFlightLayerGeoJSON(data?.private_jets, jetsConfig, flightHelpers) : null,
-        [activeLayers.jets, data?.private_jets, flightHelpers]);
+        activeLayers.jets ? buildFlightLayerGeoJSON(filteredData?.private_jets, jetsConfig, flightHelpers) : null,
+        [activeLayers.jets, filteredData?.private_jets, flightHelpers]);
 
     const milFlightsGeoJSON = useMemo(() =>
-        activeLayers.military ? buildFlightLayerGeoJSON(data?.military_flights, milConfig, flightHelpers) : null,
-        [activeLayers.military, data?.military_flights, flightHelpers]);
+        activeLayers.military ? buildFlightLayerGeoJSON(filteredData?.military_flights, milConfig, flightHelpers) : null,
+        [activeLayers.military, filteredData?.military_flights, flightHelpers]);
 
     const shipsGeoJSON = useMemo(() =>
-        buildShipsGeoJSON(data?.ships, activeLayers, inView, interpShip),
-        [activeLayers.ships_military, activeLayers.ships_cargo, activeLayers.ships_civilian, activeLayers.ships_passenger, activeLayers.ships_tracked_yachts, data?.ships, inView]);
+        buildShipsGeoJSON(filteredData?.ships, activeLayers, inView, interpShip),
+        [activeLayers.ships_military, activeLayers.ships_cargo, activeLayers.ships_civilian, activeLayers.ships_passenger, activeLayers.ships_tracked_yachts, filteredData?.ships, inView]);
 
     // Extract cluster label positions via shared hook
     const shipClusters = useClusterLabels(mapRef, 'ships', shipsGeoJSON);
     const eqClusters = useClusterLabels(mapRef, 'earthquakes', earthquakesGeoJSON);
 
     const carriersGeoJSON = useMemo(() =>
-        activeLayers.ships_military ? buildCarriersGeoJSON(data?.ships) : null,
-        [activeLayers.ships_military, data?.ships]);
+        activeLayers.ships_military ? buildCarriersGeoJSON(filteredData?.ships) : null,
+        [activeLayers.ships_military, filteredData?.ships]);
 
     const activeRouteGeoJSON = useMemo(() => {
         if (!selectedEntity || !data) return null;
@@ -523,7 +593,7 @@ const MaplibreViewer = ({ data, activeLayers, onEntityClick, flyToLocation, sele
 
     // Tracked flights GeoJSON with interpolation
     const trackedFlightsGeoJSON = useMemo(() => {
-        if (!activeLayers.tracked || !data?.tracked_flights) return null;
+        if (!activeLayers.tracked || !filteredData?.tracked_flights) return null;
 
         // Tracked icon maps by aircraft shape and alert color
         const trackedIconMap: Record<string, Record<string, string>> = {
@@ -534,8 +604,8 @@ const MaplibreViewer = ({ data, activeLayers, onEntityClick, flyToLocation, sele
         };
 
         const features: any[] = [];
-        for (let i = 0; i < data.tracked_flights.length; i++) {
-            const f = data.tracked_flights[i];
+        for (let i = 0; i < filteredData.tracked_flights.length; i++) {
+            const f = filteredData.tracked_flights[i];
             if (f.lat == null || f.lng == null) continue;
 
             const [lng, lat] = interpFlight(f);
@@ -650,6 +720,27 @@ const MaplibreViewer = ({ data, activeLayers, onEntityClick, flyToLocation, sele
                 onLoad={onMapLoad}
                 onIdle={updateBounds}
                 interactiveLayerIds={activeInteractiveLayerIds}
+                cursor={boxSelectMode ? 'crosshair' : hoverInfo ? 'pointer' : measureMode ? 'crosshair' : 'grab'}
+                onMouseEnter={(e) => {
+                    if (selectedEntity || !e.features?.length) return;
+                    const props = e.features[0].properties || {};
+                    if (props.cluster) return;
+                    const typeLabels: Record<string, string> = {
+                        commercial_flight: 'FLIGHT', private_ga: 'PRIVATE', private_flight: 'PRIVATE',
+                        private_jet: 'JET', military_flight: 'MILITARY', tracked_flight: 'TRACKED',
+                        ship: 'VESSEL', satellite: 'SATELLITE', uav: 'UAV', earthquake: 'EARTHQUAKE',
+                        gdelt: 'CONFLICT', liveuamap: 'EVENT', cctv: 'CCTV', kiwisdr: 'SDR',
+                        firms_fire: 'FIRE', internet_outage: 'OUTAGE', datacenter: 'DATACENTER',
+                        military_base: 'MIL BASE', power_plant: 'POWER PLANT',
+                    };
+                    setHoverInfo({
+                        x: e.point.x,
+                        y: e.point.y,
+                        name: props.name || props.callsign || props.title || props.id || '',
+                        type: typeLabels[props.type] || (props.type || '').toUpperCase(),
+                    });
+                }}
+                onMouseLeave={() => setHoverInfo(null)}
                 onClick={(e) => {
                     // Measurement mode: place waypoints instead of selecting entities
                     if (measureMode && onMeasureClick) {
@@ -671,6 +762,7 @@ const MaplibreViewer = ({ data, activeLayers, onEntityClick, flyToLocation, sele
                             });
                             return;
                         }
+                        setHoverInfo(null);
                         onEntityClick?.({
                             id: props.id,
                             type: props.type,
@@ -812,12 +904,23 @@ const MaplibreViewer = ({ data, activeLayers, onEntityClick, flyToLocation, sele
                             type="symbol"
                             layout={{
                                 'icon-image': ['get', 'iconId'],
-                                'icon-size': 0.8,
+                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.4, 5, 0.6, 8, 0.8, 12, 1.0, 16, 1.2],
                                 'icon-allow-overlap': true,
                                 'icon-rotate': ['get', 'rotation'],
-                                'icon-rotation-alignment': 'map'
+                                'icon-rotation-alignment': 'map',
+                                'text-field': ['step', ['zoom'], '', 8, ['get', 'callsign']],
+                                'text-size': 9,
+                                'text-offset': [0, 1.5],
+                                'text-optional': true,
+                                'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
                             }}
-                            paint={{ 'icon-opacity': opacityFilter }}
+                            paint={{
+                                'icon-opacity': opacityFilter,
+                                'text-color': '#67e8f9',
+                                'text-halo-color': '#000000',
+                                'text-halo-width': 1,
+                                'text-opacity': 0.8,
+                            }}
                         />
                     </Source>
 
@@ -827,7 +930,7 @@ const MaplibreViewer = ({ data, activeLayers, onEntityClick, flyToLocation, sele
                             type="symbol"
                             layout={{
                                 'icon-image': ['get', 'iconId'],
-                                'icon-size': 0.8,
+                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.4, 5, 0.6, 8, 0.8, 12, 1.0, 16, 1.2],
                                 'icon-allow-overlap': true,
                                 'icon-rotate': ['get', 'rotation'],
                                 'icon-rotation-alignment': 'map'
@@ -842,7 +945,7 @@ const MaplibreViewer = ({ data, activeLayers, onEntityClick, flyToLocation, sele
                             type="symbol"
                             layout={{
                                 'icon-image': ['get', 'iconId'],
-                                'icon-size': 0.8,
+                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.4, 5, 0.6, 8, 0.8, 12, 1.0, 16, 1.2],
                                 'icon-allow-overlap': true,
                                 'icon-rotate': ['get', 'rotation'],
                                 'icon-rotation-alignment': 'map'
@@ -857,7 +960,7 @@ const MaplibreViewer = ({ data, activeLayers, onEntityClick, flyToLocation, sele
                             type="symbol"
                             layout={{
                                 'icon-image': ['get', 'iconId'],
-                                'icon-size': 0.8,
+                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.4, 5, 0.6, 8, 0.8, 12, 1.0, 16, 1.2],
                                 'icon-allow-overlap': true,
                                 'icon-rotate': ['get', 'rotation'],
                                 'icon-rotation-alignment': 'map'
@@ -914,13 +1017,22 @@ const MaplibreViewer = ({ data, activeLayers, onEntityClick, flyToLocation, sele
                             filter={['!', ['has', 'point_count']]}
                             layout={{
                                 'icon-image': ['get', 'iconId'],
-                                'icon-size': 0.8,
+                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.4, 5, 0.6, 8, 0.8, 12, 1.0, 16, 1.2],
                                 'icon-allow-overlap': true,
                                 'icon-rotate': ['get', 'rotation'],
-                                'icon-rotation-alignment': 'map'
+                                'icon-rotation-alignment': 'map',
+                                'text-field': ['step', ['zoom'], '', 9, ['get', 'name']],
+                                'text-size': 9,
+                                'text-offset': [0, 1.5],
+                                'text-optional': true,
+                                'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
                             }}
                             paint={{
-                                'icon-opacity': opacityFilter
+                                'icon-opacity': opacityFilter,
+                                'text-color': '#94a3b8',
+                                'text-halo-color': '#000000',
+                                'text-halo-width': 1,
+                                'text-opacity': 0.7,
                             }}
                         />
                     </Source>
@@ -933,7 +1045,7 @@ const MaplibreViewer = ({ data, activeLayers, onEntityClick, flyToLocation, sele
                             type="symbol"
                             layout={{
                                 'icon-image': 'svgCarrier',
-                                'icon-size': 0.8,
+                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.4, 5, 0.6, 8, 0.8, 12, 1.0, 16, 1.2],
                                 'icon-allow-overlap': true,
                                 'icon-rotate': ['get', 'rotation'],
                                 'icon-rotation-alignment': 'map'
@@ -1056,7 +1168,7 @@ const MaplibreViewer = ({ data, activeLayers, onEntityClick, flyToLocation, sele
                             type="symbol"
                             layout={{
                                 'icon-image': ['get', 'iconId'],
-                                'icon-size': 0.8,
+                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.4, 5, 0.6, 8, 0.8, 12, 1.0, 16, 1.2],
                                 'icon-allow-overlap': true,
                                 'icon-rotate': ['get', 'rotation'],
                                 'icon-rotation-alignment': 'map'
@@ -1092,7 +1204,7 @@ const MaplibreViewer = ({ data, activeLayers, onEntityClick, flyToLocation, sele
                             minzoom={4}
                             layout={{
                                 'icon-image': ['get', 'iconId'],
-                                'icon-size': 0.8,
+                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.4, 5, 0.6, 8, 0.8, 12, 1.0, 16, 1.2],
                                 'icon-allow-overlap': true,
                             }}
                         />
@@ -2483,6 +2595,32 @@ const MaplibreViewer = ({ data, activeLayers, onEntityClick, flyToLocation, sele
                 ))}
 
             </Map>
+
+            {/* Hover tooltip */}
+            {hoverInfo && !selectedEntity && (
+                <div
+                    style={{ left: hoverInfo.x + 12, top: hoverInfo.y - 12 }}
+                    className="absolute pointer-events-none z-50 px-2 py-1 rounded border border-cyan-800/60 bg-black/85 backdrop-blur-sm text-xs font-mono whitespace-nowrap"
+                >
+                    <span className="text-cyan-400 tracking-wider">{hoverInfo.type}</span>
+                    {hoverInfo.name && (
+                        <span className="text-gray-300 ml-2">{hoverInfo.name}</span>
+                    )}
+                </div>
+            )}
+
+            {/* Box selection rectangle overlay */}
+            {boxDrawing && boxRect && (
+                <div
+                    className="absolute pointer-events-none z-50 border-2 border-cyan-400/70 bg-cyan-400/10"
+                    style={{
+                        left: Math.min(boxRect.startX, boxRect.endX),
+                        top: Math.min(boxRect.startY, boxRect.endY),
+                        width: Math.abs(boxRect.endX - boxRect.startX),
+                        height: Math.abs(boxRect.endY - boxRect.startY),
+                    }}
+                />
+            )}
         </div>
     );
 }
