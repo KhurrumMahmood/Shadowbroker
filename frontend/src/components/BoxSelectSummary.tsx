@@ -54,6 +54,7 @@ export default function BoxSelectSummary({
             </span>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="text-[var(--text-muted)] hover:text-cyan-400 transition-colors"
           >

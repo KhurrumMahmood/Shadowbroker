@@ -267,7 +267,7 @@ export default function FilterPanel({ data, activeFilters, setActiveFilters }: F
                             </span>
                         )}
                     </div>
-                    <button className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+                    <button type="button" className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
                         {isMinimized ? <SlidersHorizontal size={14} /> : <ChevronUp size={14} />}
                     </button>
                 </div>
@@ -282,6 +282,7 @@ export default function FilterPanel({ data, activeFilters, setActiveFilters }: F
                         >
                             {activeCount > 0 && (
                                 <button
+                                    type="button"
                                     onClick={clearAll}
                                     className="text-[9px] text-red-400 hover:text-red-300 tracking-widest self-end mb-1"
                                 >

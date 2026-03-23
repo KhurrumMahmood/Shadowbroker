@@ -171,6 +171,7 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                 <div className="flex items-center gap-3">
                     <h1 className="text-2xl font-bold tracking-[0.2em] text-[var(--text-heading)]">WORLDVIEW</h1>
                     <button
+                        type="button"
                         onClick={toggleTheme}
                         className={`w-7 h-7 rounded-lg border border-[var(--border-primary)] hover:border-cyan-500/50 flex items-center justify-center ${theme === 'dark' ? 'text-cyan-400' : 'text-[var(--text-muted)]'} hover:text-cyan-300 transition-all hover:bg-[var(--hover-accent)]`}
                         title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
@@ -178,6 +179,7 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                         {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
                     </button>
                     <button
+                        type="button"
                         onClick={cycleHudColor}
                         className={`w-7 h-7 rounded-lg border border-[var(--border-primary)] hover:border-cyan-500/50 flex items-center justify-center text-cyan-400 hover:text-cyan-300 transition-all hover:bg-[var(--hover-accent)]`}
                         title={hudColor === 'cyan' ? 'Switch to Matrix HUD' : 'Switch to Cyan HUD'}
@@ -186,6 +188,7 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                     </button>
                     {onSettingsClick && (
                         <button
+                            type="button"
                             onClick={onSettingsClick}
                             className={`w-7 h-7 rounded-lg border border-[var(--border-primary)] hover:border-cyan-500/50 flex items-center justify-center ${theme === 'dark' ? 'text-cyan-400' : 'text-[var(--text-muted)]'} hover:text-cyan-300 transition-all hover:bg-[var(--hover-accent)] group`}
                             title="System Settings"
@@ -195,6 +198,7 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                     )}
                     {onLegendClick && (
                         <button
+                            type="button"
                             onClick={onLegendClick}
                             className={`h-7 px-2 rounded-lg border border-[var(--border-primary)] hover:border-cyan-500/50 flex items-center justify-center gap-1 ${theme === 'dark' ? 'text-cyan-400' : 'text-[var(--text-muted)]'} hover:text-cyan-300 transition-all hover:bg-[var(--hover-accent)]`}
                             title="Map Legend / Icon Key"
@@ -216,6 +220,7 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                 <div className="flex items-center gap-1 px-3 pt-3 pb-1">
                     {(Object.keys(PRESETS) as PresetKey[]).map((key) => (
                         <button
+                            type="button"
                             key={key}
                             onClick={() => onPresetSelect(key)}
                             className={`flex-1 text-[7px] font-mono tracking-[0.15em] py-1.5 rounded border transition-all ${
@@ -236,6 +241,7 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                     <span className="text-[10px] text-[var(--text-muted)] font-mono tracking-widest" onClick={() => setIsMinimized(!isMinimized)}>DATA LAYERS</span>
                     <div className="flex items-center gap-2">
                         <button
+                            type="button"
                             title={Object.entries(activeLayers).filter(([k]) => k !== 'gibs_imagery').every(([, v]) => v) ? "Disable all layers" : "Enable all layers"}
                             className={`${Object.entries(activeLayers).filter(([k]) => k !== 'gibs_imagery').every(([, v]) => v) ? 'text-cyan-400' : 'text-[var(--text-muted)]'} hover:text-cyan-400 transition-colors`}
                             onClick={(e) => {
@@ -252,7 +258,7 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                         >
                             {Object.entries(activeLayers).filter(([k]) => k !== 'gibs_imagery').every(([, v]) => v) ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
                         </button>
-                        <button className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors" onClick={() => setIsMinimized(!isMinimized)}>
+                        <button type="button" className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors" onClick={(e) => { e.stopPropagation(); setIsMinimized(!isMinimized); }}>
                             {isMinimized ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
                         </button>
                     </div>
@@ -279,6 +285,7 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                                                 </span>
                                             </div>
                                             <button
+                                                type="button"
                                                 onClick={(e) => { e.stopPropagation(); setTrackedSdr?.(null); }}
                                                 className="text-[8px] font-mono text-[var(--text-muted)] hover:text-red-400 border border-[var(--border-primary)] hover:border-red-400/40 rounded px-1.5 py-0.5 transition-colors"
                                                 title="Release SDR and clear tracking"
@@ -297,6 +304,7 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                                                 </div>
                                                 <div className="flex items-center gap-2 mt-1">
                                                     <button
+                                                        type="button"
                                                         onClick={() => onFlyTo?.(trackedSdr.lat, trackedSdr.lon)}
                                                         className="flex-1 text-center px-2 py-1.5 rounded border border-[var(--border-primary)] hover:border-amber-400/50 hover:text-amber-400 text-[var(--text-muted)] text-[9px] font-mono tracking-widest transition-colors flex items-center justify-center gap-1.5"
                                                         title="Pan camera to SDR location"
@@ -331,6 +339,7 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                                                 </span>
                                             </div>
                                             <button
+                                                type="button"
                                                 onClick={(e) => { e.stopPropagation(); setPotusEnabled(false); }}
                                                 className="text-[8px] font-mono text-[var(--text-muted)] hover:text-[#ff1493] border border-[var(--border-primary)] hover:border-[#ff1493]/40 rounded px-1.5 py-0.5 transition-colors"
                                                 title="Hide POTUS Fleet tracker"
@@ -403,6 +412,7 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                                                 <div className="flex items-center gap-2">
                                                     {canCycle && (
                                                         <button
+                                                            type="button"
                                                             onClick={(e) => { e.stopPropagation(); onCycleStart(layer.id); }}
                                                             className={`p-1 rounded border transition-all ${
                                                                 isCycling
@@ -429,6 +439,7 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                                             {isCycling && (
                                                 <div className="ml-7 mt-2 flex items-center gap-2" onClick={e => e.stopPropagation()}>
                                                     <button
+                                                        type="button"
                                                         onClick={onCyclePrev}
                                                         className="w-6 h-6 flex items-center justify-center rounded border border-cyan-500/30 text-cyan-400 hover:bg-cyan-950/30 transition-colors"
                                                     >
@@ -438,12 +449,14 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                                                         {cyclerState.total > 0 ? `${cyclerState.index + 1} / ${cyclerState.total.toLocaleString()}` : "0 / 0"}
                                                     </span>
                                                     <button
+                                                        type="button"
                                                         onClick={onCycleNext}
                                                         className="w-6 h-6 flex items-center justify-center rounded border border-cyan-500/30 text-cyan-400 hover:bg-cyan-950/30 transition-colors"
                                                     >
                                                         <ChevronRightIcon size={12} />
                                                     </button>
                                                     <button
+                                                        type="button"
                                                         onClick={() => onCycleStart(layer.id)}
                                                         className="text-[8px] font-mono text-[var(--text-muted)] hover:text-red-400 border border-[var(--border-primary)] hover:border-red-400/40 rounded px-1.5 py-0.5 transition-colors ml-auto"
                                                     >
@@ -456,6 +469,7 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                                                 <div className="ml-7 mt-2 flex flex-col gap-2" onClick={e => e.stopPropagation()}>
                                                     <div className="flex items-center gap-2">
                                                         <button
+                                                            type="button"
                                                             onClick={() => setGibsPlaying(p => !p)}
                                                             className="w-5 h-5 flex items-center justify-center rounded border border-cyan-500/30 text-cyan-400 hover:bg-cyan-950/30 transition-colors"
                                                         >
@@ -511,6 +525,7 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                                             </div>
                                             {!potusEnabled ? (
                                                 <button
+                                                    type="button"
                                                     onClick={(e) => { e.stopPropagation(); setPotusEnabled(true); }}
                                                     className="text-[8px] font-mono text-[var(--text-muted)] hover:text-[#ff1493] border border-[var(--border-primary)] hover:border-[#ff1493]/40 rounded px-1.5 py-0.5 transition-colors"
                                                 >

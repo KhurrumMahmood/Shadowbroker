@@ -334,6 +334,7 @@ export default function AIAssistantPanel({
           <div className="flex items-center gap-2">
             {mode === "chat" && (
               <button
+                type="button"
                 onClick={() => switchMode("history")}
                 className="text-[var(--text-muted)] hover:text-cyan-400 transition-colors"
                 title="Conversation history"
@@ -343,6 +344,7 @@ export default function AIAssistantPanel({
             )}
             {mode === "actions" && (
               <button
+                type="button"
                 onClick={() => switchMode("chat")}
                 className="text-[var(--text-muted)] hover:text-cyan-400 transition-colors"
               >
@@ -357,6 +359,7 @@ export default function AIAssistantPanel({
           <div className="flex items-center gap-1.5">
             {mode === "chat" && hasActions && (
               <button
+                type="button"
                 onClick={() => switchMode("actions")}
                 className="text-[9px] font-mono px-2 py-0.5 rounded border border-cyan-800/40 text-cyan-500/70 hover:text-cyan-400 hover:bg-cyan-950/30 transition-colors"
                 title="View past actions"
@@ -366,6 +369,7 @@ export default function AIAssistantPanel({
             )}
             {mode === "chat" && messages.length > 0 && (
               <button
+                type="button"
                 onClick={handleClear}
                 className="text-[9px] font-mono px-2 py-0.5 rounded border border-cyan-800/40 text-cyan-500/70 hover:text-cyan-400 hover:bg-cyan-950/30 transition-colors"
               >
@@ -374,6 +378,7 @@ export default function AIAssistantPanel({
             )}
             {mode === "history" && (
               <button
+                type="button"
                 onClick={handleNewChat}
                 className="text-[var(--text-muted)] hover:text-cyan-400 transition-colors"
                 title="New chat"
@@ -381,7 +386,7 @@ export default function AIAssistantPanel({
                 <Plus size={14} />
               </button>
             )}
-            <button onClick={onClose} className="text-[var(--text-muted)] hover:text-cyan-400 transition-colors">
+            <button type="button" onClick={onClose} className="text-[var(--text-muted)] hover:text-cyan-400 transition-colors">
               <X size={14} />
             </button>
           </div>
@@ -449,17 +454,17 @@ export default function AIAssistantPanel({
                 <div className="px-3 py-2 border-t border-cyan-800/40 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-[9px] text-cyan-400 font-mono tracking-wider">RESULTS</span>
-                    <button onClick={onAIResultPrev} className="p-0.5 text-cyan-400 hover:text-cyan-300">
+                    <button type="button" onClick={onAIResultPrev} className="p-0.5 text-cyan-400 hover:text-cyan-300">
                       <ChevronLeft size={12} />
                     </button>
                     <span className="text-[10px] text-[var(--text-primary)] font-mono">
                       {aiResultState.index + 1} / {aiResultState.total}
                     </span>
-                    <button onClick={onAIResultNext} className="p-0.5 text-cyan-400 hover:text-cyan-300">
+                    <button type="button" onClick={onAIResultNext} className="p-0.5 text-cyan-400 hover:text-cyan-300">
                       <ChevronRight size={12} />
                     </button>
                   </div>
-                  <button onClick={onAIResultClear} className="p-0.5 text-[var(--text-muted)] hover:text-cyan-400">
+                  <button type="button" onClick={onAIResultClear} className="p-0.5 text-[var(--text-muted)] hover:text-cyan-400">
                     <XCircle size={12} />
                   </button>
                 </div>
@@ -478,6 +483,7 @@ export default function AIAssistantPanel({
                     className="flex-1 bg-transparent text-[10px] text-[var(--text-primary)] font-mono tracking-wider outline-none placeholder:text-[var(--text-muted)] disabled:opacity-50"
                   />
                   <button
+                    type="button"
                     onClick={handleSend}
                     disabled={loading || !input.trim()}
                     className="p-1.5 rounded border border-cyan-800/40 text-cyan-400 hover:bg-cyan-950/30 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
@@ -528,6 +534,7 @@ export default function AIAssistantPanel({
                         </div>
                       </div>
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           store.remove(entry.id);

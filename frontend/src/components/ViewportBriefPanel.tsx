@@ -50,7 +50,7 @@ export default function ViewportBriefPanel({
               VIEWPORT BRIEFING
             </span>
           </div>
-          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-cyan-400 transition-colors">
+          <button type="button" onClick={onClose} className="text-[var(--text-muted)] hover:text-cyan-400 transition-colors">
             <X size={14} />
           </button>
         </div>
@@ -97,6 +97,7 @@ export default function ViewportBriefPanel({
                   <div className="space-y-1">
                     {data.notable_entities.map((entity, i) => (
                       <button
+                        type="button"
                         key={`${entity.type}-${entity.id}-${i}`}
                         onClick={() => onEntityClick(entity)}
                         className="w-full text-left flex items-start gap-2 px-2 py-1.5 rounded hover:bg-cyan-950/30 transition-colors group"
@@ -122,6 +123,7 @@ export default function ViewportBriefPanel({
               {Object.keys(data.suggested_layers).length > 0 && (
                 <div className="pt-2 border-t border-cyan-800/30">
                   <button
+                    type="button"
                     onClick={() => onApplyLayers(data.suggested_layers)}
                     className="text-[9px] font-mono text-cyan-500 hover:text-cyan-300 transition-colors tracking-wider"
                   >

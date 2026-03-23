@@ -90,6 +90,7 @@ function LocateBar({ onLocate }: { onLocate: (lat: number, lng: number) => void 
   if (!open) {
     return (
       <button
+        type="button"
         onClick={() => setOpen(true)}
         className="flex items-center gap-1.5 bg-[var(--bg-primary)]/60 backdrop-blur-md border border-[var(--border-primary)] rounded-lg px-3 py-1.5 text-[9px] font-mono tracking-[0.15em] text-[var(--text-muted)] hover:text-cyan-400 hover:border-cyan-800 transition-colors"
       >
@@ -112,14 +113,14 @@ function LocateBar({ onLocate }: { onLocate: (lat: number, lng: number) => void 
           className="flex-1 bg-transparent text-[10px] text-[var(--text-primary)] font-mono tracking-wider outline-none placeholder:text-[var(--text-muted)]"
         />
         {loading && <div className="w-3 h-3 border border-cyan-500 border-t-transparent rounded-full animate-spin" />}
-        <button onClick={() => { setOpen(false); setValue(''); setResults([]); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+        <button type="button" onClick={() => { setOpen(false); setValue(''); setResults([]); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
           <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
         </button>
       </div>
       {results.length > 0 && (
         <div className="absolute bottom-full left-0 right-0 mb-1 bg-[var(--bg-secondary)]/95 backdrop-blur-md border border-[var(--border-primary)] rounded-lg overflow-hidden shadow-[0_-8px_30px_rgba(0,0,0,0.4)] max-h-[200px] overflow-y-auto styled-scrollbar">
           {results.map((r, i) => (
-            <button key={i} onClick={() => handleSelect(r)} className="w-full text-left px-3 py-2 hover:bg-cyan-950/40 transition-colors border-b border-[var(--border-primary)]/50 last:border-0 flex items-center gap-2">
+            <button type="button" key={i} onClick={() => handleSelect(r)} className="w-full text-left px-3 py-2 hover:bg-cyan-950/40 transition-colors border-b border-[var(--border-primary)]/50 last:border-0 flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyan-500 flex-shrink-0"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
               <span className="text-[9px] text-[var(--text-secondary)] font-mono truncate">{r.label}</span>
             </button>
@@ -334,6 +335,7 @@ export default function Dashboard() {
             transition={{ type: 'spring', damping: 30, stiffness: 250 }}
           >
             <button
+              type="button"
               onClick={() => setLeftOpen(!leftOpen)}
               className="flex flex-col items-center gap-1.5 py-5 px-1.5 bg-cyan-400 border border-cyan-400 border-l-0 rounded-r-md text-black hover:bg-cyan-300 hover:border-cyan-300 transition-colors shadow-[2px_0_12px_rgba(0,0,0,0.4)]"
             >
@@ -349,6 +351,7 @@ export default function Dashboard() {
             transition={{ type: 'spring', damping: 30, stiffness: 250 }}
           >
             <button
+              type="button"
               onClick={() => setRightOpen(!rightOpen)}
               className="flex flex-col items-center gap-1.5 py-5 px-1.5 bg-cyan-400 border border-cyan-400 border-r-0 rounded-l-md text-black hover:bg-cyan-300 hover:border-cyan-300 transition-colors shadow-[-2px_0_12px_rgba(0,0,0,0.4)]"
             >
@@ -583,6 +586,7 @@ export default function Dashboard() {
       {/* RESTORE UI BUTTON (If Hidden) */}
       {!uiVisible && (
         <button
+          type="button"
           onClick={() => setUiVisible(true)}
           className="absolute bottom-6 right-6 z-[200] bg-[var(--bg-primary)]/60 backdrop-blur-md border border-[var(--border-primary)] rounded px-4 py-2 text-[10px] font-mono tracking-widest text-cyan-500 hover:text-cyan-300 hover:border-cyan-800 transition-colors pointer-events-auto"
         >

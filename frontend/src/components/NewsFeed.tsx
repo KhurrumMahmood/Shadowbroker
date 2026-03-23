@@ -975,7 +975,7 @@ function NewsFeedInner({ data, selectedEntity, regionDossier, regionDossierLoadi
                     <h2 className="text-xs tracking-widest font-bold text-cyan-400 flex items-center gap-2">
                         <AlertTriangle size={14} /> GLOBAL THREAT INTERCEPT
                     </h2>
-                    <button className="text-cyan-500 hover:text-[var(--text-primary)] transition-colors">
+                    <button type="button" className="text-cyan-500 hover:text-[var(--text-primary)] transition-colors">
                         {isMinimized ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
                     </button>
                 </div>
@@ -1058,7 +1058,7 @@ function NewsFeedInner({ data, selectedEntity, regionDossier, regionDossierLoadi
                                         </span>
                                         <div className="flex items-center gap-2">
                                             {item.cluster_count > 1 && (
-                                                <button onClick={() => toggleExpand(idx)} className="text-[8px] font-bold text-cyan-500 bg-[var(--bg-secondary)]/50 hover:text-[var(--text-primary)] hover:bg-[var(--hover-accent)] border border-cyan-500/30 px-1.5 py-0.5 rounded-sm transition-colors cursor-pointer">
+                                                <button type="button" onClick={() => toggleExpand(idx)} className="text-[8px] font-bold text-cyan-500 bg-[var(--bg-secondary)]/50 hover:text-[var(--text-primary)] hover:bg-[var(--hover-accent)] border border-cyan-500/30 px-1.5 py-0.5 rounded-sm transition-colors cursor-pointer">
                                                     {isExpanded ? '[- COLLAPSE]' : `[+${item.cluster_count - 1} SOURCES]`}
                                                 </button>
                                             )}
