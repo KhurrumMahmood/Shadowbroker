@@ -460,6 +460,14 @@ async def api_get_keys(request: Request):
 async def api_update_key(request: Request, body: ApiKeyUpdate):
     ok = update_api_key(body.env_key, body.value)
     if ok:
+        # Refresh LLM providers if an LLM key was updated
+        if body.env_key in ("CEREBRAS_API_KEY", "LLM_API_KEY", "CEREBRAS_BASE_URL",
+                            "LLM_BASE_URL", "CEREBRAS_MODEL", "LLM_MODEL"):
+            try:
+                from services.llm_assistant import refresh_providers
+                refresh_providers()
+            except Exception as e:
+                logger.warning(f"Failed to refresh LLM providers: {e}")
         return {"status": "updated", "env_key": body.env_key}
     return {"status": "error", "message": "Failed to update .env file"}
 
@@ -635,31 +643,36 @@ async def assistant_brief(request: Request, body: BriefRequest):
     viewport = {"south": body.south, "west": body.west, "north": body.north, "east": body.east}
     ctx = build_briefing_context(data, viewport)
 
-    # Try LLM-enhanced summary if available, otherwise return structured data with text summary
+    # Try LLM-enhanced summary with provider fallback
     try:
         import httpx as _httpx
         from services.llm_assistant import _PROVIDERS
 
+        llm_summary = None
         if _PROVIDERS:
-            provider = _PROVIDERS[0]  # use primary provider for briefings
             prompt = build_briefing_prompt(ctx)
-            url = f"{provider['base_url'].rstrip('/')}/chat/completions"
-            headers = {"Authorization": f"Bearer {provider['api_key']}", "Content-Type": "application/json"}
-            payload = {
-                "model": provider["model"],
-                "messages": [
-                    {"role": "system", "content": prompt},
-                    {"role": "user", "content": "Brief me on what's in view."},
-                ],
-                "temperature": 0.3,
-                **({"max_completion_tokens": 512} if provider["name"] == "cerebras" else {"max_tokens": 512}),
-            }
-            resp = _httpx.post(url, json=payload, headers=headers, timeout=20.0)
-            resp.raise_for_status()
-            llm_summary = resp.json()["choices"][0]["message"].get("content", "").strip()
-            ctx["summary"] = llm_summary or ctx["summary_text"]
-        else:
-            ctx["summary"] = ctx["summary_text"]
+            for provider in _PROVIDERS:
+                try:
+                    url = f"{provider['base_url'].rstrip('/')}/chat/completions"
+                    headers = {"Authorization": f"Bearer {provider['api_key']}", "Content-Type": "application/json"}
+                    payload = {
+                        "model": provider["model"],
+                        "messages": [
+                            {"role": "system", "content": prompt},
+                            {"role": "user", "content": "Brief me on what's in view."},
+                        ],
+                        "temperature": 0.3,
+                        **({"max_completion_tokens": 512} if provider["name"] == "cerebras" else {"max_tokens": 512}),
+                    }
+                    resp = _httpx.post(url, json=payload, headers=headers, timeout=20.0)
+                    resp.raise_for_status()
+                    llm_summary = resp.json()["choices"][0]["message"].get("content", "").strip()
+                    if llm_summary:
+                        break
+                except Exception as e:
+                    logger.warning(f"Briefing [{provider['name']}] failed, trying next: {e}")
+                    continue
+        ctx["summary"] = llm_summary or ctx["summary_text"]
     except Exception as e:
         logger.warning(f"Briefing LLM call failed, using text summary: {e}")
         ctx["summary"] = ctx["summary_text"]

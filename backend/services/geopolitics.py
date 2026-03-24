@@ -330,6 +330,7 @@ def _parse_gdelt_export_zip(zip_bytes, conflict_codes, seen_locs, features, loc_
                         "properties": {
                             "name": name,
                             "count": 1,
+                            "action_geo_cc": action_geo_cc,
                             "_urls": [source_url] if source_url else [],
                             "_domains": {domain} if domain else set(),
                         },

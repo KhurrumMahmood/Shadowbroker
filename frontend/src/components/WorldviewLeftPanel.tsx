@@ -136,6 +136,49 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
         });
     };
 
+    // Section breakdown pills — top 5 values per section's primary dimension
+    const [sectionFilter, setSectionFilter] = useState<Record<string, string | null>>({});
+
+    const sectionBreakdowns = useMemo(() => {
+        const top5 = (counts: Record<string, number>): [string, number][] =>
+            Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+        // AVIATION — by registration country
+        const av: Record<string, number> = {};
+        for (const list of [data?.commercial_flights, data?.private_flights, data?.private_jets, data?.military_flights, data?.tracked_flights]) {
+            for (const f of list ?? []) { const c = f.country; if (c) av[c] = (av[c] || 0) + 1; }
+        }
+
+        // MARITIME — by flag state
+        const ma: Record<string, number> = {};
+        for (const s of data?.ships ?? []) if (s.country) ma[s.country] = (ma[s.country] || 0) + 1;
+
+        // INTELLIGENCE — by GDELT country code
+        const intel: Record<string, number> = {};
+        for (const g of data?.gdelt ?? []) {
+            const cc = g.properties?.action_geo_cc;
+            if (cc) intel[cc] = (intel[cc] || 0) + (g.properties?.count || 1);
+        }
+
+        // SPACE & SENSORS — by satellite country
+        const sp: Record<string, number> = {};
+        for (const s of data?.satellites ?? []) if (s.country) sp[s.country] = (sp[s.country] || 0) + 1;
+
+        // INFRASTRUCTURE — by country
+        const inf: Record<string, number> = {};
+        for (const dc of data?.datacenters ?? []) if (dc.country) inf[dc.country] = (inf[dc.country] || 0) + 1;
+        for (const pp of data?.power_plants ?? []) if (pp.country) inf[pp.country] = (inf[pp.country] || 0) + 1;
+        for (const mb of data?.military_bases ?? []) if (mb.country) inf[mb.country] = (inf[mb.country] || 0) + 1;
+
+        return {
+            "AVIATION": top5(av),
+            "MARITIME": top5(ma),
+            "INTELLIGENCE & THREATS": top5(intel),
+            "SPACE & SENSORS": top5(sp),
+            "INFRASTRUCTURE": top5(inf),
+        } as Record<string, [string, number][]>;
+    }, [data?.commercial_flights, data?.private_flights, data?.private_jets, data?.military_flights, data?.tracked_flights, data?.ships, data?.gdelt, data?.satellites, data?.datacenters, data?.power_plants, data?.military_bases]);
+
     type LayerDef = { id: string; name: string; source: string; count: number | null; icon: any };
     const sections: { name: string; layers: LayerDef[] }[] = [
         { name: "INTELLIGENCE & THREATS", layers: [
@@ -440,6 +483,48 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                                                         className="overflow-hidden"
                                                     >
                                                         <div className="flex flex-col gap-4 pl-1 pt-1 pb-2">
+                                                            {/* Breakdown pills */}
+                                                            {(() => {
+                                                                const pills = sectionBreakdowns[section.name];
+                                                                if (!pills || pills.length === 0) return null;
+                                                                const activeFilter = sectionFilter[section.name] ?? null;
+                                                                return (
+                                                                    <div className="flex flex-wrap gap-1 -mt-0.5 mb-1">
+                                                                        {pills.map(([value, count]) => (
+                                                                            <button
+                                                                                key={value}
+                                                                                type="button"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setSectionFilter(prev => ({
+                                                                                        ...prev,
+                                                                                        [section.name]: prev[section.name] === value ? null : value,
+                                                                                    }));
+                                                                                }}
+                                                                                className={`text-[8px] font-mono px-1.5 py-0.5 rounded border transition-all ${
+                                                                                    activeFilter === value
+                                                                                        ? 'border-cyan-500/60 text-cyan-400 bg-cyan-950/40'
+                                                                                        : 'border-[var(--border-primary)] text-[var(--text-muted)] hover:text-cyan-400 hover:border-cyan-500/30'
+                                                                                }`}
+                                                                            >
+                                                                                {value} <span className="opacity-60">{count.toLocaleString()}</span>
+                                                                            </button>
+                                                                        ))}
+                                                                        {activeFilter && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setSectionFilter(prev => ({ ...prev, [section.name]: null }));
+                                                                                }}
+                                                                                className="text-[8px] font-mono px-1.5 py-0.5 rounded border border-red-500/30 text-red-400/70 hover:text-red-400 hover:border-red-500/50 transition-all"
+                                                                            >
+                                                                                CLEAR
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                             {section.layers.map((layer) => {
                                                                 const Icon = layer.icon;
                                                                 const active = activeLayers[layer.id as keyof typeof activeLayers] || false;

@@ -52,6 +52,18 @@ def _build_providers() -> list[dict]:
 
 _PROVIDERS = _build_providers()
 
+
+def refresh_providers():
+    """Rebuild the provider list from current env vars (call after key updates)."""
+    global _PROVIDERS
+    _PROVIDERS = _build_providers()
+    logger.info(f"LLM providers refreshed: {[p['name'] for p in _PROVIDERS]}")
+
+
+# Retry config for transient errors (429, 5xx, timeout, network)
+_MAX_RETRIES = 2
+_RETRY_DELAYS = [1.0, 3.0]  # seconds
+
 # All data layers the frontend can control
 _LAYER_NAMES = [
     "flights", "private", "jets", "military", "tracked", "satellites",
@@ -893,29 +905,61 @@ def _call_provider(provider: dict, messages: list, live_data: dict | None,
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
 
-        try:
-            resp = httpx.post(url, json=payload, headers=headers, timeout=60.0)
-            resp.raise_for_status()
-        except httpx.HTTPStatusError as e:
-            status = e.response.status_code
-            body = e.response.text[:300]
-            logger.error(f"[{pname}] LLM API error: {status} — {body}")
-            if tools and status == 400:
-                logger.warning(f"[{pname}] Retrying without tools")
-                tools = None
-                continue
-            if status in (400, 422) and ("content" in body.lower() or "moderation" in body.lower() or "filter" in body.lower()):
-                raise ContentFilterError(f"The LLM provider rejected this query (HTTP {status}).")
-            raise LLMConnectionError(f"[{pname}] LLM API returned {status}")
-        except httpx.TimeoutException:
-            logger.error(f"[{pname}] LLM API request timed out")
-            raise LLMConnectionError(f"[{pname}] LLM request timed out")
-        except (httpx.ConnectError, httpx.NetworkError, ConnectionError, OSError) as e:
-            logger.error(f"[{pname}] LLM connection failed: {e}")
-            raise LLMConnectionError(f"[{pname}] Cannot reach LLM API: {e}")
-        except Exception as e:
-            logger.error(f"[{pname}] LLM call failed: {e}")
-            raise LLMConnectionError(f"[{pname}] LLM call failed: {e}")
+        # Retry loop for transient errors (429, 5xx, timeout, network)
+        resp = None
+        for _attempt in range(_MAX_RETRIES + 1):
+            try:
+                resp = httpx.post(url, json=payload, headers=headers, timeout=60.0)
+                resp.raise_for_status()
+                break  # success
+            except httpx.HTTPStatusError as e:
+                status = e.response.status_code
+                body = e.response.text[:300]
+                # Content filter — don't retry
+                if status in (400, 422) and ("content" in body.lower() or "moderation" in body.lower() or "filter" in body.lower()):
+                    raise ContentFilterError(f"The LLM provider rejected this query (HTTP {status}).")
+                # 400 with tools — retry without tools (not a transient error)
+                if tools and status == 400:
+                    logger.warning(f"[{pname}] Retrying without tools")
+                    tools = None
+                    resp = None
+                    break  # break retry loop, continue tool loop
+                # 429 rate limit — respect Retry-After header
+                if status == 429 and _attempt < _MAX_RETRIES:
+                    delay = min(float(e.response.headers.get("Retry-After", _RETRY_DELAYS[_attempt])), 10.0)
+                    logger.warning(f"[{pname}] Rate limited (429), retrying in {delay}s (attempt {_attempt + 1})")
+                    _time.sleep(delay)
+                    continue
+                # 5xx server error — retry with backoff
+                if status >= 500 and _attempt < _MAX_RETRIES:
+                    delay = _RETRY_DELAYS[min(_attempt, len(_RETRY_DELAYS) - 1)]
+                    logger.warning(f"[{pname}] Server error ({status}), retrying in {delay}s (attempt {_attempt + 1})")
+                    _time.sleep(delay)
+                    continue
+                logger.error(f"[{pname}] LLM API error: {status} — {body}")
+                raise LLMConnectionError(f"[{pname}] LLM API returned {status}")
+            except httpx.TimeoutException:
+                if _attempt < _MAX_RETRIES:
+                    delay = _RETRY_DELAYS[min(_attempt, len(_RETRY_DELAYS) - 1)]
+                    logger.warning(f"[{pname}] Timeout, retrying in {delay}s (attempt {_attempt + 1})")
+                    _time.sleep(delay)
+                    continue
+                logger.error(f"[{pname}] LLM API request timed out after {_MAX_RETRIES + 1} attempts")
+                raise LLMConnectionError(f"[{pname}] LLM request timed out")
+            except (httpx.ConnectError, httpx.NetworkError, ConnectionError, OSError) as e:
+                if _attempt < _MAX_RETRIES:
+                    delay = _RETRY_DELAYS[min(_attempt, len(_RETRY_DELAYS) - 1)]
+                    logger.warning(f"[{pname}] Network error, retrying in {delay}s (attempt {_attempt + 1}): {e}")
+                    _time.sleep(delay)
+                    continue
+                logger.error(f"[{pname}] LLM connection failed: {e}")
+                raise LLMConnectionError(f"[{pname}] Cannot reach LLM API: {e}")
+            except Exception as e:
+                logger.error(f"[{pname}] LLM call failed: {e}")
+                raise LLMConnectionError(f"[{pname}] LLM call failed: {e}")
+
+        if resp is None:
+            continue  # tool-removal retry — go back to tool loop
 
         resp_data = resp.json()
         choice = resp_data["choices"][0]
@@ -1095,34 +1139,62 @@ def _call_provider_streaming(provider: dict, messages: list, live_data: dict | N
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
 
-        try:
-            resp = httpx.post(url, json=payload, headers=headers, timeout=60.0)
-            resp.raise_for_status()
-        except httpx.HTTPStatusError as e:
-            status = e.response.status_code
-            body = e.response.text[:300]
-            logger.error(f"[{pname}] LLM API error: {status} — {body}")
-            if tools and status == 400:
-                logger.warning(f"[{pname}] Retrying without tools")
-                tools = None
-                continue
-            if status in (400, 422) and ("content" in body.lower() or "moderation" in body.lower() or "filter" in body.lower()):
-                yield _sse("error", {"error": f"The LLM provider rejected this query (HTTP {status}).", "error_type": "content_filter"})
+        # Retry loop for transient errors
+        resp = None
+        for _attempt in range(_MAX_RETRIES + 1):
+            try:
+                resp = httpx.post(url, json=payload, headers=headers, timeout=60.0)
+                resp.raise_for_status()
+                break
+            except httpx.HTTPStatusError as e:
+                status = e.response.status_code
+                body = e.response.text[:300]
+                if status in (400, 422) and ("content" in body.lower() or "moderation" in body.lower() or "filter" in body.lower()):
+                    yield _sse("error", {"error": f"The LLM provider rejected this query (HTTP {status}).", "error_type": "content_filter"})
+                    return
+                if tools and status == 400:
+                    logger.warning(f"[{pname}] Retrying without tools")
+                    tools = None
+                    resp = None
+                    break
+                if status == 429 and _attempt < _MAX_RETRIES:
+                    delay = min(float(e.response.headers.get("Retry-After", _RETRY_DELAYS[_attempt])), 10.0)
+                    logger.warning(f"[{pname}] Rate limited (429), retrying in {delay}s")
+                    yield _sse("status", {"step": "retrying", "detail": f"Rate limited, retrying..."})
+                    _time.sleep(delay)
+                    continue
+                if status >= 500 and _attempt < _MAX_RETRIES:
+                    delay = _RETRY_DELAYS[min(_attempt, len(_RETRY_DELAYS) - 1)]
+                    logger.warning(f"[{pname}] Server error ({status}), retrying in {delay}s")
+                    yield _sse("status", {"step": "retrying", "detail": f"Server error, retrying..."})
+                    _time.sleep(delay)
+                    continue
+                yield _sse("error", {"error": f"LLM API returned {status}", "error_type": "connection"})
                 return
-            yield _sse("error", {"error": f"LLM API returned {status}", "error_type": "connection"})
-            return
-        except httpx.TimeoutException:
-            logger.error(f"[{pname}] LLM API request timed out")
-            yield _sse("error", {"error": "LLM request timed out", "error_type": "connection"})
-            return
-        except (httpx.ConnectError, httpx.NetworkError, ConnectionError, OSError) as e:
-            logger.error(f"[{pname}] LLM connection failed: {e}")
-            yield _sse("error", {"error": f"Cannot reach LLM API: {e}", "error_type": "connection"})
-            return
-        except Exception as e:
-            logger.error(f"[{pname}] LLM call failed: {e}")
-            yield _sse("error", {"error": f"LLM call failed: {e}", "error_type": "connection"})
-            return
+            except httpx.TimeoutException:
+                if _attempt < _MAX_RETRIES:
+                    delay = _RETRY_DELAYS[min(_attempt, len(_RETRY_DELAYS) - 1)]
+                    logger.warning(f"[{pname}] Timeout, retrying in {delay}s")
+                    yield _sse("status", {"step": "retrying", "detail": "Request timed out, retrying..."})
+                    _time.sleep(delay)
+                    continue
+                yield _sse("error", {"error": "LLM request timed out", "error_type": "connection"})
+                return
+            except (httpx.ConnectError, httpx.NetworkError, ConnectionError, OSError) as e:
+                if _attempt < _MAX_RETRIES:
+                    delay = _RETRY_DELAYS[min(_attempt, len(_RETRY_DELAYS) - 1)]
+                    logger.warning(f"[{pname}] Network error, retrying in {delay}s: {e}")
+                    yield _sse("status", {"step": "retrying", "detail": "Connection issue, retrying..."})
+                    _time.sleep(delay)
+                    continue
+                yield _sse("error", {"error": f"Cannot reach LLM API: {e}", "error_type": "connection"})
+                return
+            except Exception as e:
+                yield _sse("error", {"error": f"LLM call failed: {e}", "error_type": "connection"})
+                return
+
+        if resp is None:
+            continue  # tool-removal retry
 
         resp_data = resp.json()
         choice = resp_data["choices"][0]
@@ -1254,12 +1326,17 @@ def call_llm_streaming(query: str, data_summary: dict, viewport: dict | None = N
 
     t0 = _time.monotonic()
     last_error = None
-    for provider in _PROVIDERS:
+    providers = list(_PROVIDERS)
+    for i, provider in enumerate(providers):
+        is_last = (i == len(providers) - 1)
         had_result = False
+        buffered: list[str] = []  # buffer status events until we know this provider succeeds
         try:
             for event_str in _call_provider_streaming(provider, messages, live_data, original_query=query):
-                # Intercept the final result to attach timing metadata
                 if event_str.startswith("event: result\n"):
+                    # Provider succeeded — flush buffered status events, then emit result
+                    for b in buffered:
+                        yield b
                     data_line = event_str.split("data: ", 1)[1].rsplit("\n\n", 1)[0]
                     result = json.loads(data_line)
                     result["duration_ms"] = int((_time.monotonic() - t0) * 1000)
@@ -1267,24 +1344,29 @@ def call_llm_streaming(query: str, data_summary: dict, viewport: dict | None = N
                     yield _sse("result", result)
                     had_result = True
                 elif event_str.startswith("event: error\n"):
-                    # Check if it's a content filter (don't retry) or connection (retry)
                     data_line = event_str.split("data: ", 1)[1].rsplit("\n\n", 1)[0]
                     err = json.loads(data_line)
                     if err.get("error_type") == "content_filter":
                         yield event_str
                         return
-                    # Connection error — try next provider
+                    # Connection error — discard buffered events, try next provider
                     last_error = err.get("error", "Unknown error")
-                    if len(_PROVIDERS) > 1:
+                    if not is_last:
                         logger.warning(f"[{provider['name']}] streaming failed, trying next provider")
+                        yield _sse("status", {"step": "fallback", "detail": "Switching to backup provider..."})
                     break
                 else:
-                    yield event_str
+                    if is_last:
+                        yield event_str  # last provider: stream live for responsiveness
+                    else:
+                        buffered.append(event_str)  # buffer until success confirmed
             if had_result:
                 return
         except Exception as e:
             last_error = str(e)
             logger.warning(f"[{provider['name']}] streaming exception: {e}")
+            if not is_last:
+                yield _sse("status", {"step": "fallback", "detail": "Switching to backup provider..."})
             continue
 
     yield _sse("error", {"error": f"All LLM providers failed. Last error: {last_error}", "error_type": "connection"})

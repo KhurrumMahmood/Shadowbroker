@@ -296,6 +296,7 @@ export interface GDELTIncident {
   properties: {
     name: string;
     count: number;
+    action_geo_cc?: string;
     _urls_list: string[];
     _headlines_list: string[];
   };

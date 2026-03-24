@@ -532,3 +532,131 @@ class TestQueryCacheInjection:
         )
         system = msgs[0]["content"]
         assert "similar query previously succeeded" not in system
+
+
+# ---------------------------------------------------------------------------
+# Retry + Fallback Tests
+# ---------------------------------------------------------------------------
+
+from services.llm_assistant import (
+    _call_provider, refresh_providers, _PROVIDERS, _MAX_RETRIES,
+    LLMConnectionError, ContentFilterError,
+)
+from unittest.mock import patch, MagicMock
+
+
+class TestProviderRetry:
+    """Tests for per-provider retry with backoff."""
+
+    def _make_provider(self):
+        return {
+            "name": "test",
+            "api_key": "key",
+            "base_url": "https://test.example.com/v1",
+            "model": "test-model",
+        }
+
+    def _make_ok_response(self):
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.raise_for_status = MagicMock()
+        resp.json.return_value = {
+            "choices": [{"message": {"content": '{"summary": "test"}'}, "finish_reason": "stop"}],
+            "usage": {},
+        }
+        return resp
+
+    def _make_error_response(self, status_code, body="Server Error"):
+        resp = MagicMock()
+        resp.status_code = status_code
+        resp.text = body
+        resp.headers = {}
+        error = httpx.HTTPStatusError("error", request=MagicMock(), response=resp)
+        return error
+
+    @patch("services.llm_assistant.httpx.post")
+    @patch("services.llm_assistant._time.sleep")
+    def test_retries_on_500_then_succeeds(self, mock_sleep, mock_post):
+        """500 on first attempt, success on retry."""
+        err = self._make_error_response(500)
+        ok = self._make_ok_response()
+        mock_post.side_effect = [type(err)(str(err), request=MagicMock(), response=err.response), ok]
+        # Make the first call raise, second succeed
+        def side_effect(*args, **kwargs):
+            r = mock_post.call_count
+            if r == 1:
+                raise httpx.HTTPStatusError("500", request=MagicMock(), response=err.response)
+            return ok
+        mock_post.side_effect = side_effect
+
+        messages = [{"role": "user", "content": "test"}]
+        result = _call_provider(self._make_provider(), messages, None)
+        assert result["summary"] == "test"
+        assert mock_post.call_count == 2
+        mock_sleep.assert_called_once()
+
+    @patch("services.llm_assistant.httpx.post")
+    @patch("services.llm_assistant._time.sleep")
+    def test_retries_on_429_respects_retry_after(self, mock_sleep, mock_post):
+        """429 with Retry-After header should use that delay."""
+        err_resp = MagicMock()
+        err_resp.status_code = 429
+        err_resp.text = "Rate limited"
+        err_resp.headers = {"Retry-After": "2"}
+        ok = self._make_ok_response()
+
+        call_count = [0]
+        def side_effect(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                raise httpx.HTTPStatusError("429", request=MagicMock(), response=err_resp)
+            return ok
+        mock_post.side_effect = side_effect
+
+        messages = [{"role": "user", "content": "test"}]
+        result = _call_provider(self._make_provider(), messages, None)
+        assert result["summary"] == "test"
+        mock_sleep.assert_called_once_with(2.0)
+
+    @patch("services.llm_assistant.httpx.post")
+    @patch("services.llm_assistant._time.sleep")
+    def test_raises_after_exhausting_retries(self, mock_sleep, mock_post):
+        """After MAX_RETRIES+1 failures, should raise."""
+        err_resp = MagicMock()
+        err_resp.status_code = 500
+        err_resp.text = "Server Error"
+        err_resp.headers = {}
+        mock_post.side_effect = httpx.HTTPStatusError("500", request=MagicMock(), response=err_resp)
+
+        messages = [{"role": "user", "content": "test"}]
+        with pytest.raises(LLMConnectionError):
+            _call_provider(self._make_provider(), messages, None)
+        assert mock_post.call_count == _MAX_RETRIES + 1
+
+    @patch("services.llm_assistant.httpx.post")
+    def test_content_filter_not_retried(self, mock_post):
+        """Content filter errors should raise immediately without retry."""
+        err_resp = MagicMock()
+        err_resp.status_code = 400
+        err_resp.text = "content moderation filter triggered"
+        err_resp.headers = {}
+        mock_post.side_effect = httpx.HTTPStatusError("400", request=MagicMock(), response=err_resp)
+
+        messages = [{"role": "user", "content": "test"}]
+        with pytest.raises(ContentFilterError):
+            _call_provider(self._make_provider(), messages, None)
+        assert mock_post.call_count == 1  # no retry
+
+
+class TestRefreshProviders:
+    """Tests for runtime provider refresh."""
+
+    @patch.dict("os.environ", {"CEREBRAS_API_KEY": "new-key", "LLM_API_KEY": ""}, clear=False)
+    def test_refresh_updates_provider_list(self):
+        refresh_providers()
+        from services.llm_assistant import _PROVIDERS as providers
+        names = [p["name"] for p in providers]
+        assert "cerebras" in names
+
+
+import httpx
