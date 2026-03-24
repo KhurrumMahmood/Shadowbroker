@@ -60,6 +60,7 @@ export const PRESETS: Record<PresetKey, { label: string; layers: ActiveLayers }>
       ships_passenger: true,
       ships_tracked_yachts: true,
       day_night: true,
+      highres_satellite: true,
     },
   },
   AVIATION: {
@@ -73,6 +74,7 @@ export const PRESETS: Record<PresetKey, { label: string; layers: ActiveLayers }>
       tracked: true,
       gps_jamming: true,
       day_night: true,
+      highres_satellite: true,
     },
   },
   CONFLICT: {
@@ -88,6 +90,7 @@ export const PRESETS: Record<PresetKey, { label: string; layers: ActiveLayers }>
       military_bases: true,
       firms: true,
       day_night: true,
+      highres_satellite: true,
     },
   },
   INFRA: {
@@ -100,6 +103,7 @@ export const PRESETS: Record<PresetKey, { label: string; layers: ActiveLayers }>
       kiwisdr: true,
       firms: true,
       day_night: true,
+      highres_satellite: true,
     },
   },
   ALL: {
@@ -123,7 +127,7 @@ export const PRESETS: Record<PresetKey, { label: string; layers: ActiveLayers }>
       day_night: true,
       gps_jamming: true,
       gibs_imagery: false,
-      highres_satellite: false,
+      highres_satellite: true,
       kiwisdr: true,
       firms: true,
       internet_outages: true,

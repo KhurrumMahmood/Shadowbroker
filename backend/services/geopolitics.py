@@ -275,6 +275,16 @@ def _parse_gdelt_export_zip(zip_bytes, conflict_codes, seen_locs, features, loc_
                     actor1 = row[6].strip() if len(row) > 6 else ''
                     actor2 = row[16].strip() if len(row) > 16 else ''
 
+                    # Geographic relevance: skip events where neither actor
+                    # country matches the geocoded location country (filters out
+                    # "news about country X published from country Y")
+                    action_geo_cc = row[53].strip() if len(row) > 53 else ''
+                    actor1_cc = row[7].strip() if len(row) > 7 else ''
+                    actor2_cc = row[17].strip() if len(row) > 17 else ''
+                    if action_geo_cc and actor1_cc and actor2_cc:
+                        if action_geo_cc != actor1_cc and action_geo_cc != actor2_cc:
+                            continue
+
                     loc_key = f"{round(lat, 1)}_{round(lng, 1)}"
                     if loc_key in seen_locs:
                         # Merge: increment count and add source URL if new (dedup by domain)

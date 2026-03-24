@@ -180,8 +180,11 @@ export default function Dashboard() {
 
   // Preset handler — selecting a preset applies its layers; manual toggle clears indicator
   const handlePresetSelect = (key: PresetKey) => {
-    setActiveLayers(PRESETS[key].layers);
+    const layers = PRESETS[key].layers;
+    setActiveLayers(layers);
     setActivePreset(key);
+    // Keep activeStyle in sync so satellite tile layer isn't torn down/rebuilt
+    setActiveStyle(layers.highres_satellite ? 'SATELLITE' : 'DEFAULT');
   };
   const handleManualLayerToggle: typeof setActiveLayers = (updater) => {
     setActiveLayers(updater);
