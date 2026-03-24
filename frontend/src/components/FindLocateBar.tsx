@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
-import { Search, Crosshair, Plane, Shield, Star, Ship, X, Database } from "lucide-react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { Search, Crosshair, Plane, Shield, Star, Ship, X, Database, MapPin } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { trackedOperators } from '../lib/trackedData';
 
 interface FindLocateBarProps {
     data: any;
-    onLocate: (lat: number, lng: number, entityId: string, entityType: string) => void;
+    onLocate: (lat: number, lng: number, entityId: string, entityType: string, zoom?: number) => void;
     onFilter?: (filterType: string, filterValue: string) => void;
 }
 
@@ -22,11 +22,20 @@ interface SearchResult {
     entityType: string;
 }
 
+function radiusToZoom(radiusKm: number): number {
+    if (radiusKm >= 1000) return 4;
+    if (radiusKm >= 200) return 6;
+    if (radiusKm >= 60) return 9;
+    return 11;
+}
+
 export default function FindLocateBar({ data, onLocate, onFilter }: FindLocateBarProps) {
     const [query, setQuery] = useState("");
     const [isOpen, setIsOpen] = useState(false);
+    const [locationResults, setLocationResults] = useState<SearchResult[]>([]);
     const inputRef = useRef<HTMLInputElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -37,6 +46,30 @@ export default function FindLocateBar({ data, onLocate, onFilter }: FindLocateBa
         };
         document.addEventListener("mousedown", handler);
         return () => document.removeEventListener("mousedown", handler);
+    }, []);
+
+    // Debounced geocode fetch for location results
+    const fetchLocations = useCallback((q: string) => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        if (q.length < 3) { setLocationResults([]); return; }
+        debounceRef.current = setTimeout(async () => {
+            try {
+                const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`);
+                if (!res.ok) { setLocationResults([]); return; }
+                const data = await res.json();
+                setLocationResults((data.results || []).map((loc: any) => ({
+                    id: `location-${loc.name}`,
+                    label: loc.name,
+                    sublabel: `${loc.lat.toFixed(2)}, ${loc.lng.toFixed(2)} · Location`,
+                    category: "LOCATION",
+                    categoryColor: "text-green-400",
+                    lat: loc.lat,
+                    lng: loc.lng,
+                    entityType: "location",
+                    _zoom: radiusToZoom(loc.radius_km),
+                })));
+            } catch { setLocationResults([]); }
+        }, 300);
     }, []);
 
     // Build searchable index from all data
@@ -140,26 +173,32 @@ export default function FindLocateBar({ data, onLocate, onFilter }: FindLocateBa
         return results;
     }, [data]);
 
-    // Filter results based on query
+    // Filter results based on query — entity matches + location results
     const filtered = useMemo(() => {
         if (!query.trim()) return [];
         const q = query.toLowerCase();
-        return allEntities
+        const entityMatches = allEntities
             .filter(e => {
                 const searchable = `${e.label} ${e.sublabel} ${e.id} ${(e as any)._extra || ''}`.toLowerCase();
                 return searchable.includes(q);
             })
             .slice(0, 12);
-    }, [query, allEntities]);
+        // Append location results (deduplicated by id)
+        const entityIds = new Set(entityMatches.map(e => e.id));
+        const locs = locationResults.filter(l => !entityIds.has(l.id));
+        return [...entityMatches, ...locs].slice(0, 15);
+    }, [query, allEntities, locationResults]);
 
     const handleSelect = (result: SearchResult) => {
         if (result.entityType === "database_operator") {
             if (onFilter) onFilter("tracked_owner", result.label);
         } else {
-            onLocate(result.lat, result.lng, result.id, result.entityType);
+            const zoom = (result as any)._zoom as number | undefined;
+            onLocate(result.lat, result.lng, result.id, result.entityType, zoom);
         }
         setQuery("");
         setIsOpen(false);
+        setLocationResults([]);
     };
 
     const categoryIcons: Record<string, React.ReactNode> = {
@@ -169,6 +208,7 @@ export default function FindLocateBar({ data, onLocate, onFilter }: FindLocateBa
         TRACKED: <Star size={10} className="text-pink-400" />,
         MARITIME: <Ship size={10} className="text-blue-400" />,
         DATABASE: <Database size={10} className="text-purple-400" />,
+        LOCATION: <MapPin size={10} className="text-green-400" />,
     };
 
     return (
@@ -179,16 +219,17 @@ export default function FindLocateBar({ data, onLocate, onFilter }: FindLocateBa
                     ref={inputRef}
                     type="text"
                     value={query}
-                    placeholder="Find aircraft, person or vessel..."
+                    placeholder="Find aircraft, vessel or location..."
                     className="flex-1 bg-transparent text-[10px] text-[var(--text-secondary)] font-mono tracking-wider outline-none placeholder:text-[var(--text-muted)]"
                     onChange={(e) => {
                         setQuery(e.target.value);
                         setIsOpen(true);
+                        fetchLocations(e.target.value.trim());
                     }}
                     onFocus={() => setIsOpen(true)}
                 />
                 {query && (
-                    <button onClick={() => { setQuery(""); setIsOpen(false); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+                    <button onClick={() => { setQuery(""); setIsOpen(false); setLocationResults([]); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
                         <X size={10} />
                     </button>
                 )}

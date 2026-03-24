@@ -216,6 +216,25 @@ async def update_viewport(vp: ViewportUpdate, request: Request):
     _store._current_viewport = {"s": vp.s, "w": vp.w, "n": vp.n, "e": vp.e}
     return {"status": "ok"}
 
+@app.get("/api/geocode")
+async def geocode(q: str = ""):
+    """Lightweight gazetteer lookup — returns matching locations for the search bar."""
+    from services.geo_gazetteer import STRATEGIC_LOCATIONS
+    if not q or len(q) < 2:
+        return {"results": []}
+    query = q.lower().strip()
+    matches = []
+    for name, loc in STRATEGIC_LOCATIONS.items():
+        if query in name or name in query:
+            matches.append({
+                "name": name.title(),
+                "lat": loc["lat"],
+                "lng": loc["lng"],
+                "radius_km": loc["radius_km"],
+            })
+    matches.sort(key=lambda m: (m["name"].lower() != query, len(m["name"])))
+    return {"results": matches[:8]}
+
 @app.get("/api/live-data")
 @limiter.limit("120/minute")
 async def live_data(request: Request):

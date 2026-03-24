@@ -375,8 +375,8 @@ export default function Dashboard() {
             <div className="flex-shrink-0">
               <FindLocateBar
                 data={data}
-                onLocate={(lat, lng, entityId, entityType) => {
-                  setFlyToLocation({ lat, lng, ts: Date.now() });
+                onLocate={(lat, lng, entityId, entityType, zoom) => {
+                  setFlyToLocation({ lat, lng, zoom, ts: Date.now() });
                 }}
                 onFilter={(filterKey, value) => {
                   setActiveFilters(prev => {
