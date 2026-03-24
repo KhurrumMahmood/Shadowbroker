@@ -29,6 +29,8 @@ export interface AssistantResponse {
   result_entities: Array<{ type: string; id: string | number }>;
   filters: Record<string, string[]> | null;
   reasoning_steps?: ReasoningStep[];
+  duration_ms?: number;
+  provider?: string;
 }
 
 /**
@@ -128,7 +130,11 @@ export function validateAssistantResponse(raw: unknown): AssistantResponse {
     if (valid.length > 0) reasoning_steps = valid;
   }
 
-  return { summary, layers, viewport, highlight_entities, result_entities, filters, reasoning_steps };
+  // Timing metadata — pass through as-is
+  const duration_ms = typeof obj.duration_ms === "number" ? obj.duration_ms : undefined;
+  const provider = typeof obj.provider === "string" ? obj.provider : undefined;
+
+  return { summary, layers, viewport, highlight_entities, result_entities, filters, reasoning_steps, duration_ms, provider };
 }
 
 /**

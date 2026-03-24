@@ -846,7 +846,7 @@ def _call_provider(provider: dict, messages: list, live_data: dict | None) -> di
     msgs = list(messages)
     reasoning_steps: list[dict] = []
 
-    for _round in range(3):
+    for _round in range(5):
         payload: dict = {
             "model": model,
             "messages": msgs,
@@ -993,15 +993,20 @@ def call_llm(query: str, data_summary: dict, viewport: dict | None = None,
 
     Raises RuntimeError if no LLM is configured.
     """
+    import time as _time
     if not _PROVIDERS:
         raise RuntimeError("LLM not configured — set CEREBRAS_API_KEY or LLM_API_KEY")
 
     messages = _build_messages(query, data_summary, viewport, conversation, search_results)
 
+    t0 = _time.monotonic()
     last_error = None
     for provider in _PROVIDERS:
         try:
-            return _call_provider(provider, messages, live_data)
+            result = _call_provider(provider, messages, live_data)
+            result["duration_ms"] = int((_time.monotonic() - t0) * 1000)
+            result["provider"] = provider["name"]
+            return result
         except ContentFilterError:
             raise  # don't retry content filters on another provider
         except LLMConnectionError as e:

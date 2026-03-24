@@ -81,6 +81,10 @@ async function proxy(req: NextRequest, path: string[]): Promise<NextResponse> {
   }
 
   // POST/PUT/DELETE — stream without retry (request bodies can't be replayed)
+  // LLM queries with tool-calling loops can take 60-120s, so use a longer timeout
+  // for assistant endpoints, 30s for everything else.
+  const isAssistant = path.join("/").startsWith("assistant/");
+  const postTimeout = isAssistant ? 120_000 : 30_000;
   let upstream: Response;
   try {
     upstream = await fetch(targetUrl.toString(), {
@@ -89,7 +93,7 @@ async function proxy(req: NextRequest, path: string[]): Promise<NextResponse> {
       body: req.body,
       // @ts-ignore
       duplex: "half",
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(postTimeout),
     });
   } catch (err) {
     return new NextResponse(JSON.stringify({ error: "Backend unavailable" }), {

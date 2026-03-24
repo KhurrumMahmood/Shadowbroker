@@ -12,6 +12,8 @@ export interface StoredMessage {
   content: string;
   action?: StoredAction;
   reasoning_steps?: Array<{ type: string; content: string }>;
+  duration_ms?: number;
+  provider?: string;
   timestamp: number;
 }
 

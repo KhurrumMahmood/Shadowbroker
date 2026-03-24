@@ -202,6 +202,8 @@ export default function AIAssistantPanel({
         content: validated.summary,
         action,
         reasoning_steps: validated.reasoning_steps,
+        duration_ms: validated.duration_ms,
+        provider: validated.provider,
         timestamp: Date.now(),
       };
       const updated = [...newMessages, assistantMsg];
@@ -466,6 +468,11 @@ export default function AIAssistantPanel({
                       }`}
                     >
                       {msg.content}
+                      {msg.role === "assistant" && msg.duration_ms != null && (
+                        <div className="mt-1 text-[7px] font-mono text-cyan-600/40">
+                          {(msg.duration_ms / 1000).toFixed(1)}s{msg.provider ? ` · ${msg.provider}` : ""}
+                        </div>
+                      )}
                       {msg.reasoning_steps && msg.reasoning_steps.length > 0 && (
                         <div className="mt-1.5">
                           <button
