@@ -42,19 +42,23 @@ def _load_airline_db():
 
 _load_airline_db()
 
-# Supplement with newer airlines not in OpenFlights (post-2020 launches)
-_AIRLINE_NAMES.update({
-    "SIS": "AirSial",        # ICAO — was "PF" (2-letter IATA, never matched)
+# Supplement with newer airlines not in OpenFlights (post-2020 launches).
+# setdefault avoids overriding existing DB entries (e.g. SIS=Saber Airlines,
+# FIA=Four Island Air). For these airlines, ownOp from the API is the primary
+# name source — the ICAO lookup is only a fallback.
+for _code, _name in {
+    "SIS": "AirSial",
     "SEP": "Serene Air",
-    "FIA": "Fly Baghdad",    # ICAO — was "FBD" (not a real code)
+    "FIA": "Fly Baghdad",
     "FJD": "Fly Jinnah",
     "AKY": "Akasa Air",
     "AIQ": "AirAsia India",
     "FLE": "Flyone",
     "RDA": "Red Air",
-    "APZ": "Air Premia",     # ICAO — was "ABJ" (that's Abidjan airport)
+    "APZ": "Air Premia",
     "BDI": "Bonza",
-})
+}.items():
+    _AIRLINE_NAMES.setdefault(_code, _name)
 
 # ---------------------------------------------------------------------------
 # OpenSky Network API Client (OAuth2)

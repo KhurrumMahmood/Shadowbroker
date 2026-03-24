@@ -229,8 +229,8 @@ def run_tests():
         report("Assistant query responds (not stuck in retry loop)",
                elapsed < 280000,  # should respond well within 280s
                f"status={status}, elapsed={elapsed}ms")
-        report("Assistant query returns valid status (not server error)",
-               status in (200, 400, 422),
+        report("Assistant query returns 200 for valid input",
+               status == 200,
                f"status={status}")
 
         # Briefing endpoint test (uses provider fallback)
@@ -250,7 +250,7 @@ def run_tests():
             })()
         """)
         report("Briefing endpoint responds with summary (provider fallback works)",
-               brief_resp.get("status") == 200 and brief_resp.get("has_counts"),
+               brief_resp.get("status") == 200 and brief_resp.get("has_summary") and brief_resp.get("has_counts"),
                f"got: {brief_resp}")
 
         # ─── SECTION COLLAPSE / EXPAND ────────────────────────────────
