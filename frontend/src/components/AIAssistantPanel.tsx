@@ -110,9 +110,12 @@ export default function AIAssistantPanel({
       if (action.filters && onApplyFilters) onApplyFilters(action.filters);
       if (action.result_entities && action.result_entities.length > 0 && onSetAIResults) {
         onSetAIResults(action.result_entities);
-      } else if (action.highlight_entities && action.highlight_entities.length > 0) {
+      } else {
+        // Clear stale AI results so the results bar and dimming don't persist
         onAIResultClear?.();
-        onSelectEntity(action.highlight_entities[0]);
+        if (action.highlight_entities && action.highlight_entities.length > 0) {
+          onSelectEntity(action.highlight_entities[0]);
+        }
       }
     },
     [onApplyLayers, onFlyTo, onSelectEntity, onApplyFilters, onSetAIResults, onAIResultClear],
@@ -605,6 +608,12 @@ export default function AIAssistantPanel({
                         onClick={(e) => {
                           e.stopPropagation();
                           store.remove(entry.id);
+                          // If we deleted the active conversation, reset to a fresh one
+                          if (entry.id === conversationId) {
+                            setConversationId(generateId());
+                            setMessages([]);
+                            onAIResultClear?.();
+                          }
                         }}
                         className="opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-400 transition-all p-1"
                         title="Delete conversation"

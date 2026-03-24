@@ -119,6 +119,17 @@ function applyFilters(items: any[], layerId: string, filters?: Record<string, st
         return true;
       });
     }
+    case "private":
+    case "jets": {
+      const pc = filters.private_callsign || [];
+      const pt = filters.private_aircraft_type || [];
+      if (!pc.length && !pt.length) return items;
+      return items.filter(f => {
+        if (pc.length && !pc.includes(f.callsign || "")) return false;
+        if (pt.length && !pt.includes(f.aircraft_type || "")) return false;
+        return true;
+      });
+    }
     case "ships_military":
     case "ships_cargo":
     case "ships_civilian":
@@ -178,7 +189,7 @@ export function useCategoryCycler(
       setIndex(0);
       if (items.length > 0) flyToItem(items[0], raw.entityType);
     },
-    [activeLayer, data, flyToItem, onSelect],
+    [activeLayer, data, flyToItem, onSelect, activeFilters],
   );
 
   const next = useCallback(() => {

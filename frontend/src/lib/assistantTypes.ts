@@ -102,13 +102,17 @@ export function validateAssistantResponse(raw: unknown): AssistantResponse {
   // Filters — validate keys against known filter set
   let filters: Record<string, string[]> | null = null;
   if (obj.filters && typeof obj.filters === "object") {
+    const rawEntries = Object.entries(obj.filters as Record<string, unknown>);
     filters = {};
-    for (const [k, v] of Object.entries(obj.filters as Record<string, unknown>)) {
+    for (const [k, v] of rawEntries) {
       if (VALID_FILTERS.has(k) && Array.isArray(v)) {
         filters[k] = v.map(String);
       }
     }
-    // {} means "clear all filters" — preserve it as distinct from null ("no change")
+    // {} from an explicitly empty input means "clear all filters" — preserve it.
+    // But if the input had keys that were ALL invalid, treat as null (no change)
+    // to avoid an unintended clear-all.
+    if (Object.keys(filters).length === 0 && rawEntries.length > 0) filters = null;
   }
 
   // Reasoning steps — pass through valid entries

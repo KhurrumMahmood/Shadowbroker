@@ -10,6 +10,7 @@ export const MAX_CONVERSATIONS = 50;
 export const MAX_MESSAGES = 100;
 
 export function loadIndex(): ConversationSummary[] {
+  if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(INDEX_KEY);
     if (!raw) return [];

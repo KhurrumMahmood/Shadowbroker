@@ -164,12 +164,12 @@ describe('validateAssistantResponse', () => {
     expect((result.filters as any).bogus_filter).toBeUndefined();
   });
 
-  it('returns empty object when all filter keys are invalid', () => {
+  it('returns null when all filter keys are invalid (avoids unintended clear-all)', () => {
     const result = validateAssistantResponse({
       summary: "test",
       filters: { invalid_key: ["value"] },
     });
-    expect(result.filters).toEqual({});
+    expect(result.filters).toBeNull();
   });
 
   it('defaults filters to null when missing', () => {

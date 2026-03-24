@@ -746,11 +746,17 @@ def parse_llm_response(raw: str) -> dict:
     # Validate filters — keys must be known filter keys
     filters = result.get("filters")
     if isinstance(filters, dict):
+        raw_keys = list(filters.keys())
         validated_filters = {}
         for k, v in filters.items():
             if k in _FILTER_KEYS and isinstance(v, list):
                 validated_filters[k] = [str(x) for x in v]
-        result["filters"] = validated_filters  # {} means clear all, non-empty means set
+        # {} from explicitly empty input means "clear all" — preserve it.
+        # But if ALL keys were invalid, treat as None (no change) to avoid unintended clear-all.
+        if not validated_filters and raw_keys:
+            result["filters"] = None
+        else:
+            result["filters"] = validated_filters
     else:
         result["filters"] = None
 
