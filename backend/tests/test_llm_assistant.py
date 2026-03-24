@@ -5,6 +5,7 @@ from services.llm_assistant import _FIELDS_BLOCK
 from services.llm_assistant import (
     _parse_directional_hints,
     _parse_inline_tool_calls,
+    _fuzzy_contains,
     search_entities,
     parse_llm_response,
     _exec_query_data,
@@ -195,6 +196,48 @@ class TestApplyFilters:
     def test_no_filters(self):
         result = _apply_filters(SAMPLE_FLIGHTS, None, None)
         assert len(result) == 4
+
+
+class TestFuzzyContains:
+    def test_exact_substring(self):
+        assert _fuzzy_contains("AirSial", "airsial")
+
+    def test_space_stripped(self):
+        """'Air Sial' should match 'AirSial' via space removal."""
+        assert _fuzzy_contains("AirSial", "air sial")
+
+    def test_space_stripped_reverse(self):
+        """'AirSial' query should match 'Air Sial Ltd' field."""
+        assert _fuzzy_contains("Air Sial Ltd", "airsial")
+
+    def test_token_containment(self):
+        """'Turkish Air' should match 'Turkish Airlines' (both tokens present)."""
+        assert _fuzzy_contains("Turkish Airlines", "Turkish Air")
+
+    def test_token_containment_order(self):
+        """Token order shouldn't matter."""
+        assert _fuzzy_contains("Delta Air Lines", "lines delta")
+
+    def test_single_token_substring(self):
+        assert _fuzzy_contains("Pakistan International Airlines", "pakistan")
+
+    def test_no_match(self):
+        assert not _fuzzy_contains("Delta Air Lines", "qatar")
+
+    def test_partial_token_no_false_positive(self):
+        """Single token 'air' shouldn't match via token-containment on its own."""
+        # But it DOES match via direct substring since "air" is in "AirSial"
+        assert _fuzzy_contains("AirSial", "air")
+
+    def test_apply_filters_uses_fuzzy(self):
+        """_apply_filters should use fuzzy matching."""
+        items = [
+            {"airline_name": "AirSial", "callsign": "PF101"},
+            {"airline_name": "Delta Air Lines", "callsign": "DAL200"},
+        ]
+        result = _apply_filters(items, {"airline_name": "air sial"}, None)
+        assert len(result) == 1
+        assert result[0]["callsign"] == "PF101"
 
 
 class TestExecQueryData:

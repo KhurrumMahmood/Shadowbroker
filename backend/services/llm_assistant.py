@@ -501,6 +501,35 @@ def _build_tools() -> list:
     ]
 
 
+def _fuzzy_contains(field_val: str, match_val: str) -> bool:
+    """Case-insensitive substring match with space-resilient fallback.
+
+    1. Exact substring: "airsial" in "AirSial" → True
+    2. Space-stripped: "air sial" → "airsial" in "AirSial" → True
+    3. Token containment: all words in match_val appear in field_val
+       e.g. "air sial" → "air" in "airsial" AND "sial" in "airsial" → True
+    """
+    fv = field_val.lower()
+    mv = match_val.lower()
+
+    # 1. Direct substring
+    if mv in fv:
+        return True
+
+    # 2. Space-stripped match (handles "Air Sial" vs "AirSial")
+    mv_stripped = mv.replace(" ", "")
+    fv_stripped = fv.replace(" ", "")
+    if mv_stripped in fv_stripped:
+        return True
+
+    # 3. All tokens present (handles "Turkish Air" vs "Turkish Airlines")
+    tokens = mv.split()
+    if len(tokens) > 1 and all(t in fv for t in tokens):
+        return True
+
+    return False
+
+
 def _apply_filters(items: list, filters: dict | None, near: dict | None) -> list:
     """Apply field filters (AND, case-insensitive contains) and geo filter."""
     from services.geo_gazetteer import entities_in_radius
@@ -508,8 +537,8 @@ def _apply_filters(items: list, filters: dict | None, near: dict | None) -> list
     result = items
     if filters:
         for field, match_val in filters.items():
-            ml = str(match_val).lower()
-            result = [e for e in result if ml in str(e.get(field, "")).lower()]
+            ml = str(match_val)
+            result = [e for e in result if _fuzzy_contains(str(e.get(field, "")), ml)]
     if near:
         result = entities_in_radius(
             result, near.get("lat", 0), near.get("lng", 0),
