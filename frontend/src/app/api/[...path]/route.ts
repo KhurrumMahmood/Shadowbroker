@@ -81,10 +81,10 @@ async function proxy(req: NextRequest, path: string[]): Promise<NextResponse> {
   }
 
   // POST/PUT/DELETE — stream without retry (request bodies can't be replayed)
-  // LLM queries with tool-calling loops can take 60-120s, so use a longer timeout
-  // for assistant endpoints, 30s for everything else.
+  // Assistant tool-calling loop: up to 5 rounds × 60s httpx timeout = 300s worst case.
+  // SSE streaming keeps the connection active, but AbortSignal is absolute, not idle.
   const isAssistant = path.join("/").startsWith("assistant/");
-  const postTimeout = isAssistant ? 120_000 : 30_000;
+  const postTimeout = isAssistant ? 300_000 : 30_000;
   let upstream: Response;
   try {
     upstream = await fetch(targetUrl.toString(), {

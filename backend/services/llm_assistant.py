@@ -365,11 +365,15 @@ _FIELDS_BLOCK = "\n".join(f"- {k}: {', '.join(v)}" for k, v in _QUERYABLE_FIELDS
 def _cache_key(query: str) -> str:
     """Normalize a query to a reusable pattern key.
 
-    Collapses proper-noun place names to '_X_' so that
-    "flights from London to Paris" and "flights from Tokyo to Sydney"
-    share the same cache slot.
+    Only replaces proper nouns that follow spatial prepositions (from, to,
+    near, in, at, over, around, of) so that "flights from London to Paris"
+    and "flights from Tokyo to Sydney" share the same cache slot, while
+    "Show flights..." and "Count flights..." remain distinct.
     """
-    q = re.sub(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', '_X_', query)
+    q = re.sub(
+        r'\b(from|to|near|in|at|over|around|of)\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*',
+        r'\1 _X_', query,
+    )
     return re.sub(r'\s+', ' ', q).strip().lower()
 
 
@@ -832,7 +836,7 @@ def _build_messages(query: str, data_summary: dict, viewport: dict | None,
 
     if conversation:
         _ERROR_MARKERS = ("Cannot reach", "LLM service unavailable", "Query filtered",
-                          "Connection error", "Error:", "content_filter")
+                          "Connection error", "Connection lost", "Error:", "content_filter")
         cleaned = []
         skip_prior_user = False
         for msg in reversed(conversation[-12:]):

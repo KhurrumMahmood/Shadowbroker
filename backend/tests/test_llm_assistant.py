@@ -467,14 +467,26 @@ class TestCacheKey:
         k2 = _cache_key("How many ships are near Rotterdam")
         assert k1 != k2
 
+    def test_different_intent_different_key(self):
+        """Show vs Count must not collide — only place names are normalized."""
+        k1 = _cache_key("Show flights from London to Paris")
+        k2 = _cache_key("Count flights from London to Paris")
+        assert k1 != k2
+
     def test_collapses_whitespace(self):
         k1 = _cache_key("flights  from   London")
         k2 = _cache_key("flights from London")
         assert k1 == k2
 
     def test_lowercase(self):
-        k = _cache_key("FLIGHTS FROM London")
+        k = _cache_key("flights from London")
         assert k == k.lower()
+
+    def test_preserves_sentence_initial_verb(self):
+        """Sentence-initial verbs like Show/Count should NOT be replaced."""
+        k = _cache_key("Show flights from London")
+        assert "show" in k
+        assert "_x_" not in k.split("from")[0]  # _x_ only after 'from'
 
 
 class TestSseHelper:

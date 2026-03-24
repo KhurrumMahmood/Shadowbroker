@@ -153,7 +153,7 @@ export default function AIAssistantPanel({
     try {
       // Filter out error exchanges — sending them back to the LLM causes
       // self-reinforcing refusals. Drop both the error and the user msg that caused it.
-      const ERROR_MARKERS = ["Cannot reach", "LLM service unavailable", "Query filtered", "Connection error"];
+      const ERROR_MARKERS = ["Cannot reach", "LLM service unavailable", "Query filtered", "Connection error", "Connection lost"];
       const conversation: { role: string; content: string }[] = [];
       for (let i = 0; i < messages.length; i++) {
         const m = messages[i];
