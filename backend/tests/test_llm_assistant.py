@@ -737,3 +737,82 @@ class TestDeadlineBudget:
 
 
 import httpx
+
+from services.llm_assistant import _parse_xml_response
+
+
+class TestParseXmlResponse:
+    def test_summary_only(self):
+        xml = "<response><summary>No flights found for AirSial.</summary></response>"
+        result = _parse_xml_response(xml)
+        assert result is not None
+        assert result["summary"] == "No flights found for AirSial."
+
+    def test_with_layers_and_viewport(self):
+        xml = (
+            '<response>'
+            '<summary>Found 3 flights near Pakistan.</summary>'
+            '<layers>{"commercial_flights": true}</layers>'
+            '<viewport>{"lat": 30.3, "lng": 69.3, "zoom": 6}</viewport>'
+            '<result_entities>[]</result_entities>'
+            '</response>'
+        )
+        result = _parse_xml_response(xml)
+        assert result is not None
+        assert result["summary"] == "Found 3 flights near Pakistan."
+        assert result["layers"] == {"commercial_flights": True}
+        assert result["viewport"]["lat"] == 30.3
+        assert result["viewport"]["zoom"] == 6
+
+    def test_null_fields(self):
+        xml = "<response><summary>Hello</summary><layers>null</layers><viewport>null</viewport></response>"
+        result = _parse_xml_response(xml)
+        assert result is not None
+        assert result["layers"] is None
+        assert result["viewport"] is None
+
+    def test_result_entities_list(self):
+        xml = (
+            '<response><summary>2 results</summary>'
+            '<result_entities>[{"type": "flight", "id": "abc123"}]</result_entities>'
+            '</response>'
+        )
+        result = _parse_xml_response(xml)
+        assert result is not None
+        assert len(result["result_entities"]) == 1
+        assert result["result_entities"][0]["id"] == "abc123"
+
+    def test_garbage_returns_none(self):
+        assert _parse_xml_response("just some random text") is None
+
+    def test_no_summary_returns_none(self):
+        assert _parse_xml_response("<response><layers>null</layers></response>") is None
+
+
+class TestParseLlmResponseXmlFallback:
+    def test_xml_response_parsed(self):
+        xml = "<response><summary>No AirSial data available.</summary><layers>null</layers></response>"
+        result = parse_llm_response(xml)
+        assert result["summary"] == "No AirSial data available."
+        assert result["layers"] is None
+
+    def test_xml_with_entities(self):
+        xml = (
+            '<response><summary>Found flights</summary>'
+            '<layers>{"flights": true}</layers>'
+            '<viewport>{"lat": 25, "lng": 67, "zoom": 8}</viewport>'
+            '<result_entities>[{"type": "flight", "id": "x1"}]</result_entities>'
+            '</response>'
+        )
+        result = parse_llm_response(xml)
+        assert result["summary"] == "Found flights"
+        assert result["layers"] == {"flights": True}
+        assert result["viewport"]["lat"] == 25
+        assert len(result["result_entities"]) == 1
+
+    def test_raw_xml_tags_stripped_in_fallback(self):
+        """When XML has no <summary> tag, tags should be stripped from the fallback summary."""
+        raw = "<data><info>something</info><detail>more</detail></data>"
+        result = parse_llm_response(raw)
+        # Should not contain XML tags in summary
+        assert "<" not in result["summary"]

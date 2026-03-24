@@ -165,7 +165,7 @@ CURRENT DATA COUNTS:
 {counts or '  (no data currently loaded)'}
 {search_section}
 
-RESPONSE FORMAT — You MUST respond with valid JSON:
+RESPONSE FORMAT — You MUST respond with a raw JSON object (no XML, no markdown, no wrapper tags):
 {{
   "summary": "Brief natural-language answer to the user's question.",
   "layers": {{"layer_name": true/false, ...}} or null,
@@ -174,6 +174,9 @@ RESPONSE FORMAT — You MUST respond with valid JSON:
   "result_entities": [{{"type": "entity_type", "id": "entity_id"}}] or [],
   "filters": {{"filter_key": ["value1", "value2"]}} or null
 }}
+
+CRITICAL: Output ONLY the JSON object above. Do NOT wrap it in XML tags like <response>, <result>, \
+<tool_call>, or any other XML/HTML elements. Do NOT use markdown code fences. Just the raw JSON.
 
 FIELD RULES:
 - "summary": required, concise but informative. Mention how many results were found when listing entities.
@@ -750,8 +753,59 @@ def search_entities(query: str, data: dict, viewport: dict | None = None) -> dic
     return results
 
 
+def _parse_xml_response(text: str) -> dict | None:
+    """Try to extract a structured response from XML-tagged LLM output.
+
+    Some models emit XML like <response><summary>...</summary><layers>...</layers></response>
+    instead of JSON. This converts recognized tags into the expected dict format.
+    Returns None if no recognizable XML structure is found.
+    """
+    # Check if the text looks like XML at all
+    if "<summary>" not in text and "<response>" not in text:
+        return None
+
+    result: dict = {}
+
+    # Extract summary
+    m = re.search(r'<summary>(.*?)</summary>', text, re.DOTALL)
+    if m:
+        result["summary"] = m.group(1).strip()
+    else:
+        return None  # summary is required — not useful without it
+
+    # Extract JSON-valued fields
+    for field in ("layers", "viewport", "filters"):
+        m = re.search(rf'<{field}>(.*?)</{field}>', text, re.DOTALL)
+        if m:
+            val = m.group(1).strip()
+            if val.lower() in ("null", "none", ""):
+                result[field] = None
+            else:
+                try:
+                    result[field] = json.loads(val)
+                except (json.JSONDecodeError, ValueError):
+                    result[field] = None
+
+    # Extract entity list fields
+    for field in ("highlight_entities", "result_entities"):
+        m = re.search(rf'<{field}>(.*?)</{field}>', text, re.DOTALL)
+        if m:
+            val = m.group(1).strip()
+            if val.lower() in ("null", "none", "", "[]"):
+                result[field] = []
+            else:
+                try:
+                    parsed = json.loads(val)
+                    result[field] = parsed if isinstance(parsed, list) else []
+                except (json.JSONDecodeError, ValueError):
+                    result[field] = []
+
+    logger.info(f"Recovered structured response from XML output (summary: {len(result.get('summary', ''))} chars)")
+    return result
+
+
 def parse_llm_response(raw: str) -> dict:
-    """Parse LLM output into structured response, handling markdown fences and invalid JSON."""
+    """Parse LLM output into structured response, handling markdown fences, XML, and invalid JSON."""
     # Try to extract JSON from markdown code fences
     fence_match = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', raw, re.DOTALL)
     text = fence_match.group(1).strip() if fence_match else raw.strip()
@@ -759,26 +813,32 @@ def parse_llm_response(raw: str) -> dict:
     try:
         result = json.loads(text)
     except json.JSONDecodeError:
-        # Truncated JSON — try to salvage the summary field
-        summary_match = re.search(r'"summary"\s*:\s*"((?:[^"\\]|\\.)*)"', text)
-        if summary_match:
+        # Try XML-to-JSON conversion (some models emit XML instead of JSON)
+        xml_parsed = _parse_xml_response(text)
+        if xml_parsed:
+            result = xml_parsed
+        else:
+            # Truncated JSON — try to salvage the summary field
+            summary_match = re.search(r'"summary"\s*:\s*"((?:[^"\\]|\\.)*)"', text)
+            if summary_match:
+                return {
+                    "summary": summary_match.group(1),
+                    "layers": None,
+                    "viewport": None,
+                    "highlight_entities": [],
+                    "result_entities": [],
+                    "filters": None,
+                }
+            # Fallback: strip any XML tags and return as summary
+            clean = re.sub(r'<[^>]+>', '', raw).strip()
             return {
-                "summary": summary_match.group(1),
+                "summary": clean[:500] if clean else raw.strip()[:500],
                 "layers": None,
                 "viewport": None,
                 "highlight_entities": [],
                 "result_entities": [],
                 "filters": None,
             }
-        # Fallback: return the raw text as summary
-        return {
-            "summary": raw.strip()[:500],
-            "layers": None,
-            "viewport": None,
-            "highlight_entities": [],
-            "result_entities": [],
-            "filters": None,
-        }
 
     # Ensure required keys exist with defaults
     result.setdefault("summary", "")
@@ -918,6 +978,8 @@ def _call_provider(provider: dict, messages: list, live_data: dict | None,
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
+        else:
+            payload["response_format"] = {"type": "json_object"}
 
         # Retry loop for transient errors (429, 5xx, timeout, network)
         resp = None
@@ -1182,6 +1244,8 @@ def _call_provider_streaming(provider: dict, messages: list, live_data: dict | N
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
+        else:
+            payload["response_format"] = {"type": "json_object"}
 
         # Retry loop for transient errors
         resp = None

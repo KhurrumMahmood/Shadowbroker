@@ -86,23 +86,29 @@ def update_slow_data():
         fetch_kiwisdr,
         fetch_frontlines,
         fetch_gdelt,
-        fetch_datacenters,
-        fetch_military_bases,
-        fetch_power_plants,
+        # datacenters, military_bases, power_plants are static files —
+        # loaded once at startup via _load_static_infrastructure(), not every 5min
     ]
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(slow_funcs)) as executor:
         futures = [executor.submit(func) for func in slow_funcs]
         concurrent.futures.wait(futures)
     logger.info("Slow-tier update complete.")
 
+def _load_static_infrastructure():
+    """Load static datasets that don't change at runtime. Called once at startup."""
+    fetch_datacenters()
+    fetch_military_bases()
+    fetch_power_plants()
+
 def update_all_data():
     """Full refresh — all tiers run IN PARALLEL for fastest startup."""
     logger.info("Full data update starting (parallel)...")
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
         f0 = pool.submit(fetch_airports)
         f1 = pool.submit(update_fast_data)
         f2 = pool.submit(update_slow_data)
-        concurrent.futures.wait([f0, f1, f2])
+        f3 = pool.submit(_load_static_infrastructure)
+        concurrent.futures.wait([f0, f1, f2, f3])
     logger.info("Full data update complete.")
 
 _scheduler = None
