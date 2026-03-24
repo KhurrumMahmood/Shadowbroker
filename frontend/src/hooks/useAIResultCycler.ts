@@ -102,7 +102,7 @@ export function useAIResultCycler(
         if (found) {
           const selected = toSelectedEntity(found.item, found.entityType);
           resolved.push(selected);
-          idSet.add(`${type}:${String(selected.id)}`);
+          idSet.add(`${found.entityType}:${String(selected.id)}`);
         }
       }
 

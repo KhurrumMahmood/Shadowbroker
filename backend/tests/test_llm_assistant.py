@@ -1,6 +1,7 @@
 """Tests for llm_assistant search and parsing utilities."""
 import json
 import pytest
+from services.llm_assistant import _FIELDS_BLOCK
 from services.llm_assistant import (
     _parse_directional_hints,
     _parse_inline_tool_calls,
@@ -399,3 +400,53 @@ class TestCountryFieldsInConfig:
         result = json.loads(raw)
         assert result["total"] == 1
         assert result["results"][0]["callsign"] == "BA1"
+
+
+# --- Field validation in tool execution ---
+
+class TestFieldsBlock:
+    def test_fields_block_contains_real_field_names(self):
+        """Ensure the prompt field block has actual field names, not literal {k}."""
+        assert "{k}" not in _FIELDS_BLOCK
+        assert "commercial_flights" in _FIELDS_BLOCK
+        assert "callsign" in _FIELDS_BLOCK
+        assert "origin_country" in _FIELDS_BLOCK
+
+
+class TestFieldValidation:
+    def test_query_data_drops_unknown_filter_keys(self):
+        raw = _exec_query_data({
+            "category": "commercial_flights",
+            "filters": {"departure_city": "London", "origin_name": "london"},
+        }, SAMPLE_DATA)
+        result = json.loads(raw)
+        # "departure_city" is not a valid field — should be dropped, not filter everything out
+        # "origin_name" is valid — should still match
+        assert result["total"] > 0
+
+    def test_query_data_all_unknown_filters_returns_all(self):
+        raw = _exec_query_data({
+            "category": "commercial_flights",
+            "filters": {"bogus_field": "test"},
+        }, SAMPLE_DATA)
+        result = json.loads(raw)
+        # All filters dropped → should return all items
+        assert result["total"] == 4
+
+    def test_aggregate_data_rejects_unknown_group_by(self):
+        raw = _exec_aggregate_data({
+            "category": "commercial_flights",
+            "group_by": "nonexistent_field",
+        }, SAMPLE_DATA)
+        result = json.loads(raw)
+        assert "error" in result
+
+    def test_aggregate_data_drops_unknown_filter_keys(self):
+        raw = _exec_aggregate_data({
+            "category": "commercial_flights",
+            "group_by": "country",
+            "filters": {"bogus": "test", "origin_name": "london"},
+        }, SAMPLE_DATA)
+        result = json.loads(raw)
+        # bogus filter dropped, origin_name=london applied → 3 items (BA100, EZY300, UA400)
+        assert result["total_items"] == 3

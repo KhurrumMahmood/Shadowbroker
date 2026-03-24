@@ -125,8 +125,8 @@ function applyFilters(items: any[], layerId: string, filters?: Record<string, st
       const pt = filters.private_aircraft_type || [];
       if (!pc.length && !pt.length) return items;
       return items.filter(f => {
-        if (pc.length && !pc.includes(f.callsign || "")) return false;
-        if (pt.length && !pt.includes(f.aircraft_type || "")) return false;
+        if (pc.length && !pc.includes(f.callsign || "") && !pc.includes(f.registration || "")) return false;
+        if (pt.length && !pt.includes(f.model || "")) return false;
         return true;
       });
     }

@@ -619,7 +619,7 @@ async def assistant_brief(request: Request, body: BriefRequest):
                     {"role": "user", "content": "Brief me on what's in view."},
                 ],
                 "temperature": 0.3,
-                "max_tokens": 512,
+                **({"max_completion_tokens": 512} if provider["name"] == "cerebras" else {"max_tokens": 512}),
             }
             resp = _httpx.post(url, json=payload, headers=headers, timeout=20.0)
             resp.raise_for_status()

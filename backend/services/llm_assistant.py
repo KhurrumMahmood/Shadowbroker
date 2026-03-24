@@ -175,7 +175,7 @@ countries"). Returns grouped counts.
 - For simple queries, the SEARCH RESULTS above may be sufficient — use tools when you need precision.
 
 QUERYABLE FIELDS PER CATEGORY:
-{chr(10).join(f"- {{k}}: {{', '.join(v)}}" for k, v in _QUERYABLE_FIELDS.items())}
+{_FIELDS_BLOCK}
 
 origin_name / dest_name format: "IATA: Airport Name" (e.g. "LHR: London Heathrow", "JFK: John F Kennedy Intl")
 origin_country / dest_country: full country name (e.g. "United States", "United Kingdom", "Germany")
@@ -353,6 +353,9 @@ _QUERYABLE_FIELDS = {
     "earthquakes": ["place", "id", "mag"],
 }
 
+# Pre-built for the system prompt (avoids f-string brace-escaping issues)
+_FIELDS_BLOCK = "\n".join(f"- {k}: {', '.join(v)}" for k, v in _QUERYABLE_FIELDS.items())
+
 
 def _build_tools() -> list:
     """Build OpenAI-compatible function calling tool definitions."""
@@ -474,7 +477,17 @@ def _exec_query_data(args: dict, data: dict) -> str:
     if not items or not isinstance(items, list):
         return json.dumps({"total": 0, "showing": 0, "results": []})
 
-    filtered = _apply_filters(items, args.get("filters"), args.get("near"))
+    # Validate filter keys against known queryable fields
+    raw_filters = args.get("filters")
+    if raw_filters and isinstance(raw_filters, dict):
+        valid_fields = set(_QUERYABLE_FIELDS.get(category, []))
+        cleaned = {k: v for k, v in raw_filters.items() if k in valid_fields}
+        dropped = set(raw_filters) - set(cleaned)
+        if dropped:
+            logger.warning(f"[query_data] Dropped unknown filter keys for {category}: {dropped}")
+        raw_filters = cleaned or None
+
+    filtered = _apply_filters(items, raw_filters, args.get("near"))
     limit = min(max(args.get("limit", 50), 1), 100)
     compact = config["compact"]
     results = [compact(e) for e in filtered[:limit]]
@@ -492,8 +505,23 @@ def _exec_aggregate_data(args: dict, data: dict) -> str:
     if not items or not isinstance(items, list):
         return json.dumps({"total_items": 0, "groups": {}})
 
-    filtered = _apply_filters(items, args.get("filters"), args.get("near"))
+    # Validate filter keys
+    raw_filters = args.get("filters")
+    if raw_filters and isinstance(raw_filters, dict):
+        valid_fields = set(_QUERYABLE_FIELDS.get(category, []))
+        cleaned = {k: v for k, v in raw_filters.items() if k in valid_fields}
+        dropped = set(raw_filters) - set(cleaned)
+        if dropped:
+            logger.warning(f"[aggregate_data] Dropped unknown filter keys for {category}: {dropped}")
+        raw_filters = cleaned or None
+
+    filtered = _apply_filters(items, raw_filters, args.get("near"))
     group_by = args.get("group_by", "")
+
+    # Validate group_by field
+    valid_fields = set(_QUERYABLE_FIELDS.get(category, []))
+    if group_by and group_by not in valid_fields:
+        return json.dumps({"error": f"Unknown group_by field '{group_by}' for {category}. Valid: {sorted(valid_fields)}"})
 
     counts: dict[str, int] = {}
     for e in filtered:
