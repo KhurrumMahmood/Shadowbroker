@@ -198,19 +198,22 @@ class ViewportUpdate(BaseModel):
 @app.post("/api/viewport")
 @limiter.limit("60/minute")
 async def update_viewport(vp: ViewportUpdate, request: Request):
-    """Receive frontend map bounds to dynamically choke the AIS stream."""
+    """Receive frontend map bounds — updates AIS stream + flight viewport."""
     from services.ais_stream import update_ais_bbox
+    import services.fetchers._store as _store
     # Add a gentle 10% padding so ships don't pop-in right at the edge
     pad_lat = (vp.n - vp.s) * 0.1
     # handle antimeridian bounding box padding later if needed, simple for now:
-    pad_lng = (vp.e - vp.w) * 0.1 if vp.e > vp.w else 0 
-    
+    pad_lng = (vp.e - vp.w) * 0.1 if vp.e > vp.w else 0
+
     update_ais_bbox(
         south=max(-90, vp.s - pad_lat),
         west=max(-180, vp.w - pad_lng) if pad_lng else vp.w,
         north=min(90, vp.n + pad_lat),
         east=min(180, vp.e + pad_lng) if pad_lng else vp.e
     )
+    # Also store viewport for flight fetcher dead-zone detection
+    _store._current_viewport = {"s": vp.s, "w": vp.w, "n": vp.n, "e": vp.e}
     return {"status": "ok"}
 
 @app.get("/api/live-data")

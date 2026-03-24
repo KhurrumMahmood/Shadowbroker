@@ -1,6 +1,7 @@
 """Tests for llm_assistant search and parsing utilities."""
 import json
 import pytest
+from unittest.mock import patch, MagicMock
 from services.llm_assistant import _FIELDS_BLOCK
 from services.llm_assistant import (
     _parse_directional_hints,
@@ -10,8 +11,10 @@ from services.llm_assistant import (
     parse_llm_response,
     _exec_query_data,
     _exec_aggregate_data,
+    _exec_web_search,
     execute_tool_call,
     _apply_filters,
+    _build_tools,
     _QUERYABLE_FIELDS,
     _SEARCH_CONFIG,
     _cache_key,
@@ -863,3 +866,51 @@ class TestParseLlmResponseXmlFallback:
         result = parse_llm_response(raw)
         # Should not contain XML tags in summary
         assert "<" not in result["summary"]
+
+
+class TestWebSearch:
+    def test_tool_in_definitions(self):
+        tools = _build_tools()
+        names = [t["function"]["name"] for t in tools]
+        assert "web_search" in names
+
+    def test_empty_query_returns_error(self):
+        result = json.loads(_exec_web_search({"query": ""}))
+        assert "error" in result
+
+    def test_execute_tool_call_routes_web_search(self):
+        """web_search should not return 'Unknown tool'."""
+        with patch("services.llm_assistant._exec_web_search", return_value='{"result":"ok"}'):
+            result = execute_tool_call("web_search", {"query": "test"}, {})
+        assert "Unknown tool" not in result
+
+    def test_success_returns_result(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "choices": [{"message": {"content": "Pakistan flights reduced due to fuel costs."}}]
+        }
+        with patch("services.llm_assistant.httpx.post", return_value=mock_resp), \
+             patch.dict("os.environ", {"LLM_API_KEY": "test-key", "LLM_BASE_URL": "https://example.com/v1"}):
+            result = json.loads(_exec_web_search({"query": "Pakistan flight reductions"}))
+        assert "result" in result
+        assert "Pakistan" in result["result"]
+
+    def test_truncates_long_response(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "choices": [{"message": {"content": "x" * 5000}}]
+        }
+        with patch("services.llm_assistant.httpx.post", return_value=mock_resp), \
+             patch.dict("os.environ", {"LLM_API_KEY": "test-key", "LLM_BASE_URL": "https://example.com/v1"}):
+            result = json.loads(_exec_web_search({"query": "test"}))
+        assert result["result"].endswith("... [truncated]")
+        assert len(result["result"]) < 3100
+
+    def test_inline_parser_recognizes_web_search(self):
+        text = '<tool_call>web_search<arg_key>query</arg_key><arg_value>Pakistan oil crisis</arg_value></tool_call>'
+        calls = _parse_inline_tool_calls(text)
+        assert len(calls) == 1
+        assert calls[0][0] == "web_search"
+        assert calls[0][1]["query"] == "Pakistan oil crisis"

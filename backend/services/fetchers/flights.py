@@ -114,6 +114,10 @@ _BLIND_SPOT_REGIONS = [
     {"name": "Chengdu",       "lat": 30.6, "lon": 104.1, "radius_nm": 250},
     {"name": "Lagos-Accra",   "lat": 6.5,  "lon": 3.4,   "radius_nm": 250},
     {"name": "Addis Ababa",   "lat": 9.0,  "lon": 38.7,  "radius_nm": 250},
+    {"name": "Karachi",       "lat": 24.9, "lon": 67.0,  "radius_nm": 250},
+    {"name": "Delhi",         "lat": 28.6, "lon": 77.2,  "radius_nm": 250},
+    {"name": "Mumbai",        "lat": 19.1, "lon": 72.9,  "radius_nm": 250},
+    {"name": "Dubai",         "lat": 25.3, "lon": 55.3,  "radius_nm": 250},
 ]
 _SUPPLEMENTAL_FETCH_INTERVAL = 120
 last_supplemental_fetch = 0
@@ -630,16 +634,39 @@ def _classify_and_publish(all_adsb_flights):
         latest_data['last_updated'] = datetime.utcnow().isoformat()
 
 
+def _point_in_any_region(lat: float, lon: float, regions: list) -> bool:
+    """Check if a lat/lon falls within any static region's radius (approximate)."""
+    for r in regions:
+        dlat = lat - r["lat"]
+        dlon = lon - r["lon"]
+        # 1 degree ≈ 60nm; adjust longitude by cos(lat)
+        dist_nm = math.sqrt((dlat * 60) ** 2 + (dlon * 60 * math.cos(math.radians(lat))) ** 2)
+        if dist_nm < r["dist"]:
+            return True
+    return False
+
+
 def _fetch_adsb_lol_regions():
     """Fetch all adsb.lol regions in parallel (~3-5s). Returns raw aircraft list."""
+    from services.fetchers._store import _current_viewport
+
     regions = [
-        {"lat": 39.8, "lon": -98.5, "dist": 2000},
-        {"lat": 50.0, "lon": 15.0, "dist": 2000},
-        {"lat": 35.0, "lon": 105.0, "dist": 2000},
-        {"lat": -25.0, "lon": 133.0, "dist": 2000},
-        {"lat": 0.0, "lon": 20.0, "dist": 2500},
-        {"lat": -15.0, "lon": -60.0, "dist": 2000}
+        {"lat": 39.8, "lon": -98.5, "dist": 2000},   # Central USA
+        {"lat": 50.0, "lon": 15.0, "dist": 2000},     # Central Europe
+        {"lat": 25.0, "lon": 65.0, "dist": 2000},     # South Asia / Middle East
+        {"lat": 35.0, "lon": 105.0, "dist": 2000},    # China
+        {"lat": -25.0, "lon": 133.0, "dist": 2000},   # Australia
+        {"lat": 0.0, "lon": 20.0, "dist": 2500},      # Central Africa
+        {"lat": -15.0, "lon": -60.0, "dist": 2000},   # South America
     ]
+
+    # Viewport bonus: if the user is looking at a dead zone, add one small query
+    if _current_viewport:
+        center_lat = (_current_viewport["s"] + _current_viewport["n"]) / 2
+        center_lon = (_current_viewport["w"] + _current_viewport["e"]) / 2
+        if not _point_in_any_region(center_lat, center_lon, regions):
+            regions.append({"lat": center_lat, "lon": center_lon, "dist": 500})
+            logger.info(f"Viewport bonus region: lat={center_lat:.1f}, lon={center_lon:.1f}")
 
     def _fetch_region(r):
         url = f"https://api.adsb.lol/v2/lat/{r['lat']}/lon/{r['lon']}/dist/{r['dist']}"
@@ -653,7 +680,7 @@ def _fetch_adsb_lol_regions():
         return []
 
     all_flights = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(regions)) as pool:
         results = pool.map(_fetch_region, regions)
     for region_flights in results:
         all_flights.extend(region_flights)

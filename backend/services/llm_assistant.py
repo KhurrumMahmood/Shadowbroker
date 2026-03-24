@@ -198,12 +198,16 @@ GUIDELINES:
 - Keep responses factual — describe what the data shows, not speculation.
 - Lat must be -90 to 90, lng -180 to 180, zoom 2 to 14.
 
-TOOLS — you have query_data and aggregate_data functions:
+TOOLS — you have query_data, aggregate_data, and web_search functions:
 - Use query_data to filter entities by specific field values (case-insensitive substring match) and/or \
 by geographic proximity. Prefer this over the SEARCH RESULTS when the query needs precise field matching \
 (e.g. origin vs destination), or when results above show UNKNOWN fields.
 - Use aggregate_data to count/group entities (e.g. "how many airlines fly from London", "top destination \
 countries"). Returns grouped counts.
+- Use web_search to research current events, geopolitics, sanctions, conflicts, or context \
+that live data feeds don't contain. Great for answering "why" questions (e.g. "why are there \
+fewer flights over Pakistan?"). Only search when the query needs external context — don't \
+search for data that's already in the live feeds.
 - You may call multiple tools in parallel to gather data, then produce the final JSON response.
 - For simple queries, the SEARCH RESULTS above may be sufficient — use tools when you need precision.
 
@@ -498,6 +502,29 @@ def _build_tools() -> list:
                 },
             },
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "web_search",
+                "description": (
+                    "Search the web for current information about world events, "
+                    "geopolitics, military conflicts, aviation incidents, sanctions, "
+                    "or any topic not available in the live data feeds. Use this "
+                    "when the user asks WHY something is happening, or when you "
+                    "need context that live sensor data alone cannot provide."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Search query (be specific and factual)",
+                        },
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
     ]
 
 
@@ -633,7 +660,7 @@ def _parse_inline_tool_calls(text: str) -> list[tuple[str, dict]]:
         # First token is the function name
         parts = re.split(r'<arg_key>', block, maxsplit=1)
         fn_name = parts[0].strip()
-        if not fn_name or fn_name not in ("query_data", "aggregate_data"):
+        if not fn_name or fn_name not in ("query_data", "aggregate_data", "web_search"):
             continue
 
         # Parse key-value pairs
@@ -650,12 +677,48 @@ def _parse_inline_tool_calls(text: str) -> list[tuple[str, dict]]:
     return calls
 
 
+def _exec_web_search(args: dict) -> str:
+    """Call Perplexity sonar via OpenRouter for web search."""
+    query = args.get("query", "").strip()
+    if not query:
+        return json.dumps({"error": "Empty search query"})
+
+    api_key = os.environ.get("LLM_API_KEY", "")
+    base_url = os.environ.get("LLM_BASE_URL", "https://openrouter.ai/api/v1")
+    if not api_key:
+        return json.dumps({"error": "No API key configured for web search"})
+
+    try:
+        resp = httpx.post(
+            f"{base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={
+                "model": "perplexity/sonar",
+                "messages": [{"role": "user", "content": query}],
+                "max_tokens": 1024,
+            },
+            timeout=15,
+        )
+        if resp.status_code != 200:
+            return json.dumps({"error": f"Search failed: HTTP {resp.status_code}"})
+
+        content = resp.json()["choices"][0]["message"]["content"]
+        if len(content) > 3000:
+            content = content[:3000] + "... [truncated]"
+        return json.dumps({"result": content})
+    except Exception as e:
+        logger.warning(f"web_search failed: {e}")
+        return json.dumps({"error": f"Search failed: {str(e)}"})
+
+
 def execute_tool_call(name: str, args: dict, data: dict) -> str:
     """Route a tool call to the right handler."""
     if name == "query_data":
         return _exec_query_data(args, data)
     elif name == "aggregate_data":
         return _exec_aggregate_data(args, data)
+    elif name == "web_search":
+        return _exec_web_search(args)
     return json.dumps({"error": f"Unknown tool: {name}"})
 
 

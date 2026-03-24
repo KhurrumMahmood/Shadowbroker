@@ -46,3 +46,6 @@ def _mark_fresh(*keys):
 
 # Thread lock for safe reads/writes to latest_data
 _data_lock = threading.Lock()
+
+# Current map viewport — updated by POST /api/viewport, read by flight fetcher
+_current_viewport: dict | None = None  # {"s": float, "w": float, "n": float, "e": float}
