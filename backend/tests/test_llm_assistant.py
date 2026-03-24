@@ -869,10 +869,17 @@ class TestParseLlmResponseXmlFallback:
 
 
 class TestWebSearch:
-    def test_tool_in_definitions(self):
+    @patch.dict("os.environ", {"LLM_API_KEY": "test-key", "LLM_BASE_URL": "https://openrouter.ai/api/v1"})
+    def test_tool_in_definitions_with_openrouter(self):
         tools = _build_tools()
         names = [t["function"]["name"] for t in tools]
         assert "web_search" in names
+
+    @patch.dict("os.environ", {"LLM_API_KEY": "test-key", "LLM_BASE_URL": "https://api.cerebras.ai/v1"})
+    def test_tool_hidden_without_openrouter(self):
+        tools = _build_tools()
+        names = [t["function"]["name"] for t in tools]
+        assert "web_search" not in names
 
     def test_empty_query_returns_error(self):
         result = json.loads(_exec_web_search({"query": ""}))

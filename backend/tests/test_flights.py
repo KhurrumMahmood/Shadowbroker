@@ -79,3 +79,25 @@ class TestViewportBonusRegion:
             _fetch_adsb_lol_regions()
 
         assert mock_curl.call_count == 7
+
+    @patch("services.fetchers.flights.fetch_with_curl")
+    def test_antimeridian_viewport_centers_correctly(self, mock_curl):
+        """Viewport crossing 180° should center in the Pacific, not Atlantic."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"ac": []}
+        mock_curl.return_value = mock_resp
+
+        # Viewport straddling antimeridian: 170E to 170W
+        viewport = {"s": -5.0, "w": 170.0, "n": 5.0, "e": -170.0}
+        with patch("services.fetchers._store._current_viewport", viewport):
+            _fetch_adsb_lol_regions()
+
+        # Should get a bonus region (Pacific is a dead zone)
+        assert mock_curl.call_count == 8
+        # Verify the bonus region's longitude is near 180, not near 0
+        last_call_url = mock_curl.call_args_list[-1][0][0]
+        # URL format: .../lon/{lon}/...
+        lon_str = last_call_url.split("/lon/")[1].split("/")[0]
+        bonus_lon = float(lon_str)
+        assert abs(bonus_lon) > 150, f"Bonus lon {bonus_lon} should be near ±180, not 0"

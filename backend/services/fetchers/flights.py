@@ -663,7 +663,14 @@ def _fetch_adsb_lol_regions():
     # Viewport bonus: if the user is looking at a dead zone, add one small query
     if _current_viewport:
         center_lat = (_current_viewport["s"] + _current_viewport["n"]) / 2
-        center_lon = (_current_viewport["w"] + _current_viewport["e"]) / 2
+        w, e = _current_viewport["w"], _current_viewport["e"]
+        # Handle antimeridian wrap: if west > east, the viewport crosses 180°
+        if w > e:
+            center_lon = ((w + e + 360) / 2) % 360
+            if center_lon > 180:
+                center_lon -= 360
+        else:
+            center_lon = (w + e) / 2
         if not _point_in_any_region(center_lat, center_lon, regions):
             regions.append({"lat": center_lat, "lon": center_lon, "dist": 500})
             logger.info(f"Viewport bonus region: lat={center_lat:.1f}, lon={center_lon:.1f}")

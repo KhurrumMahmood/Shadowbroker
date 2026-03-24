@@ -36,6 +36,8 @@ export default function FindLocateBar({ data, onLocate, onFilter }: FindLocateBa
     const inputRef = useRef<HTMLInputElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const abortRef = useRef<AbortController | null>(null);
+    const seqRef = useRef(0);
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -48,15 +50,20 @@ export default function FindLocateBar({ data, onLocate, onFilter }: FindLocateBa
         return () => document.removeEventListener("mousedown", handler);
     }, []);
 
-    // Debounced geocode fetch for location results
+    // Debounced geocode fetch for location results (with abort to prevent stale results)
     const fetchLocations = useCallback((q: string) => {
         if (debounceRef.current) clearTimeout(debounceRef.current);
+        if (abortRef.current) abortRef.current.abort();
         if (q.length < 3) { setLocationResults([]); return; }
+        const seq = ++seqRef.current;
         debounceRef.current = setTimeout(async () => {
+            const controller = new AbortController();
+            abortRef.current = controller;
             try {
-                const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`);
-                if (!res.ok) { setLocationResults([]); return; }
+                const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`, { signal: controller.signal });
+                if (!res.ok || seq !== seqRef.current) { setLocationResults([]); return; }
                 const data = await res.json();
+                if (seq !== seqRef.current) return; // stale
                 setLocationResults((data.results || []).map((loc: any) => ({
                     id: `location-${loc.name}`,
                     label: loc.name,
@@ -68,7 +75,7 @@ export default function FindLocateBar({ data, onLocate, onFilter }: FindLocateBa
                     entityType: "location",
                     _zoom: radiusToZoom(loc.radius_km),
                 })));
-            } catch { setLocationResults([]); }
+            } catch { if (seq === seqRef.current) setLocationResults([]); }
         }, 300);
     }, []);
 

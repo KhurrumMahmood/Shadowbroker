@@ -416,7 +416,7 @@ def _cache_key(query: str) -> str:
 def _build_tools() -> list:
     """Build OpenAI-compatible function calling tool definitions."""
     categories = list(_QUERYABLE_FIELDS.keys())
-    return [
+    tools = [
         {
             "type": "function",
             "function": {
@@ -502,7 +502,10 @@ def _build_tools() -> list:
                 },
             },
         },
-        {
+    ]
+    # Only expose web_search when OpenRouter + API key are available
+    if os.environ.get("LLM_API_KEY") and "openrouter" in os.environ.get("LLM_BASE_URL", "").lower():
+        tools.append({
             "type": "function",
             "function": {
                 "name": "web_search",
@@ -524,8 +527,8 @@ def _build_tools() -> list:
                     "required": ["query"],
                 },
             },
-        },
-    ]
+        })
+    return tools
 
 
 def _fuzzy_contains(field_val: str, match_val: str) -> bool:
