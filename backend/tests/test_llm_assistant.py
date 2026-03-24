@@ -540,6 +540,7 @@ class TestQueryCacheInjection:
 
 from services.llm_assistant import (
     _call_provider, refresh_providers, _PROVIDERS, _MAX_RETRIES,
+    _OVERALL_BUDGET_S, _parse_retry_after,
     LLMConnectionError, ContentFilterError,
 )
 from unittest.mock import patch, MagicMock
@@ -657,6 +658,82 @@ class TestRefreshProviders:
         from services.llm_assistant import _PROVIDERS as providers
         names = [p["name"] for p in providers]
         assert "cerebras" in names
+
+
+class TestParseRetryAfter:
+    """Tests for Retry-After header parsing."""
+
+    def test_numeric_string(self):
+        assert _parse_retry_after("5", 1.0) == 5.0
+
+    def test_float_string(self):
+        assert _parse_retry_after("2.5", 1.0) == 2.5
+
+    def test_http_date_returns_default(self):
+        assert _parse_retry_after("Fri, 31 Dec 2027 23:59:59 GMT", 3.0) == 3.0
+
+    def test_garbage_returns_default(self):
+        assert _parse_retry_after("not-a-number", 3.0) == 3.0
+
+    def test_none_returns_default(self):
+        assert _parse_retry_after(None, 2.0) == 2.0
+
+    def test_empty_string_returns_default(self):
+        assert _parse_retry_after("", 1.5) == 1.5
+
+
+class TestDeadlineBudget:
+    """Tests that the overall time budget prevents runaway retries."""
+
+    def _make_provider(self):
+        return {
+            "name": "test",
+            "api_key": "key",
+            "base_url": "https://test.example.com/v1",
+            "model": "test-model",
+        }
+
+    @patch("services.llm_assistant.httpx.post")
+    @patch("services.llm_assistant._time.sleep")
+    def test_deadline_caps_total_duration(self, mock_sleep, mock_post):
+        """With a tight deadline, should bail out quickly, not exhaust all retries."""
+        import time as real_time
+        err_resp = MagicMock()
+        err_resp.status_code = 500
+        err_resp.text = "Server Error"
+        err_resp.headers = {}
+        mock_post.side_effect = httpx.HTTPStatusError("500", request=MagicMock(), response=err_resp)
+
+        messages = [{"role": "user", "content": "test"}]
+        # Set deadline 0.5s from now — should bail fast
+        deadline = real_time.monotonic() + 0.5
+
+        with pytest.raises(LLMConnectionError):
+            _call_provider(self._make_provider(), messages, None, deadline=deadline)
+
+    @patch("services.llm_assistant.httpx.post")
+    @patch("services.llm_assistant._time.sleep")
+    def test_per_call_timeout_clamped_by_deadline(self, mock_sleep, mock_post):
+        """The per-call httpx timeout should be clamped to remaining budget."""
+        import time as real_time
+        ok = MagicMock()
+        ok.status_code = 200
+        ok.raise_for_status = MagicMock()
+        ok.json.return_value = {
+            "choices": [{"message": {"content": '{"summary": "test"}'}, "finish_reason": "stop"}],
+            "usage": {},
+        }
+        mock_post.return_value = ok
+
+        messages = [{"role": "user", "content": "test"}]
+        deadline = real_time.monotonic() + 10.0  # 10s budget
+
+        _call_provider(self._make_provider(), messages, None, deadline=deadline)
+
+        # Verify the timeout kwarg was clamped below 60s
+        call_kwargs = mock_post.call_args
+        timeout_used = call_kwargs.kwargs.get("timeout", call_kwargs[1].get("timeout", 60.0))
+        assert timeout_used <= 10.0, f"Expected timeout <= 10s, got {timeout_used}"
 
 
 import httpx

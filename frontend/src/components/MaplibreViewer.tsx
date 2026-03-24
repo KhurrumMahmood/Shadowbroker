@@ -10,6 +10,7 @@ import { darkStyle, lightStyle } from "@/components/map/styles/mapStyles";
 import ScaleBar from "@/components/ScaleBar";
 import maplibregl from "maplibre-gl";
 import { showPulseAt, removePulse } from "@/components/map/PulseMarker";
+import { findEntityInData } from "@/hooks/useAIResultCycler";
 import { AlertTriangle, Radio, Globe, Activity, Play } from "lucide-react";
 import WikiImage from "@/components/WikiImage";
 import { useTheme } from "@/lib/ThemeContext";
@@ -255,23 +256,22 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
         return () => { isMounted = false; };
     }, [selectedEntity, data]);
 
-    // Pulse marker: show a pulsing ring at the selected entity's position
+    // Pulse marker: track selected entity position using live data
     useEffect(() => {
         const map = mapRef.current?.getMap();
-        if (!map) { removePulse(); return; }
-        if (!selectedEntity) { removePulse(); return; }
+        if (!map || !selectedEntity) { removePulse(); return; }
 
-        const lat = selectedEntity.extra?.lat ?? selectedEntity.extra?.geometry?.coordinates?.[1];
-        const lng = selectedEntity.extra?.lng ?? selectedEntity.extra?.lon ?? selectedEntity.extra?.geometry?.coordinates?.[0];
+        // Re-resolve from live data for fresh coordinates (entities move between polls)
+        const fresh = findEntityInData(selectedEntity.type, selectedEntity.id, data);
+        const item = fresh?.item ?? selectedEntity.extra;
+        const lat = item?.lat ?? item?.geometry?.coordinates?.[1];
+        const lng = item?.lng ?? item?.lon ?? item?.geometry?.coordinates?.[0];
 
-        if (lat != null && lng != null) {
-            showPulseAt(map, lng, lat);
-        } else {
-            removePulse();
-        }
+        if (lat != null && lng != null) showPulseAt(map, lng, lat);
+        else removePulse();
 
         return () => removePulse();
-    }, [selectedEntity]);
+    }, [selectedEntity, data]);
 
     useEffect(() => {
         if (flyToLocation && mapRef.current) {

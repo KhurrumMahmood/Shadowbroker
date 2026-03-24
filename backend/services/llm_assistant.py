@@ -63,6 +63,17 @@ def refresh_providers():
 # Retry config for transient errors (429, 5xx, timeout, network)
 _MAX_RETRIES = 2
 _RETRY_DELAYS = [1.0, 3.0]  # seconds
+_OVERALL_BUDGET_S = 240  # total time budget — 60s margin below 300s proxy cap
+
+
+def _parse_retry_after(value: str | None, default: float) -> float:
+    """Parse Retry-After header safely. Returns default on non-numeric values."""
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return default
 
 # All data layers the frontend can control
 _LAYER_NAMES = [
@@ -872,11 +883,12 @@ def _build_messages(query: str, data_summary: dict, viewport: dict | None,
 
 
 def _call_provider(provider: dict, messages: list, live_data: dict | None,
-                   original_query: str = "") -> dict:
+                   original_query: str = "", deadline: float = 0.0) -> dict:
     """Run the tool-calling loop against a single provider. Returns parsed response.
 
     Collects reasoning_steps (thinking, tool calls, results) for frontend display.
     Raises ContentFilterError, LLMConnectionError on failure.
+    deadline: monotonic time after which we should bail (0 = no limit).
     """
     url = f"{provider['base_url'].rstrip('/')}/chat/completions"
     headers = {
@@ -891,6 +903,8 @@ def _call_provider(provider: dict, messages: list, live_data: dict | None,
     reasoning_steps: list[dict] = []
 
     for _round in range(5):
+        if deadline and _time.monotonic() >= deadline:
+            raise LLMConnectionError(f"[{pname}] Time budget exhausted")
         payload: dict = {
             "model": model,
             "messages": msgs,
@@ -908,8 +922,13 @@ def _call_provider(provider: dict, messages: list, live_data: dict | None,
         # Retry loop for transient errors (429, 5xx, timeout, network)
         resp = None
         for _attempt in range(_MAX_RETRIES + 1):
+            if deadline and _time.monotonic() >= deadline:
+                raise LLMConnectionError(f"[{pname}] Time budget exhausted")
+            per_call_timeout = 60.0
+            if deadline:
+                per_call_timeout = min(per_call_timeout, max(deadline - _time.monotonic(), 5.0))
             try:
-                resp = httpx.post(url, json=payload, headers=headers, timeout=60.0)
+                resp = httpx.post(url, json=payload, headers=headers, timeout=per_call_timeout)
                 resp.raise_for_status()
                 break  # success
             except httpx.HTTPStatusError as e:
@@ -926,13 +945,23 @@ def _call_provider(provider: dict, messages: list, live_data: dict | None,
                     break  # break retry loop, continue tool loop
                 # 429 rate limit — respect Retry-After header
                 if status == 429 and _attempt < _MAX_RETRIES:
-                    delay = min(float(e.response.headers.get("Retry-After", _RETRY_DELAYS[_attempt])), 10.0)
+                    delay = min(_parse_retry_after(e.response.headers.get("Retry-After"), _RETRY_DELAYS[_attempt]), 10.0)
+                    if deadline:
+                        remaining = deadline - _time.monotonic()
+                        if remaining <= 0:
+                            raise LLMConnectionError(f"[{pname}] Time budget exhausted")
+                        delay = min(delay, remaining)
                     logger.warning(f"[{pname}] Rate limited (429), retrying in {delay}s (attempt {_attempt + 1})")
                     _time.sleep(delay)
                     continue
                 # 5xx server error — retry with backoff
                 if status >= 500 and _attempt < _MAX_RETRIES:
                     delay = _RETRY_DELAYS[min(_attempt, len(_RETRY_DELAYS) - 1)]
+                    if deadline:
+                        remaining = deadline - _time.monotonic()
+                        if remaining <= 0:
+                            raise LLMConnectionError(f"[{pname}] Time budget exhausted")
+                        delay = min(delay, remaining)
                     logger.warning(f"[{pname}] Server error ({status}), retrying in {delay}s (attempt {_attempt + 1})")
                     _time.sleep(delay)
                     continue
@@ -941,6 +970,11 @@ def _call_provider(provider: dict, messages: list, live_data: dict | None,
             except httpx.TimeoutException:
                 if _attempt < _MAX_RETRIES:
                     delay = _RETRY_DELAYS[min(_attempt, len(_RETRY_DELAYS) - 1)]
+                    if deadline:
+                        remaining = deadline - _time.monotonic()
+                        if remaining <= 0:
+                            raise LLMConnectionError(f"[{pname}] Time budget exhausted")
+                        delay = min(delay, remaining)
                     logger.warning(f"[{pname}] Timeout, retrying in {delay}s (attempt {_attempt + 1})")
                     _time.sleep(delay)
                     continue
@@ -949,6 +983,11 @@ def _call_provider(provider: dict, messages: list, live_data: dict | None,
             except (httpx.ConnectError, httpx.NetworkError, ConnectionError, OSError) as e:
                 if _attempt < _MAX_RETRIES:
                     delay = _RETRY_DELAYS[min(_attempt, len(_RETRY_DELAYS) - 1)]
+                    if deadline:
+                        remaining = deadline - _time.monotonic()
+                        if remaining <= 0:
+                            raise LLMConnectionError(f"[{pname}] Time budget exhausted")
+                        delay = min(delay, remaining)
                     logger.warning(f"[{pname}] Network error, retrying in {delay}s (attempt {_attempt + 1}): {e}")
                     _time.sleep(delay)
                     continue
@@ -1082,10 +1121,11 @@ def call_llm(query: str, data_summary: dict, viewport: dict | None = None,
     messages = _build_messages(query, data_summary, viewport, conversation, search_results)
 
     t0 = _time.monotonic()
+    deadline = t0 + _OVERALL_BUDGET_S
     last_error = None
     for provider in _PROVIDERS:
         try:
-            result = _call_provider(provider, messages, live_data, original_query=query)
+            result = _call_provider(provider, messages, live_data, original_query=query, deadline=deadline)
             result["duration_ms"] = int((_time.monotonic() - t0) * 1000)
             result["provider"] = provider["name"]
             return result
@@ -1110,7 +1150,7 @@ def _sse(event: str, data: dict) -> str:
 
 
 def _call_provider_streaming(provider: dict, messages: list, live_data: dict | None,
-                              original_query: str = ""):
+                              original_query: str = "", deadline: float = 0.0):
     """Generator version of _call_provider — yields SSE event strings."""
     url = f"{provider['base_url'].rstrip('/')}/chat/completions"
     headers = {
@@ -1126,6 +1166,10 @@ def _call_provider_streaming(provider: dict, messages: list, live_data: dict | N
     yield _sse("status", {"step": "thinking", "detail": "Analyzing your query..."})
 
     for _round in range(5):
+        if deadline and _time.monotonic() >= deadline:
+            yield _sse("error", {"error": "Time budget exhausted", "error_type": "connection"})
+            return
+
         payload: dict = {
             "model": model,
             "messages": msgs,
@@ -1142,8 +1186,14 @@ def _call_provider_streaming(provider: dict, messages: list, live_data: dict | N
         # Retry loop for transient errors
         resp = None
         for _attempt in range(_MAX_RETRIES + 1):
+            if deadline and _time.monotonic() >= deadline:
+                yield _sse("error", {"error": "Time budget exhausted", "error_type": "connection"})
+                return
+            per_call_timeout = 60.0
+            if deadline:
+                per_call_timeout = min(per_call_timeout, max(deadline - _time.monotonic(), 5.0))
             try:
-                resp = httpx.post(url, json=payload, headers=headers, timeout=60.0)
+                resp = httpx.post(url, json=payload, headers=headers, timeout=per_call_timeout)
                 resp.raise_for_status()
                 break
             except httpx.HTTPStatusError as e:
@@ -1158,13 +1208,25 @@ def _call_provider_streaming(provider: dict, messages: list, live_data: dict | N
                     resp = None
                     break
                 if status == 429 and _attempt < _MAX_RETRIES:
-                    delay = min(float(e.response.headers.get("Retry-After", _RETRY_DELAYS[_attempt])), 10.0)
+                    delay = min(_parse_retry_after(e.response.headers.get("Retry-After"), _RETRY_DELAYS[_attempt]), 10.0)
+                    if deadline:
+                        remaining = deadline - _time.monotonic()
+                        if remaining <= 0:
+                            yield _sse("error", {"error": "Time budget exhausted", "error_type": "connection"})
+                            return
+                        delay = min(delay, remaining)
                     logger.warning(f"[{pname}] Rate limited (429), retrying in {delay}s")
                     yield _sse("status", {"step": "retrying", "detail": f"Rate limited, retrying..."})
                     _time.sleep(delay)
                     continue
                 if status >= 500 and _attempt < _MAX_RETRIES:
                     delay = _RETRY_DELAYS[min(_attempt, len(_RETRY_DELAYS) - 1)]
+                    if deadline:
+                        remaining = deadline - _time.monotonic()
+                        if remaining <= 0:
+                            yield _sse("error", {"error": "Time budget exhausted", "error_type": "connection"})
+                            return
+                        delay = min(delay, remaining)
                     logger.warning(f"[{pname}] Server error ({status}), retrying in {delay}s")
                     yield _sse("status", {"step": "retrying", "detail": f"Server error, retrying..."})
                     _time.sleep(delay)
@@ -1174,6 +1236,12 @@ def _call_provider_streaming(provider: dict, messages: list, live_data: dict | N
             except httpx.TimeoutException:
                 if _attempt < _MAX_RETRIES:
                     delay = _RETRY_DELAYS[min(_attempt, len(_RETRY_DELAYS) - 1)]
+                    if deadline:
+                        remaining = deadline - _time.monotonic()
+                        if remaining <= 0:
+                            yield _sse("error", {"error": "Time budget exhausted", "error_type": "connection"})
+                            return
+                        delay = min(delay, remaining)
                     logger.warning(f"[{pname}] Timeout, retrying in {delay}s")
                     yield _sse("status", {"step": "retrying", "detail": "Request timed out, retrying..."})
                     _time.sleep(delay)
@@ -1183,6 +1251,12 @@ def _call_provider_streaming(provider: dict, messages: list, live_data: dict | N
             except (httpx.ConnectError, httpx.NetworkError, ConnectionError, OSError) as e:
                 if _attempt < _MAX_RETRIES:
                     delay = _RETRY_DELAYS[min(_attempt, len(_RETRY_DELAYS) - 1)]
+                    if deadline:
+                        remaining = deadline - _time.monotonic()
+                        if remaining <= 0:
+                            yield _sse("error", {"error": "Time budget exhausted", "error_type": "connection"})
+                            return
+                        delay = min(delay, remaining)
                     logger.warning(f"[{pname}] Network error, retrying in {delay}s: {e}")
                     yield _sse("status", {"step": "retrying", "detail": "Connection issue, retrying..."})
                     _time.sleep(delay)
@@ -1325,6 +1399,7 @@ def call_llm_streaming(query: str, data_summary: dict, viewport: dict | None = N
     messages = _build_messages(query, data_summary, viewport, conversation, search_results)
 
     t0 = _time.monotonic()
+    deadline = t0 + _OVERALL_BUDGET_S
     last_error = None
     providers = list(_PROVIDERS)
     for i, provider in enumerate(providers):
@@ -1332,7 +1407,7 @@ def call_llm_streaming(query: str, data_summary: dict, viewport: dict | None = N
         had_result = False
         buffered: list[str] = []  # buffer status events until we know this provider succeeds
         try:
-            for event_str in _call_provider_streaming(provider, messages, live_data, original_query=query):
+            for event_str in _call_provider_streaming(provider, messages, live_data, original_query=query, deadline=deadline):
                 if event_str.startswith("event: result\n"):
                     # Provider succeeded — flush buffered status events, then emit result
                     for b in buffered:

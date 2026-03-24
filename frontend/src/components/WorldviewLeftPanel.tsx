@@ -179,6 +179,61 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
         } as Record<string, [string, number][]>;
     }, [data?.commercial_flights, data?.private_flights, data?.private_jets, data?.military_flights, data?.tracked_flights, data?.ships, data?.gdelt, data?.satellites, data?.datacenters, data?.power_plants, data?.military_bases]);
 
+    // Filtered layer counts when a section pill is active
+    const filteredLayerCounts = useMemo(() => {
+        const counts: Record<string, number | null> = {};
+
+        const avF = sectionFilter["AVIATION"];
+        if (avF) {
+            const cc = (f: any) => f.country === avF;
+            counts["flights"] = (data?.commercial_flights ?? []).filter(cc).length;
+            counts["private"] = (data?.private_flights ?? []).filter(cc).length;
+            counts["jets"] = (data?.private_jets ?? []).filter(cc).length;
+            counts["military"] = (data?.military_flights ?? []).filter(cc).length;
+            counts["tracked"] = (data?.tracked_flights ?? []).filter(cc).length;
+        }
+
+        const maF = sectionFilter["MARITIME"];
+        if (maF) {
+            const matching = (data?.ships ?? []).filter(s => s.country === maF);
+            let mil = 0, cargo = 0, passenger = 0, civilian = 0, yacht = 0;
+            for (const s of matching) {
+                if (s.yacht_alert) { yacht++; continue; }
+                const t = s.type;
+                if (t === 'carrier' || t === 'military_vessel') mil++;
+                else if (t === 'tanker' || t === 'cargo') cargo++;
+                else if (t === 'passenger') passenger++;
+                else civilian++;
+            }
+            counts["ships_military"] = mil;
+            counts["ships_cargo"] = cargo;
+            counts["ships_civilian"] = civilian;
+            counts["ships_passenger"] = passenger;
+            counts["ships_tracked_yachts"] = yacht;
+        }
+
+        const inF = sectionFilter["INTELLIGENCE & THREATS"];
+        if (inF) {
+            counts["global_incidents"] = (data?.gdelt ?? []).filter(g => g.properties?.action_geo_cc === inF).length;
+        }
+
+        const spF = sectionFilter["SPACE & SENSORS"];
+        if (spF) {
+            counts["satellites"] = (data?.satellites ?? []).filter(s => s.country === spF).length;
+        }
+
+        const ifF = sectionFilter["INFRASTRUCTURE"];
+        if (ifF) {
+            counts["datacenters"] = (data?.datacenters ?? []).filter(d => d.country === ifF).length;
+            counts["power_plants"] = (data?.power_plants ?? []).filter(p => p.country === ifF).length;
+            counts["military_bases"] = (data?.military_bases ?? []).filter(b => b.country === ifF).length;
+        }
+
+        return counts;
+    }, [sectionFilter, data?.commercial_flights, data?.private_flights, data?.private_jets,
+        data?.military_flights, data?.tracked_flights, data?.ships, data?.gdelt,
+        data?.satellites, data?.datacenters, data?.power_plants, data?.military_bases]);
+
     type LayerDef = { id: string; name: string; source: string; count: number | null; icon: any };
     const sections: { name: string; layers: LayerDef[] }[] = [
         { name: "INTELLIGENCE & THREATS", layers: [
@@ -566,9 +621,20 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                                                                                         <Crosshair size={12} />
                                                                                     </button>
                                                                                 )}
-                                                                                {active && (layer.count ?? 0) > 0 && (
-                                                                                    <span className="text-[10px] text-gray-300 font-mono">{(layer.count ?? 0).toLocaleString()}</span>
-                                                                                )}
+                                                                                {active && (layer.count ?? 0) > 0 && (() => {
+                                                                                    const filtered = filteredLayerCounts[layer.id];
+                                                                                    const total = (layer.count ?? 0).toLocaleString();
+                                                                                    if (filtered != null) {
+                                                                                        return (
+                                                                                            <span className="text-[10px] font-mono">
+                                                                                                <span className="text-cyan-400">{filtered.toLocaleString()}</span>
+                                                                                                <span className="text-gray-500"> / </span>
+                                                                                                <span className="text-gray-300">{total}</span>
+                                                                                            </span>
+                                                                                        );
+                                                                                    }
+                                                                                    return <span className="text-[10px] text-gray-300 font-mono">{total}</span>;
+                                                                                })()}
                                                                                 <div className={`text-[9px] font-mono tracking-wider px-2 py-0.5 rounded-full border ${active
                                                                                     ? 'border-cyan-500/50 text-cyan-400 bg-cyan-950/30 shadow-[0_0_10px_rgba(34,211,238,0.2)]'
                                                                                     : 'border-[var(--border-primary)] text-[var(--text-muted)] bg-transparent'
