@@ -527,7 +527,8 @@ async def system_update(request: Request):
 # AI Assistant
 # ---------------------------------------------------------------------------
 from pydantic import BaseModel, field_validator
-from services.llm_assistant import call_llm, search_entities, build_briefing_context, build_briefing_prompt, ContentFilterError, LLMConnectionError
+from starlette.responses import StreamingResponse
+from services.llm_assistant import call_llm, call_llm_streaming, search_entities, build_briefing_context, build_briefing_prompt, ContentFilterError, LLMConnectionError
 
 class AssistantQuery(BaseModel):
     query: str
@@ -587,6 +588,38 @@ async def assistant_query(request: Request, body: AssistantQuery):
             status_code=503,
             media_type="application/json",
         )
+
+@app.post("/api/assistant/query/stream")
+@limiter.limit("10/minute")
+async def assistant_query_stream(request: Request, body: AssistantQuery):
+    """Streaming version — yields SSE events for real-time progress."""
+    data = get_latest_data()
+    data_summary = {}
+    for key in ["commercial_flights", "private_flights", "private_jets",
+                "military_flights", "tracked_flights", "ships", "satellites",
+                "earthquakes", "firms_fires", "internet_outages", "gdelt",
+                "kiwisdr", "datacenters", "military_bases", "power_plants", "cctv"]:
+        items = data.get(key)
+        if items and isinstance(items, list):
+            data_summary[key] = len(items)
+
+    search_results = search_entities(body.query, data, viewport=body.viewport)
+
+    def generate():
+        yield from call_llm_streaming(
+            query=body.query,
+            data_summary=data_summary,
+            viewport=body.viewport,
+            conversation=body.conversation,
+            search_results=search_results,
+            live_data=data,
+        )
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 class BriefRequest(BaseModel):
     south: float

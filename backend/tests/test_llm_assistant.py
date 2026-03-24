@@ -13,6 +13,10 @@ from services.llm_assistant import (
     _apply_filters,
     _QUERYABLE_FIELDS,
     _SEARCH_CONFIG,
+    _cache_key,
+    _query_cache,
+    _sse,
+    _build_messages,
 )
 
 
@@ -450,3 +454,69 @@ class TestFieldValidation:
         result = json.loads(raw)
         # bogus filter dropped, origin_name=london applied → 3 items (BA100, EZY300, UA400)
         assert result["total_items"] == 3
+
+
+class TestCacheKey:
+    def test_normalizes_place_names(self):
+        k1 = _cache_key("Show flights from London to Paris")
+        k2 = _cache_key("Show flights from Tokyo to Sydney")
+        assert k1 == k2
+
+    def test_different_structure_different_key(self):
+        k1 = _cache_key("Show flights from London to Paris")
+        k2 = _cache_key("How many ships are near Rotterdam")
+        assert k1 != k2
+
+    def test_collapses_whitespace(self):
+        k1 = _cache_key("flights  from   London")
+        k2 = _cache_key("flights from London")
+        assert k1 == k2
+
+    def test_lowercase(self):
+        k = _cache_key("FLIGHTS FROM London")
+        assert k == k.lower()
+
+
+class TestSseHelper:
+    def test_formats_correctly(self):
+        result = _sse("status", {"step": "thinking", "detail": "test"})
+        assert result.startswith("event: status\n")
+        assert "data: " in result
+        assert result.endswith("\n\n")
+        data = json.loads(result.split("data: ")[1].strip())
+        assert data["step"] == "thinking"
+
+    def test_result_event(self):
+        result = _sse("result", {"summary": "hello"})
+        assert "event: result" in result
+        data = json.loads(result.split("data: ")[1].strip())
+        assert data["summary"] == "hello"
+
+
+class TestQueryCacheInjection:
+    def test_cache_hit_injects_into_system_prompt(self):
+        # Seed the cache
+        _query_cache[_cache_key("flights from London to Paris")] = [
+            {"type": "tool_call", "content": "query_data({\"category\": \"commercial_flights\"})"}
+        ]
+        try:
+            msgs = _build_messages(
+                "flights from Tokyo to Sydney",
+                {"commercial_flights": 100},
+                None, None, None,
+            )
+            system = msgs[0]["content"]
+            assert "similar query previously succeeded" in system
+            assert "query_data" in system
+        finally:
+            _query_cache.clear()
+
+    def test_no_cache_hit_no_injection(self):
+        _query_cache.clear()
+        msgs = _build_messages(
+            "a completely unique query 12345",
+            {"commercial_flights": 100},
+            None, None, None,
+        )
+        system = msgs[0]["content"]
+        assert "similar query previously succeeded" not in system

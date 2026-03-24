@@ -66,6 +66,7 @@ export default function AIAssistantPanel({
   const [messages, setMessages] = useState<StoredMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [progressText, setProgressText] = useState<string | null>(null);
   const [mode, setMode] = useState<PanelMode>("chat");
   const [conversationId, setConversationId] = useState<string>(generateId);
   const [flashEntity, setFlashEntity] = useState<string | null>(null);
@@ -147,6 +148,7 @@ export default function AIAssistantPanel({
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setLoading(true);
+    setProgressText("Connecting...");
 
     try {
       // Filter out error exchanges — sending them back to the LLM causes
@@ -156,7 +158,6 @@ export default function AIAssistantPanel({
       for (let i = 0; i < messages.length; i++) {
         const m = messages[i];
         if (m.role === "assistant" && ERROR_MARKERS.some((e) => m.content.includes(e))) {
-          // Also remove the preceding user message if it exists
           if (conversation.length > 0 && conversation[conversation.length - 1].role === "user") {
             conversation.pop();
           }
@@ -165,7 +166,7 @@ export default function AIAssistantPanel({
         conversation.push({ role: m.role, content: m.content });
       }
 
-      const resp = await fetch("/api/assistant/query", {
+      const resp = await fetch("/api/assistant/query/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query, viewport, conversation }),
@@ -194,22 +195,93 @@ export default function AIAssistantPanel({
         return;
       }
 
-      const raw = await resp.json();
-      const validated = validateAssistantResponse(raw);
-      const action = extractStoredAction(validated);
-      const assistantMsg: StoredMessage = {
-        role: "assistant",
-        content: validated.summary,
-        action,
-        reasoning_steps: validated.reasoning_steps,
-        duration_ms: validated.duration_ms,
-        provider: validated.provider,
-        timestamp: Date.now(),
-      };
-      const updated = [...newMessages, assistantMsg];
-      setMessages(updated);
-      saveCurrentConversation(updated);
-      applyResponse(validated);
+      // Read SSE stream for real-time progress
+      const reader = resp.body?.getReader();
+      if (!reader) {
+        throw new Error("No response body");
+      }
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let handled = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        // Process complete SSE events (delimited by double newline)
+        let boundary: number;
+        while ((boundary = buffer.indexOf("\n\n")) !== -1) {
+          const chunk = buffer.slice(0, boundary);
+          buffer = buffer.slice(boundary + 2);
+
+          // Parse SSE: "event: <type>\ndata: <json>"
+          let eventType = "";
+          let eventData = "";
+          for (const line of chunk.split("\n")) {
+            if (line.startsWith("event: ")) eventType = line.slice(7);
+            else if (line.startsWith("data: ")) eventData = line.slice(6);
+          }
+          if (!eventType || !eventData) continue;
+
+          if (eventType === "status") {
+            try {
+              const status = JSON.parse(eventData);
+              setProgressText(status.detail || "Working...");
+            } catch { /* ignore parse errors */ }
+          } else if (eventType === "result") {
+            try {
+              const raw = JSON.parse(eventData);
+              const validated = validateAssistantResponse(raw);
+              const action = extractStoredAction(validated);
+              const assistantMsg: StoredMessage = {
+                role: "assistant",
+                content: validated.summary,
+                action,
+                reasoning_steps: validated.reasoning_steps,
+                duration_ms: validated.duration_ms,
+                provider: validated.provider,
+                timestamp: Date.now(),
+              };
+              const updated = [...newMessages, assistantMsg];
+              setMessages(updated);
+              saveCurrentConversation(updated);
+              applyResponse(validated);
+              handled = true;
+            } catch { /* ignore parse errors */ }
+          } else if (eventType === "error") {
+            try {
+              const err = JSON.parse(eventData);
+              let errorContent: string;
+              if (err.error_type === "content_filter") {
+                errorContent = `Query filtered: ${err.error || "The LLM provider declined this request."}`;
+              } else {
+                errorContent = `LLM service unavailable: ${err.error || "Try again in a moment."}`;
+              }
+              const errMsg: StoredMessage = {
+                role: "assistant",
+                content: errorContent,
+                timestamp: Date.now(),
+              };
+              const updated = [...newMessages, errMsg];
+              setMessages(updated);
+              saveCurrentConversation(updated);
+              handled = true;
+            } catch { /* ignore parse errors */ }
+          }
+        }
+      }
+
+      if (!handled) {
+        const errMsg: StoredMessage = {
+          role: "assistant",
+          content: "Connection lost before receiving a response.",
+          timestamp: Date.now(),
+        };
+        const updated = [...newMessages, errMsg];
+        setMessages(updated);
+        saveCurrentConversation(updated);
+      }
     } catch {
       const errMsg: StoredMessage = {
         role: "assistant",
@@ -221,6 +293,7 @@ export default function AIAssistantPanel({
       saveCurrentConversation(updated);
     } finally {
       setLoading(false);
+      setProgressText(null);
     }
   };
 
@@ -521,7 +594,7 @@ export default function AIAssistantPanel({
                   <div className="flex gap-2 items-center">
                     <Bot size={12} className="text-cyan-400" />
                     <Loader2 size={12} className="text-cyan-400 animate-spin" />
-                    <span className="text-[9px] text-cyan-400/60 font-mono">Analyzing...</span>
+                    <span className="text-[9px] text-cyan-400/60 font-mono">{progressText || "Analyzing..."}</span>
                   </div>
                 )}
               </div>

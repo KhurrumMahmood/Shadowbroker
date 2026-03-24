@@ -7,9 +7,14 @@ import os
 import re
 import json
 import logging
+import time as _time
 import httpx
+from cachetools import TTLCache
 
 logger = logging.getLogger(__name__)
+
+# Cache: normalized query pattern → list of tool-call dicts that succeeded
+_query_cache: TTLCache = TTLCache(maxsize=200, ttl=3600)
 
 
 class ContentFilterError(Exception):
@@ -355,6 +360,17 @@ _QUERYABLE_FIELDS = {
 
 # Pre-built for the system prompt (avoids f-string brace-escaping issues)
 _FIELDS_BLOCK = "\n".join(f"- {k}: {', '.join(v)}" for k, v in _QUERYABLE_FIELDS.items())
+
+
+def _cache_key(query: str) -> str:
+    """Normalize a query to a reusable pattern key.
+
+    Collapses proper-noun place names to '_X_' so that
+    "flights from London to Paris" and "flights from Tokyo to Sydney"
+    share the same cache slot.
+    """
+    q = re.sub(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', '_X_', query)
+    return re.sub(r'\s+', ' ', q).strip().lower()
 
 
 def _build_tools() -> list:
@@ -801,6 +817,17 @@ def _build_messages(query: str, data_summary: dict, viewport: dict | None,
             f"west={viewport.get('west')}, north={viewport.get('north')}, east={viewport.get('east')}"
         )
 
+    # Inject cached tool-call patterns for similar queries
+    key = _cache_key(query)
+    cached = _query_cache.get(key)
+    if cached:
+        example = "\n".join(f"  {s['content'][:200]}" for s in cached)
+        system_prompt += (
+            f"\n\nA similar query previously succeeded with these tool calls:\n{example}\n"
+            "Reuse this approach if appropriate."
+        )
+        logger.info(f"Query cache hit for key: {key!r}")
+
     messages = [{"role": "system", "content": system_prompt}]
 
     if conversation:
@@ -828,7 +855,8 @@ def _build_messages(query: str, data_summary: dict, viewport: dict | None,
     return messages
 
 
-def _call_provider(provider: dict, messages: list, live_data: dict | None) -> dict:
+def _call_provider(provider: dict, messages: list, live_data: dict | None,
+                   original_query: str = "") -> dict:
     """Run the tool-calling loop against a single provider. Returns parsed response.
 
     Collects reasoning_steps (thinking, tool calls, results) for frontend display.
@@ -969,6 +997,13 @@ def _call_provider(provider: dict, messages: list, live_data: dict | None) -> di
         parsed = parse_llm_response(raw_content)
         if reasoning_steps:
             parsed["reasoning_steps"] = reasoning_steps
+
+        # Cache successful tool-call patterns for reuse
+        if original_query and reasoning_steps:
+            tool_steps = [s for s in reasoning_steps if s["type"] == "tool_call"]
+            if tool_steps:
+                _query_cache[_cache_key(original_query)] = tool_steps[:5]
+
         return parsed
 
     logger.warning(f"[{pname}] Tool-calling loop exhausted")
@@ -993,7 +1028,6 @@ def call_llm(query: str, data_summary: dict, viewport: dict | None = None,
 
     Raises RuntimeError if no LLM is configured.
     """
-    import time as _time
     if not _PROVIDERS:
         raise RuntimeError("LLM not configured — set CEREBRAS_API_KEY or LLM_API_KEY")
 
@@ -1003,7 +1037,7 @@ def call_llm(query: str, data_summary: dict, viewport: dict | None = None,
     last_error = None
     for provider in _PROVIDERS:
         try:
-            result = _call_provider(provider, messages, live_data)
+            result = _call_provider(provider, messages, live_data, original_query=query)
             result["duration_ms"] = int((_time.monotonic() - t0) * 1000)
             result["provider"] = provider["name"]
             return result
@@ -1016,6 +1050,240 @@ def call_llm(query: str, data_summary: dict, viewport: dict | None = None,
             continue
 
     raise LLMConnectionError(f"All LLM providers failed. Last error: {last_error}")
+
+
+# ---------------------------------------------------------------------------
+# Streaming variant — yields SSE events for real-time progress
+# ---------------------------------------------------------------------------
+
+def _sse(event: str, data: dict) -> str:
+    """Format a single SSE event string."""
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+def _call_provider_streaming(provider: dict, messages: list, live_data: dict | None,
+                              original_query: str = ""):
+    """Generator version of _call_provider — yields SSE event strings."""
+    url = f"{provider['base_url'].rstrip('/')}/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {provider['api_key']}",
+        "Content-Type": "application/json",
+    }
+    model = provider["model"]
+    pname = provider["name"]
+    tools = _build_tools() if live_data else None
+    msgs = list(messages)
+    reasoning_steps: list[dict] = []
+
+    yield _sse("status", {"step": "thinking", "detail": "Analyzing your query..."})
+
+    for _round in range(5):
+        payload: dict = {
+            "model": model,
+            "messages": msgs,
+            "temperature": 0.3,
+        }
+        if pname == "cerebras":
+            payload["max_completion_tokens"] = 8192
+        else:
+            payload["max_tokens"] = 4096
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
+
+        try:
+            resp = httpx.post(url, json=payload, headers=headers, timeout=60.0)
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            status = e.response.status_code
+            body = e.response.text[:300]
+            logger.error(f"[{pname}] LLM API error: {status} — {body}")
+            if tools and status == 400:
+                logger.warning(f"[{pname}] Retrying without tools")
+                tools = None
+                continue
+            if status in (400, 422) and ("content" in body.lower() or "moderation" in body.lower() or "filter" in body.lower()):
+                yield _sse("error", {"error": f"The LLM provider rejected this query (HTTP {status}).", "error_type": "content_filter"})
+                return
+            yield _sse("error", {"error": f"LLM API returned {status}", "error_type": "connection"})
+            return
+        except httpx.TimeoutException:
+            logger.error(f"[{pname}] LLM API request timed out")
+            yield _sse("error", {"error": "LLM request timed out", "error_type": "connection"})
+            return
+        except (httpx.ConnectError, httpx.NetworkError, ConnectionError, OSError) as e:
+            logger.error(f"[{pname}] LLM connection failed: {e}")
+            yield _sse("error", {"error": f"Cannot reach LLM API: {e}", "error_type": "connection"})
+            return
+        except Exception as e:
+            logger.error(f"[{pname}] LLM call failed: {e}")
+            yield _sse("error", {"error": f"LLM call failed: {e}", "error_type": "connection"})
+            return
+
+        resp_data = resp.json()
+        choice = resp_data["choices"][0]
+        message = choice.get("message", {})
+        finish = choice.get("finish_reason", "")
+        usage = resp_data.get("usage", {})
+
+        # Capture reasoning
+        reasoning = message.get("reasoning_content") or ""
+        if not reasoning:
+            thinking = message.get("thinking")
+            if isinstance(thinking, dict):
+                reasoning = thinking.get("content", "")
+        if reasoning:
+            reasoning_steps.append({"type": "thinking", "content": reasoning})
+            yield _sse("status", {"step": "thinking", "detail": "Processing..."})
+
+        # --- Structured tool_calls ---
+        tool_calls = message.get("tool_calls")
+        if tool_calls and live_data:
+            msgs.append(message)
+            for tc in tool_calls:
+                fn_name = tc["function"]["name"]
+                try:
+                    fn_args = json.loads(tc["function"]["arguments"])
+                except json.JSONDecodeError:
+                    fn_args = {}
+                category = fn_args.get("category", "data")
+                yield _sse("status", {"step": "tool_call", "detail": f"Querying {category}..."})
+                logger.info(f"[{pname}] Tool call (native): {fn_name}({json.dumps(fn_args)[:200]})")
+                result_str = execute_tool_call(fn_name, fn_args, live_data)
+                msgs.append({"role": "tool", "tool_call_id": tc["id"], "content": result_str})
+                reasoning_steps.append({"type": "tool_call", "content": f"{fn_name}({json.dumps(fn_args)[:500]})"})
+                reasoning_steps.append({"type": "tool_result", "content": result_str[:1000]})
+                # Extract count for status
+                try:
+                    r = json.loads(result_str)
+                    total = r.get("total", r.get("total_items", "?"))
+                    yield _sse("status", {"step": "tool_result", "detail": f"Found {total} results"})
+                except Exception:
+                    yield _sse("status", {"step": "tool_result", "detail": "Processing results..."})
+            tools = None
+            yield _sse("status", {"step": "thinking", "detail": "Analyzing results..."})
+            continue
+
+        # --- XML-style tool calls ---
+        raw_content = message.get("content", "")
+        inline_calls = _parse_inline_tool_calls(raw_content)
+        if inline_calls and live_data and _round < 2:
+            tool_results = []
+            for fn_name, fn_args in inline_calls:
+                category = fn_args.get("category", "data")
+                yield _sse("status", {"step": "tool_call", "detail": f"Querying {category}..."})
+                logger.info(f"[{pname}] Tool call (inline XML): {fn_name}({json.dumps(fn_args)[:200]})")
+                result_str = execute_tool_call(fn_name, fn_args, live_data)
+                tool_results.append(f"[{fn_name}] {result_str}")
+                reasoning_steps.append({"type": "tool_call", "content": f"{fn_name}({json.dumps(fn_args)[:500]})"})
+                reasoning_steps.append({"type": "tool_result", "content": result_str[:1000]})
+                try:
+                    r = json.loads(result_str)
+                    total = r.get("total", r.get("total_items", "?"))
+                    yield _sse("status", {"step": "tool_result", "detail": f"Found {total} results"})
+                except Exception:
+                    yield _sse("status", {"step": "tool_result", "detail": "Processing results..."})
+            msgs.append({"role": "assistant", "content": raw_content})
+            msgs.append({
+                "role": "user",
+                "content": (
+                    "Here are the results from the data queries you requested:\n\n"
+                    + "\n\n".join(tool_results)
+                    + "\n\nNow produce the final JSON response using these results. "
+                    "Remember: respond ONLY with the JSON object containing summary, layers, "
+                    "viewport, result_entities, etc. Do NOT output any tool calls."
+                ),
+            })
+            yield _sse("status", {"step": "thinking", "detail": "Preparing response..."})
+            continue
+
+        # --- Normal text response ---
+        if finish == "content_filter":
+            yield _sse("error", {"error": "The query was filtered by the LLM provider's content policy.", "error_type": "content_filter"})
+            return
+        refusal = message.get("refusal")
+        if refusal:
+            yield _sse("error", {"error": refusal, "error_type": "content_filter"})
+            return
+        if not raw_content:
+            yield _sse("error", {"error": "The LLM returned an empty response.", "error_type": "content_filter"})
+            return
+
+        parsed = parse_llm_response(raw_content)
+        if reasoning_steps:
+            parsed["reasoning_steps"] = reasoning_steps
+
+        # Cache successful tool-call patterns
+        if original_query and reasoning_steps:
+            tool_steps = [s for s in reasoning_steps if s["type"] == "tool_call"]
+            if tool_steps:
+                _query_cache[_cache_key(original_query)] = tool_steps[:5]
+
+        yield _sse("result", parsed)
+        return
+
+    # Loop exhausted
+    result = {
+        "summary": "The analysis is taking too long. Please try a simpler query.",
+        "layers": None, "viewport": None,
+        "highlight_entities": [], "result_entities": [], "filters": None,
+    }
+    if reasoning_steps:
+        result["reasoning_steps"] = reasoning_steps
+    yield _sse("result", result)
+
+
+def call_llm_streaming(query: str, data_summary: dict, viewport: dict | None = None,
+                       conversation: list | None = None,
+                       search_results: dict | None = None,
+                       live_data: dict | None = None):
+    """Streaming version of call_llm — yields SSE event strings.
+
+    Tries providers in order. Falls back on connection errors.
+    The final event is either 'result' or 'error'.
+    """
+    if not _PROVIDERS:
+        yield _sse("error", {"error": "LLM not configured", "error_type": "connection"})
+        return
+
+    messages = _build_messages(query, data_summary, viewport, conversation, search_results)
+
+    t0 = _time.monotonic()
+    last_error = None
+    for provider in _PROVIDERS:
+        had_result = False
+        try:
+            for event_str in _call_provider_streaming(provider, messages, live_data, original_query=query):
+                # Intercept the final result to attach timing metadata
+                if event_str.startswith("event: result\n"):
+                    data_line = event_str.split("data: ", 1)[1].rsplit("\n\n", 1)[0]
+                    result = json.loads(data_line)
+                    result["duration_ms"] = int((_time.monotonic() - t0) * 1000)
+                    result["provider"] = provider["name"]
+                    yield _sse("result", result)
+                    had_result = True
+                elif event_str.startswith("event: error\n"):
+                    # Check if it's a content filter (don't retry) or connection (retry)
+                    data_line = event_str.split("data: ", 1)[1].rsplit("\n\n", 1)[0]
+                    err = json.loads(data_line)
+                    if err.get("error_type") == "content_filter":
+                        yield event_str
+                        return
+                    # Connection error — try next provider
+                    last_error = err.get("error", "Unknown error")
+                    if len(_PROVIDERS) > 1:
+                        logger.warning(f"[{provider['name']}] streaming failed, trying next provider")
+                    break
+                else:
+                    yield event_str
+            if had_result:
+                return
+        except Exception as e:
+            last_error = str(e)
+            logger.warning(f"[{provider['name']}] streaming exception: {e}")
+            continue
+
+    yield _sse("error", {"error": f"All LLM providers failed. Last error: {last_error}", "error_type": "connection"})
 
 
 # --- Viewport Briefing ---
