@@ -23,6 +23,40 @@ _RE_AIRLINE_CODE_1 = re.compile(r'^([A-Z]{3})\d')
 _RE_AIRLINE_CODE_2 = re.compile(r'^([A-Z]{3})[A-Z\d]')
 
 # ---------------------------------------------------------------------------
+# Airline ICAO code → name lookup (loaded once from OpenFlights-derived data)
+# ---------------------------------------------------------------------------
+_AIRLINE_NAMES: dict[str, str] = {}
+
+def _load_airline_db():
+    path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "airlines.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            for entry in json.load(f):
+                icao = entry.get("icao", "").strip()
+                name = entry.get("name", "").strip()
+                if icao and name and icao != "N/A" and len(icao) <= 4:
+                    _AIRLINE_NAMES[icao] = name
+        logger.info(f"Airline DB loaded: {len(_AIRLINE_NAMES)} ICAO codes")
+    except Exception as e:
+        logger.warning(f"Could not load airline DB: {e}")
+
+_load_airline_db()
+
+# Supplement with newer airlines not in OpenFlights (post-2020 launches)
+_AIRLINE_NAMES.update({
+    "PF": "AirSial",
+    "SEP": "Serene Air",
+    "FBD": "Fly Baghdad",
+    "FJD": "Fly Jinnah",
+    "AKY": "Akasa Air",
+    "AIQ": "AirAsia India",
+    "FLE": "Flyone",
+    "RDA": "Red Air",
+    "ABJ": "Air Premia",
+    "BDI": "Bonza",
+})
+
+# ---------------------------------------------------------------------------
 # OpenSky Network API Client (OAuth2)
 # ---------------------------------------------------------------------------
 class OpenSkyClient:
@@ -299,6 +333,10 @@ def _classify_and_publish(all_adsb_flights):
             if match:
                 airline_code = match.group(1)
 
+            # Resolve airline name: prefer ownOp from API, fall back to ICAO lookup
+            own_op = (f.get("ownOp") or "").strip()
+            airline_name = own_op or _AIRLINE_NAMES.get(airline_code, "")
+
             alt_raw = f.get("alt_baro")
             alt_value = 0
             if isinstance(alt_raw, (int, float)):
@@ -333,6 +371,7 @@ def _classify_and_publish(all_adsb_flights):
                 "speed_knots": speed_knots,
                 "squawk": f.get("squawk", ""),
                 "airline_code": airline_code,
+                "airline_name": airline_name,
                 "aircraft_category": ac_category,
                 "nac_p": f.get("nac_p")
             })

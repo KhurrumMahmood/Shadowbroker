@@ -116,8 +116,10 @@ def build_system_prompt(data_summary: dict, search_results: dict | None = None) 
                 if "callsign" in item:
                     origin = item.get("origin_name", "?")
                     dest = item.get("dest_name", "?")
+                    airline = item.get("airline_name", "")
+                    airline_str = f" [{airline}]" if airline else ""
                     lines.append(
-                        f"  {item.get('callsign','?')} | {origin}→{dest} | "
+                        f"  {item.get('callsign','?')}{airline_str} | {origin}→{dest} | "
                         f"{item.get('model','?')} | alt:{item.get('alt','?')} | "
                         f"id:{item.get('icao24','?')}"
                     )
@@ -210,6 +212,9 @@ QUERYABLE FIELDS PER CATEGORY:
 
 origin_name / dest_name format: "IATA: Airport Name" (e.g. "LHR: London Heathrow", "JFK: John F Kennedy Intl")
 origin_country / dest_country: full country name (e.g. "United States", "United Kingdom", "Germany")
+airline_name: full airline name (e.g. "Delta Air Lines", "AirSial", "Pakistan International Airlines"). \
+Search by airline name for queries like "flights by Delta" or "AirSial flights".
+airline_code: 3-letter ICAO airline code (e.g. "DAL", "PF", "PIA"). Use airline_name for natural language queries.
 Filter with substrings: {{"origin_name": "london"}} matches any origin containing "london".
 For country queries: {{"dest_country": "United States"}} matches flights to US airports."""
 
@@ -234,11 +239,12 @@ _STOP_WORDS = frozenset([
 _SEARCH_CONFIG = {
     "commercial_flights": {
         "fields": ["callsign", "icao24", "registration", "origin_name", "dest_name",
-                    "origin_country", "dest_country", "airline_code", "country", "model"],
+                    "origin_country", "dest_country", "airline_code", "airline_name", "country", "model"],
         "entity_type": "flight",
         "compact": lambda f: {
             "icao24": f.get("icao24", ""),
             "callsign": f.get("callsign", ""),
+            "airline_name": f.get("airline_name", ""),
             "origin_name": f.get("origin_name", ""),
             "dest_name": f.get("dest_name", ""),
             "origin_country": f.get("origin_country", ""),
@@ -370,7 +376,7 @@ _MAX_PER_CATEGORY = 100
 _QUERYABLE_FIELDS = {
     "commercial_flights": ["callsign", "icao24", "origin_name", "dest_name",
                            "origin_country", "dest_country",
-                           "airline_code", "country", "model", "aircraft_category"],
+                           "airline_code", "airline_name", "country", "model", "aircraft_category"],
     "military_flights": ["callsign", "icao24", "country", "model",
                          "military_type", "origin_name", "dest_name"],
     "tracked_flights": ["callsign", "icao24", "tracked_name",
