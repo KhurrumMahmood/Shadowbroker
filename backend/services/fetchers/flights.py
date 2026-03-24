@@ -44,15 +44,15 @@ _load_airline_db()
 
 # Supplement with newer airlines not in OpenFlights (post-2020 launches)
 _AIRLINE_NAMES.update({
-    "PF": "AirSial",
+    "SIS": "AirSial",        # ICAO — was "PF" (2-letter IATA, never matched)
     "SEP": "Serene Air",
-    "FBD": "Fly Baghdad",
+    "FIA": "Fly Baghdad",    # ICAO — was "FBD" (not a real code)
     "FJD": "Fly Jinnah",
     "AKY": "Akasa Air",
     "AIQ": "AirAsia India",
     "FLE": "Flyone",
     "RDA": "Red Air",
-    "ABJ": "Air Premia",
+    "APZ": "Air Premia",     # ICAO — was "ABJ" (that's Abidjan airport)
     "BDI": "Bonza",
 })
 

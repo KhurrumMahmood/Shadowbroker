@@ -522,9 +522,9 @@ def _fuzzy_contains(field_val: str, match_val: str) -> bool:
     if mv_stripped in fv_stripped:
         return True
 
-    # 3. All tokens present (handles "Turkish Air" vs "Turkish Airlines")
+    # 3. All tokens present as whole words (handles "Turkish Air" vs "Turkish Airlines")
     tokens = mv.split()
-    if len(tokens) > 1 and all(t in fv for t in tokens):
+    if len(tokens) > 1 and all(re.search(r'\b' + re.escape(t) + r'\b', fv) for t in tokens):
         return True
 
     return False

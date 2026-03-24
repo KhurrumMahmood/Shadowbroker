@@ -229,8 +229,8 @@ def run_tests():
         report("Assistant query responds (not stuck in retry loop)",
                elapsed < 280000,  # should respond well within 280s
                f"status={status}, elapsed={elapsed}ms")
-        report("Assistant query returns valid status (200 or 500, not timeout)",
-               status in (200, 400, 422, 500, 503),
+        report("Assistant query returns valid status (not server error)",
+               status in (200, 400, 422),
                f"status={status}")
 
         # Briefing endpoint test (uses provider fallback)

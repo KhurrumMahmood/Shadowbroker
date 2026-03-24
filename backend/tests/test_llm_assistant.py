@@ -229,6 +229,10 @@ class TestFuzzyContains:
         # But it DOES match via direct substring since "air" is in "AirSial"
         assert _fuzzy_contains("AirSial", "air")
 
+    def test_token_no_cross_word_match(self):
+        """'Air India' must NOT match 'Thai AirAsia India' — 'air' is inside 'airasia', not a whole word."""
+        assert not _fuzzy_contains("Thai AirAsia India", "Air India")
+
     def test_apply_filters_uses_fuzzy(self):
         """_apply_filters should use fuzzy matching."""
         items = [
