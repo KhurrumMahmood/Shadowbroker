@@ -54,6 +54,8 @@ def fetch_ships():
 # Airports (ourairports.com)
 # ---------------------------------------------------------------------------
 cached_airports = []
+# IATA code → { country_code, country_name, region_code } for flight enrichment
+airport_country_lookup: dict[str, dict] = {}
 
 
 def find_nearest_airport(lat, lng, max_distance_nm=200):
@@ -88,10 +90,23 @@ def find_nearest_airport(lat, lng, max_distance_nm=200):
     return None
 
 
+def _fetch_country_names() -> dict[str, str]:
+    """Download OurAirports countries.csv → {iso_code: country_name}."""
+    try:
+        resp = fetch_with_curl("https://ourairports.com/data/countries.csv", timeout=10)
+        if resp.status_code == 200:
+            reader = csv.DictReader(io.StringIO(resp.text))
+            return {row["code"]: row["name"] for row in reader if row.get("code")}
+    except Exception as e:
+        logger.warning(f"Could not fetch countries.csv: {e}")
+    return {}
+
+
 def fetch_airports():
-    global cached_airports
+    global cached_airports, airport_country_lookup
     if not cached_airports:
         logger.info("Downloading global airports database from ourairports.com...")
+        country_names = _fetch_country_names()
         try:
             url = "https://ourairports.com/data/airports.csv"
             response = fetch_with_curl(url, timeout=15)
@@ -100,15 +115,24 @@ def fetch_airports():
                 reader = csv.DictReader(f)
                 for row in reader:
                     if row['type'] == 'large_airport' and row['iata_code']:
+                        iso_country = row.get('iso_country', '')
+                        iso_region = row.get('iso_region', '')
                         cached_airports.append({
                             "id": row['ident'],
                             "name": row['name'],
                             "iata": row['iata_code'],
                             "lat": float(row['latitude_deg']),
                             "lng": float(row['longitude_deg']),
+                            "iso_country": iso_country,
+                            "iso_region": iso_region,
                             "type": "airport"
                         })
-                logger.info(f"Loaded {len(cached_airports)} large airports into cache.")
+                        airport_country_lookup[row['iata_code']] = {
+                            "country_code": iso_country,
+                            "country_name": country_names.get(iso_country, iso_country),
+                            "region_code": iso_region,
+                        }
+                logger.info(f"Loaded {len(cached_airports)} large airports with country data.")
         except Exception as e:
             logger.error(f"Error fetching airports: {e}")
 

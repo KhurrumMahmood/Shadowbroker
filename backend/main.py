@@ -2,7 +2,11 @@ import os
 import time
 import logging
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO),
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    datefmt="%H:%M:%S",
+)
 logger = logging.getLogger(__name__)
 _start_time = time.time()
 

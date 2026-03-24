@@ -69,6 +69,7 @@ export default function AIAssistantPanel({
   const [mode, setMode] = useState<PanelMode>("chat");
   const [conversationId, setConversationId] = useState<string>(generateId);
   const [flashEntity, setFlashEntity] = useState<string | null>(null);
+  const [expandedReasoning, setExpandedReasoning] = useState<Set<number>>(new Set());
   const [prevMode, setPrevMode] = useState<PanelMode>("chat");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -197,6 +198,7 @@ export default function AIAssistantPanel({
         role: "assistant",
         content: validated.summary,
         action,
+        reasoning_steps: validated.reasoning_steps,
         timestamp: Date.now(),
       };
       const updated = [...newMessages, assistantMsg];
@@ -285,6 +287,13 @@ export default function AIAssistantPanel({
   const chipClass =
     "text-[9px] font-mono px-2 py-0.5 rounded border border-cyan-800/40 text-cyan-400 hover:bg-cyan-950/30 cursor-pointer transition-colors inline-flex items-center gap-1";
 
+  const formatLayerLabel = (layers: Record<string, boolean>) => {
+    const on = Object.entries(layers).filter(([, v]) => v).map(([k]) => k.replace(/_/g, " ").toUpperCase());
+    if (on.length === 0) return "HIDE LAYERS";
+    if (on.length <= 2) return on.join(", ") + " ON";
+    return `${on.length} LAYERS ON`;
+  };
+
   const renderActionChips = (action: StoredAction) => (
     <div className="mt-1.5 pt-1.5 border-t border-cyan-800/30 flex flex-wrap gap-1">
       {action.viewport && (
@@ -293,12 +302,12 @@ export default function AIAssistantPanel({
           onClick={(e) => { e.stopPropagation(); onFlyTo(action.viewport!.lat, action.viewport!.lng, action.viewport!.zoom); }}
           className={chipClass}
         >
-          FLY TO {action.viewport.lat.toFixed(1)}, {action.viewport.lng.toFixed(1)}
+          {action.viewport_label ? `GO TO ${action.viewport_label.toUpperCase()}` : `FLY TO ${action.viewport.lat.toFixed(1)}, ${action.viewport.lng.toFixed(1)}`}
         </button>
       )}
       {action.layers && (
         <button type="button" onClick={(e) => { e.stopPropagation(); onApplyLayers(action.layers!); }} className={chipClass}>
-          APPLY LAYERS
+          {formatLayerLabel(action.layers)}
         </button>
       )}
       {action.filters && (
@@ -454,6 +463,43 @@ export default function AIAssistantPanel({
                       }`}
                     >
                       {msg.content}
+                      {msg.reasoning_steps && msg.reasoning_steps.length > 0 && (
+                        <div className="mt-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedReasoning((prev) => {
+                                const next = new Set(prev);
+                                next.has(i) ? next.delete(i) : next.add(i);
+                                return next;
+                              });
+                            }}
+                            className="text-[8px] font-mono text-cyan-500/50 hover:text-cyan-400 transition-colors"
+                          >
+                            {expandedReasoning.has(i) ? "HIDE" : "SHOW"} REASONING ({msg.reasoning_steps.length} steps)
+                          </button>
+                          {expandedReasoning.has(i) && (
+                            <div className="mt-1 pl-2 border-l border-cyan-800/30 space-y-1">
+                              {msg.reasoning_steps.map((step, si) => (
+                                <div key={si} className="text-[8px] font-mono leading-snug">
+                                  <span className={
+                                    step.type === "thinking" ? "text-amber-400/70" :
+                                    step.type === "tool_call" ? "text-blue-400/70" :
+                                    step.type === "tool_result" ? "text-green-400/70" :
+                                    "text-cyan-400/70"
+                                  }>
+                                    {step.type.toUpperCase()}
+                                  </span>
+                                  <span className="text-[var(--text-muted)] ml-1">
+                                    {step.content.length > 300 ? step.content.slice(0, 300) + "…" : step.content}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                       {msg.action && renderActionChips(msg.action)}
                     </div>
                     {msg.role === "user" && (
@@ -604,12 +650,12 @@ export default function AIAssistantPanel({
                             onClick={(e) => { e.stopPropagation(); onFlyTo(msg.action!.viewport!.lat, msg.action!.viewport!.lng, msg.action!.viewport!.zoom); }}
                             className={chipClass}
                           >
-                            FLY TO {msg.action.viewport.lat.toFixed(1)}, {msg.action.viewport.lng.toFixed(1)}
+                            {msg.action.viewport_label ? `GO TO ${msg.action.viewport_label.toUpperCase()}` : `FLY TO ${msg.action.viewport.lat.toFixed(1)}, ${msg.action.viewport.lng.toFixed(1)}`}
                           </button>
                         )}
                         {msg.action.layers && (
                           <button type="button" onClick={(e) => { e.stopPropagation(); onApplyLayers(msg.action!.layers!); }} className={chipClass}>
-                            APPLY LAYERS
+                            {formatLayerLabel(msg.action.layers)}
                           </button>
                         )}
                         {msg.action.filters && (

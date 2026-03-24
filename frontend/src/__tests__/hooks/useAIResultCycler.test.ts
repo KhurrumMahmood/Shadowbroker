@@ -69,4 +69,41 @@ describe("findEntityInData", () => {
     expect(found).not.toBeNull();
     expect(found!.item.name).toBe("USS NIMITZ");
   });
+
+  // ── TYPE_ALIASES tests ──
+
+  it("resolves 'military' alias to military_flight", () => {
+    const found = findEntityInData("military", "mil001", MOCK_DATA);
+    expect(found).not.toBeNull();
+    expect(found!.item.callsign).toBe("RCH401");
+    expect(found!.entityType).toBe("military_flight");
+  });
+
+  it("resolves 'commercial' alias to flight", () => {
+    const found = findEntityInData("commercial", "abc123", MOCK_DATA);
+    expect(found).not.toBeNull();
+    expect(found!.item.callsign).toBe("BA123");
+    expect(found!.entityType).toBe("flight");
+  });
+
+  it("resolves 'base' alias to military_base", () => {
+    const found = findEntityInData("base", "Ramstein Air Base", MOCK_DATA);
+    expect(found).not.toBeNull();
+    expect(found!.item.country).toBe("Germany");
+    expect(found!.entityType).toBe("military_base");
+  });
+
+  // ── id: prefix stripping ──
+
+  it("strips 'id:' prefix from entity id", () => {
+    const found = findEntityInData("flight", "id:abc123", MOCK_DATA);
+    expect(found).not.toBeNull();
+    expect(found!.item.callsign).toBe("BA123");
+  });
+
+  it("strips 'id:' prefix from numeric id", () => {
+    const found = findEntityInData("ship", "id:222222", MOCK_DATA);
+    expect(found).not.toBeNull();
+    expect(found!.item.name).toBe("FRONT ALTAIR");
+  });
 });

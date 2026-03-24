@@ -224,18 +224,23 @@ def fetch_routes_background(sampled):
                     elif isinstance(route_data, list):
                         route_list = route_data
 
+                    from services.fetchers.geo import airport_country_lookup
                     for route in route_list:
                         callsign = route.get("callsign", "")
                         airports = route.get("_airports", [])
                         if airports and len(airports) >= 2:
                             orig_apt = airports[0]
                             dest_apt = airports[-1]
+                            orig_info = airport_country_lookup.get(orig_apt.get("iata", ""), {})
+                            dest_info = airport_country_lookup.get(dest_apt.get("iata", ""), {})
                             with _routes_lock:
                                 dynamic_routes_cache[callsign] = {
                                     "orig_name": f"{orig_apt.get('iata', '')}: {orig_apt.get('name', 'Unknown')}",
                                     "dest_name": f"{dest_apt.get('iata', '')}: {dest_apt.get('name', 'Unknown')}",
                                     "orig_loc": [orig_apt.get("lon", 0), orig_apt.get("lat", 0)],
                                     "dest_loc": [dest_apt.get("lon", 0), dest_apt.get("lat", 0)],
+                                    "orig_country": orig_info.get("country_name", ""),
+                                    "dest_country": dest_info.get("country_name", ""),
                                 }
                 time.sleep(0.25)
             except (requests.RequestException, ConnectionError, TimeoutError, ValueError, KeyError, json.JSONDecodeError, OSError) as e:
@@ -320,6 +325,8 @@ def _classify_and_publish(all_adsb_flights):
                 "dest_loc": dest_loc,
                 "origin_name": origin_name,
                 "dest_name": dest_name,
+                "origin_country": cached_route.get("orig_country", "") if cached_route else "",
+                "dest_country": cached_route.get("dest_country", "") if cached_route else "",
                 "registration": f.get("r", "N/A"),
                 "model": f.get("t", "Unknown"),
                 "icao24": f.get("hex", ""),

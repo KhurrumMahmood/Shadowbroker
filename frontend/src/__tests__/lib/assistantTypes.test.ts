@@ -287,4 +287,79 @@ describe('extractStoredAction', () => {
     });
     expect(extractStoredAction(resp)).toBeUndefined();
   });
+
+  it('extracts viewport_label from summary', () => {
+    const resp = validateAssistantResponse({
+      summary: "Showing military flights near London, with 3 results.",
+      viewport: { lat: 51.5, lng: -0.1, zoom: 7 },
+    });
+    const action = extractStoredAction(resp);
+    expect(action).toBeDefined();
+    expect(action!.viewport_label).toBe("London");
+  });
+
+  it('falls back to no viewport_label when summary has no location', () => {
+    const resp = validateAssistantResponse({
+      summary: "Here are the results.",
+      viewport: { lat: 51.5, lng: -0.1, zoom: 7 },
+    });
+    const action = extractStoredAction(resp);
+    expect(action).toBeDefined();
+    expect(action!.viewport_label).toBeUndefined();
+  });
+});
+
+// ── reasoning_steps tests ──
+
+describe('validateAssistantResponse reasoning_steps', () => {
+  it('passes through valid reasoning steps', () => {
+    const result = validateAssistantResponse({
+      summary: "test",
+      reasoning_steps: [
+        { type: "thinking", content: "Analyzing query..." },
+        { type: "tool_call", content: "query_data(category='flights')" },
+        { type: "tool_result", content: "Found 5 flights" },
+        { type: "response", content: "Here are 5 flights" },
+      ],
+    });
+    expect(result.reasoning_steps).toHaveLength(4);
+    expect(result.reasoning_steps![0].type).toBe("thinking");
+    expect(result.reasoning_steps![2].type).toBe("tool_result");
+  });
+
+  it('filters out invalid reasoning step types', () => {
+    const result = validateAssistantResponse({
+      summary: "test",
+      reasoning_steps: [
+        { type: "thinking", content: "ok" },
+        { type: "bogus", content: "bad" },
+        { type: "tool_call", content: "ok" },
+      ],
+    });
+    expect(result.reasoning_steps).toHaveLength(2);
+  });
+
+  it('filters out entries with non-string content', () => {
+    const result = validateAssistantResponse({
+      summary: "test",
+      reasoning_steps: [
+        { type: "thinking", content: 123 },
+        { type: "tool_call", content: "ok" },
+      ],
+    });
+    expect(result.reasoning_steps).toHaveLength(1);
+  });
+
+  it('returns undefined reasoning_steps when empty', () => {
+    const result = validateAssistantResponse({
+      summary: "test",
+      reasoning_steps: [],
+    });
+    expect(result.reasoning_steps).toBeUndefined();
+  });
+
+  it('returns undefined reasoning_steps when missing', () => {
+    const result = validateAssistantResponse({ summary: "test" });
+    expect(result.reasoning_steps).toBeUndefined();
+  });
 });

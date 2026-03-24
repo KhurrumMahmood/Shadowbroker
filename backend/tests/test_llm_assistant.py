@@ -10,6 +10,8 @@ from services.llm_assistant import (
     _exec_aggregate_data,
     execute_tool_call,
     _apply_filters,
+    _QUERYABLE_FIELDS,
+    _SEARCH_CONFIG,
 )
 
 
@@ -335,3 +337,65 @@ class TestParseInlineToolCalls:
         assert len(calls) == 2
         assert calls[0][0] == "query_data"
         assert calls[1][0] == "aggregate_data"
+
+
+# --- Reasoning steps preservation ---
+
+class TestReasoningStepsPreservation:
+    """parse_llm_response uses json.loads + setdefault — extra keys like reasoning_steps survive."""
+
+    def test_reasoning_steps_preserved_in_parsed_response(self):
+        raw = json.dumps({
+            "summary": "Analysis complete.",
+            "reasoning_steps": [
+                {"type": "thinking", "content": "Analyzing query..."},
+                {"type": "tool_call", "content": "query_data(category='flights')"},
+                {"type": "tool_result", "content": "Found 5 flights"},
+            ],
+        })
+        result = parse_llm_response(raw)
+        assert "reasoning_steps" in result
+        assert len(result["reasoning_steps"]) == 3
+        assert result["reasoning_steps"][0]["type"] == "thinking"
+
+    def test_no_reasoning_steps_when_absent(self):
+        raw = json.dumps({"summary": "Simple response."})
+        result = parse_llm_response(raw)
+        assert "reasoning_steps" not in result
+
+
+# --- Country enrichment field coverage ---
+
+class TestCountryFieldsInConfig:
+    def test_queryable_fields_has_country(self):
+        fields = _QUERYABLE_FIELDS.get("commercial_flights", [])
+        assert "origin_country" in fields
+        assert "dest_country" in fields
+
+    def test_search_config_has_country(self):
+        config = _SEARCH_CONFIG.get("commercial_flights", {})
+        search_fields = config.get("fields", [])
+        assert "origin_country" in search_fields
+        assert "dest_country" in search_fields
+
+    def test_query_filters_by_country(self):
+        flights = [
+            {"callsign": "BA1", "icao24": "x1", "origin_name": "LHR",
+             "dest_name": "JFK", "origin_country": "United Kingdom",
+             "dest_country": "United States", "country": "UK", "model": "B777",
+             "lat": 51.0, "lng": -0.5, "alt": 35000, "airline_code": "BAW",
+             "aircraft_category": "plane"},
+            {"callsign": "AF2", "icao24": "x2", "origin_name": "CDG",
+             "dest_name": "NRT", "origin_country": "France",
+             "dest_country": "Japan", "country": "FR", "model": "A380",
+             "lat": 48.8, "lng": 2.3, "alt": 38000, "airline_code": "AFR",
+             "aircraft_category": "plane"},
+        ]
+        data = {"commercial_flights": flights}
+        raw = _exec_query_data({
+            "category": "commercial_flights",
+            "filters": {"dest_country": "United States"},
+        }, data)
+        result = json.loads(raw)
+        assert result["total"] == 1
+        assert result["results"][0]["callsign"] == "BA1"

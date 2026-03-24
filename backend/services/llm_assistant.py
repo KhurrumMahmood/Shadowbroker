@@ -178,7 +178,9 @@ QUERYABLE FIELDS PER CATEGORY:
 {chr(10).join(f"- {{k}}: {{', '.join(v)}}" for k, v in _QUERYABLE_FIELDS.items())}
 
 origin_name / dest_name format: "IATA: Airport Name" (e.g. "LHR: London Heathrow", "JFK: John F Kennedy Intl")
-Filter with substrings: {{"origin_name": "london"}} matches any origin containing "london"."""
+origin_country / dest_country: full country name (e.g. "United States", "United Kingdom", "Germany")
+Filter with substrings: {{"origin_name": "london"}} matches any origin containing "london".
+For country queries: {{"dest_country": "United States"}} matches flights to US airports."""
 
 
 _STOP_WORDS = frozenset([
@@ -201,13 +203,15 @@ _STOP_WORDS = frozenset([
 _SEARCH_CONFIG = {
     "commercial_flights": {
         "fields": ["callsign", "icao24", "registration", "origin_name", "dest_name",
-                    "airline_code", "country", "model"],
+                    "origin_country", "dest_country", "airline_code", "country", "model"],
         "entity_type": "flight",
         "compact": lambda f: {
             "icao24": f.get("icao24", ""),
             "callsign": f.get("callsign", ""),
             "origin_name": f.get("origin_name", ""),
             "dest_name": f.get("dest_name", ""),
+            "origin_country": f.get("origin_country", ""),
+            "dest_country": f.get("dest_country", ""),
             "country": f.get("country", ""),
             "model": f.get("model", ""),
             "lat": f.get("lat"), "lng": f.get("lng"),
@@ -334,6 +338,7 @@ _MAX_PER_CATEGORY = 100
 # Fields the LLM can filter/group on per category
 _QUERYABLE_FIELDS = {
     "commercial_flights": ["callsign", "icao24", "origin_name", "dest_name",
+                           "origin_country", "dest_country",
                            "airline_code", "country", "model", "aircraft_category"],
     "military_flights": ["callsign", "icao24", "country", "model",
                          "military_type", "origin_name", "dest_name"],
@@ -792,6 +797,7 @@ def _build_messages(query: str, data_summary: dict, viewport: dict | None,
 def _call_provider(provider: dict, messages: list, live_data: dict | None) -> dict:
     """Run the tool-calling loop against a single provider. Returns parsed response.
 
+    Collects reasoning_steps (thinking, tool calls, results) for frontend display.
     Raises ContentFilterError, LLMConnectionError on failure.
     """
     url = f"{provider['base_url'].rstrip('/')}/chat/completions"
@@ -804,6 +810,7 @@ def _call_provider(provider: dict, messages: list, live_data: dict | None) -> di
     tools = _build_tools() if live_data else None
     # Work on a copy of messages so tool-loop appends don't leak across providers
     msgs = list(messages)
+    reasoning_steps: list[dict] = []
 
     for _round in range(3):
         payload: dict = {
@@ -847,6 +854,27 @@ def _call_provider(provider: dict, messages: list, live_data: dict | None) -> di
         resp_data = resp.json()
         choice = resp_data["choices"][0]
         message = choice.get("message", {})
+        finish = choice.get("finish_reason", "")
+
+        # --- Debug logging ---
+        usage = resp_data.get("usage", {})
+        ct_details = usage.get("completion_tokens_details", {})
+        logger.debug(
+            f"[{pname}] model={model} finish_reason={finish} "
+            f"prompt_tokens={usage.get('prompt_tokens', '?')} "
+            f"completion_tokens={usage.get('completion_tokens', '?')} "
+            f"reasoning_tokens={ct_details.get('reasoning_tokens', usage.get('reasoning_tokens', '-'))}"
+        )
+
+        # Capture reasoning/thinking content (GLM-4.7 interleaved thinking)
+        reasoning = message.get("reasoning_content") or ""
+        if not reasoning:
+            thinking = message.get("thinking")
+            if isinstance(thinking, dict):
+                reasoning = thinking.get("content", "")
+        if reasoning:
+            logger.debug(f"[{pname}] Reasoning:\n{reasoning[:1000]}")
+            reasoning_steps.append({"type": "thinking", "content": reasoning})
 
         # --- Structured tool_calls (OpenAI-native) ---
         tool_calls = message.get("tool_calls")
@@ -861,6 +889,8 @@ def _call_provider(provider: dict, messages: list, live_data: dict | None) -> di
                 logger.info(f"[{pname}] Tool call (native): {fn_name}({json.dumps(fn_args)[:200]})")
                 result_str = execute_tool_call(fn_name, fn_args, live_data)
                 msgs.append({"role": "tool", "tool_call_id": tc["id"], "content": result_str})
+                reasoning_steps.append({"type": "tool_call", "content": f"{fn_name}({json.dumps(fn_args)[:500]})"})
+                reasoning_steps.append({"type": "tool_result", "content": result_str[:1000]})
             tools = None
             continue
 
@@ -873,6 +903,8 @@ def _call_provider(provider: dict, messages: list, live_data: dict | None) -> di
                 logger.info(f"[{pname}] Tool call (inline XML): {fn_name}({json.dumps(fn_args)[:200]})")
                 result_str = execute_tool_call(fn_name, fn_args, live_data)
                 tool_results.append(f"[{fn_name}] {result_str}")
+                reasoning_steps.append({"type": "tool_call", "content": f"{fn_name}({json.dumps(fn_args)[:500]})"})
+                reasoning_steps.append({"type": "tool_result", "content": result_str[:1000]})
             msgs.append({"role": "assistant", "content": raw_content})
             msgs.append({
                 "role": "user",
@@ -887,7 +919,6 @@ def _call_provider(provider: dict, messages: list, live_data: dict | None) -> di
             continue
 
         # --- Normal text response ---
-        finish = choice.get("finish_reason", "")
         if finish == "content_filter":
             raise ContentFilterError("The query was filtered by the LLM provider's content policy.")
         refusal = message.get("refusal")
@@ -897,15 +928,24 @@ def _call_provider(provider: dict, messages: list, live_data: dict | None) -> di
             raise ContentFilterError("The LLM returned an empty response — the query may have been filtered.")
         if finish == "length":
             logger.warning(f"[{pname}] LLM response truncated (finish_reason=length)")
-        logger.info(f"[{pname}] LLM responded successfully")
-        return parse_llm_response(raw_content)
+
+        logger.debug(f"[{pname}] Raw LLM content:\n{raw_content[:2000]}")
+        logger.info(f"[{pname}] LLM responded (tokens: {usage.get('completion_tokens', '?')})")
+
+        parsed = parse_llm_response(raw_content)
+        if reasoning_steps:
+            parsed["reasoning_steps"] = reasoning_steps
+        return parsed
 
     logger.warning(f"[{pname}] Tool-calling loop exhausted")
-    return {
+    result = {
         "summary": "The analysis is taking too long. Please try a simpler query.",
         "layers": None, "viewport": None,
         "highlight_entities": [], "result_entities": [], "filters": None,
     }
+    if reasoning_steps:
+        result["reasoning_steps"] = reasoning_steps
+    return result
 
 
 def call_llm(query: str, data_summary: dict, viewport: dict | None = None,

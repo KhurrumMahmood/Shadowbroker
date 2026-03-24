@@ -2,6 +2,18 @@ import { useState, useCallback, useRef } from "react";
 import type { DashboardData, SelectedEntity } from "@/types/dashboard";
 import { toSelectedEntity } from "./useCategoryCycler";
 
+/** Normalize entity types the LLM might return in non-canonical forms */
+const TYPE_ALIASES: Record<string, string> = {
+  military: "military_flight",
+  commercial: "flight",
+  commercial_flight: "flight",
+  private: "private_flight",
+  jet: "private_jet",
+  base: "military_base",
+  fire: "firms_fire",
+  outage: "internet_outage",
+};
+
 /** Entity type → data key mapping for lookup */
 const TYPE_TO_DATA_KEY: Record<string, string> = {
   flight: "commercial_flights",
@@ -28,19 +40,27 @@ export function findEntityInData(
   id: string | number,
   data: DashboardData,
 ): { item: any; entityType: string } | null {
-  const dataKey = TYPE_TO_DATA_KEY[type];
-  if (!dataKey) return null;
+  const normalizedType = TYPE_ALIASES[type] ?? type;
+  const dataKey = TYPE_TO_DATA_KEY[normalizedType];
+  if (!dataKey) {
+    console.warn(`[AI Results] Unknown entity type "${type}" — no mapping in TYPE_TO_DATA_KEY`);
+    return null;
+  }
 
   const items = (data as any)[dataKey];
   if (!Array.isArray(items)) return null;
 
-  const idStr = String(id);
+  // Strip "id:" prefix the LLM may include from search result format
+  const idStr = String(id).replace(/^id:/, "");
   const match = items.find((item: any) => {
     const itemId = item.icao24 || item.mmsi || item.id || item.name;
     return String(itemId) === idStr;
   });
 
-  return match ? { item: match, entityType: type } : null;
+  if (!match) {
+    console.warn(`[AI Results] Entity ${type}:${id} not found in ${dataKey} (${items.length} items)`);
+  }
+  return match ? { item: match, entityType: normalizedType } : null;
 }
 
 export interface AIResultState {
@@ -85,6 +105,8 @@ export function useAIResultCycler(
           idSet.add(`${type}:${String(selected.id)}`);
         }
       }
+
+      console.log(`[AI Results] Resolved ${resolved.length}/${entities.length} entities`);
 
       setResultsState(resolved);
       setResultIdSet(idSet);

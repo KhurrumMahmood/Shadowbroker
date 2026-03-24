@@ -16,6 +16,11 @@ const VALID_FILTERS = new Set([
   "ship_name", "ship_type",
 ]);
 
+export interface ReasoningStep {
+  type: "thinking" | "tool_call" | "tool_result" | "response";
+  content: string;
+}
+
 export interface AssistantResponse {
   summary: string;
   layers: Record<string, boolean> | null;
@@ -23,6 +28,7 @@ export interface AssistantResponse {
   highlight_entities: Array<{ type: string; id: string | number }>;
   result_entities: Array<{ type: string; id: string | number }>;
   filters: Record<string, string[]> | null;
+  reasoning_steps?: ReasoningStep[];
 }
 
 /**
@@ -105,7 +111,20 @@ export function validateAssistantResponse(raw: unknown): AssistantResponse {
     // {} means "clear all filters" — preserve it as distinct from null ("no change")
   }
 
-  return { summary, layers, viewport, highlight_entities, result_entities, filters };
+  // Reasoning steps — pass through valid entries
+  const VALID_STEP_TYPES = new Set(["thinking", "tool_call", "tool_result", "response"]);
+  let reasoning_steps: ReasoningStep[] | undefined;
+  if (Array.isArray(obj.reasoning_steps)) {
+    const valid = obj.reasoning_steps.filter(
+      (s: unknown) =>
+        s && typeof s === "object" &&
+        VALID_STEP_TYPES.has((s as Record<string, unknown>).type as string) &&
+        typeof (s as Record<string, unknown>).content === "string",
+    ) as ReasoningStep[];
+    if (valid.length > 0) reasoning_steps = valid;
+  }
+
+  return { summary, layers, viewport, highlight_entities, result_entities, filters, reasoning_steps };
 }
 
 /**
@@ -124,6 +143,11 @@ export function extractStoredAction(
   }
   if (resp.viewport) {
     action.viewport = resp.viewport;
+    // Try to extract a readable location name from the summary
+    const locMatch = resp.summary.match(
+      /(?:near|around|over|in|at|to|toward|towards|of)\s+([A-Z][a-zA-Z\s]+?)(?=[,.]|\s+(?:area|region|and|with|showing|where|—|-))/,
+    );
+    if (locMatch) action.viewport_label = locMatch[1].trim();
     hasAction = true;
   }
   if (resp.filters !== null) {
