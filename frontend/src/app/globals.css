@@ -200,3 +200,18 @@ body {
 .map-focus-active .maplibregl-popup {
   z-index: 10 !important;
 }
+
+/* Pulsing ring indicator for selected/searched entities */
+.entity-pulse-marker {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid cyan;
+  animation: entity-pulse 1.5s ease-out infinite;
+  pointer-events: none;
+}
+@keyframes entity-pulse {
+  0% { transform: scale(0.5); opacity: 1; box-shadow: 0 0 0 0 rgba(0, 255, 255, 0.6); }
+  70% { transform: scale(1.5); opacity: 0.3; box-shadow: 0 0 20px 10px rgba(0, 255, 255, 0); }
+  100% { transform: scale(1.5); opacity: 0; }
+}

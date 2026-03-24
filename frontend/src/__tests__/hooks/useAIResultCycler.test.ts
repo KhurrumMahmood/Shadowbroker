@@ -106,4 +106,39 @@ describe("findEntityInData", () => {
     expect(found).not.toBeNull();
     expect(found!.item.name).toBe("FRONT ALTAIR");
   });
+
+  // ── Re-resolution: fresh data returns updated positions ──
+
+  it("returns updated position when entity has moved", () => {
+    const staleData = {
+      ...MOCK_DATA,
+      commercial_flights: [
+        { icao24: "abc123", callsign: "BA123", lat: 51.0, lng: -0.5, alt: 35000, origin_name: "LHR" },
+      ],
+    } as unknown as DashboardData;
+
+    const freshData = {
+      ...MOCK_DATA,
+      commercial_flights: [
+        { icao24: "abc123", callsign: "BA123", lat: 52.5, lng: 1.2, alt: 36000, origin_name: "LHR" },
+      ],
+    } as unknown as DashboardData;
+
+    const stale = findEntityInData("flight", "abc123", staleData);
+    const fresh = findEntityInData("flight", "abc123", freshData);
+
+    expect(stale!.item.lat).toBe(51.0);
+    expect(fresh!.item.lat).toBe(52.5);
+    expect(fresh!.item.lng).toBe(1.2);
+  });
+
+  it("returns null when entity is no longer in data", () => {
+    const emptyData = {
+      ...MOCK_DATA,
+      commercial_flights: [],
+    } as unknown as DashboardData;
+
+    const found = findEntityInData("flight", "abc123", emptyData);
+    expect(found).toBeNull();
+  });
 });

@@ -127,32 +127,54 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
         return results;
     }, [data?.tracked_flights]);
 
-    const layers = [
-        { id: "flights", name: "Commercial Flights", source: "adsb.lol", count: data?.commercial_flights?.length || 0, icon: Plane },
-        { id: "private", name: "Private Flights", source: "adsb.lol", count: data?.private_flights?.length || 0, icon: Plane },
-        { id: "jets", name: "Private Jets", source: "adsb.lol", count: data?.private_jets?.length || 0, icon: Plane },
-        { id: "military", name: "Military Flights", source: "adsb.lol", count: data?.military_flights?.length || 0, icon: AlertTriangle },
-        { id: "tracked", name: "Tracked Aircraft", source: "Plane-Alert DB", count: data?.tracked_flights?.length || 0, icon: Eye },
-        { id: "earthquakes", name: "Earthquakes (24h)", source: "USGS", count: data?.earthquakes?.length || 0, icon: Activity },
-        { id: "satellites", name: "Satellites", source: data?.satellite_source === "celestrak" ? "CelesTrak SGP4" : data?.satellite_source === "tle_api" ? "TLE API · SGP4" : data?.satellite_source === "disk_cache" ? "Cached · SGP4 (est.)" : "CelesTrak SGP4", count: data?.satellites?.length || 0, icon: Satellite },
-        { id: "ships_military", name: "Military / Carriers", source: "AIS Stream", count: militaryShipCount, icon: Ship },
-        { id: "ships_cargo", name: "Cargo / Tankers", source: "AIS Stream", count: cargoShipCount, icon: Ship },
-        { id: "ships_civilian", name: "Civilian Vessels", source: "AIS Stream", count: civilianShipCount, icon: Anchor },
-        { id: "ships_passenger", name: "Cruise / Passenger", source: "AIS Stream", count: passengerShipCount, icon: Anchor },
-        { id: "ships_tracked_yachts", name: "Tracked Yachts", source: "Yacht-Alert DB", count: trackedYachtCount, icon: Eye },
-        { id: "ukraine_frontline", name: "Ukraine Frontline", source: "DeepStateMap", count: data?.frontlines ? 1 : 0, icon: AlertTriangle },
-        { id: "global_incidents", name: "Global Incidents", source: "GDELT", count: data?.gdelt?.length || 0, icon: Activity },
-        { id: "cctv", name: "CCTV Mesh", source: "CCTV Mesh + Street View", count: data?.cctv?.length || 0, icon: Cctv },
-        { id: "gps_jamming", name: "GPS Jamming", source: "ADS-B NACp", count: data?.gps_jamming?.length || 0, icon: Radio },
-        { id: "gibs_imagery", name: "MODIS Terra (Daily)", source: "NASA GIBS", count: null, icon: Globe },
-        { id: "highres_satellite", name: "High-Res Satellite", source: "Esri World Imagery", count: null, icon: Satellite },
-        { id: "kiwisdr", name: "KiwiSDR Receivers", source: "KiwiSDR.com", count: data?.kiwisdr?.length || 0, icon: Radio },
-        { id: "firms", name: "Fire Hotspots (24h)", source: "NASA FIRMS VIIRS", count: data?.firms_fires?.length || 0, icon: Flame },
-        { id: "internet_outages", name: "Internet Outages", source: "IODA / Georgia Tech", count: data?.internet_outages?.length || 0, icon: Wifi },
-        { id: "datacenters", name: "Data Centers", source: "DC Map (GitHub)", count: data?.datacenters?.length || 0, icon: Server },
-        { id: "power_plants", name: "Power Plants", source: "WRI (Static)", count: data?.power_plants?.length || 0, icon: Zap },
-        { id: "military_bases", name: "Military Bases", source: "OSINT (Static)", count: data?.military_bases?.length || 0, icon: Shield },
-        { id: "day_night", name: "Day / Night Cycle", source: "Solar Calc", count: null, icon: Sun },
+    const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+    const toggleSection = (name: string) => {
+        setCollapsedSections(prev => {
+            const next = new Set(prev);
+            if (next.has(name)) next.delete(name); else next.add(name);
+            return next;
+        });
+    };
+
+    type LayerDef = { id: string; name: string; source: string; count: number | null; icon: any };
+    const sections: { name: string; layers: LayerDef[] }[] = [
+        { name: "INTELLIGENCE & THREATS", layers: [
+            { id: "global_incidents", name: "Global Incidents", source: "GDELT", count: data?.gdelt?.length || 0, icon: Activity },
+            { id: "ukraine_frontline", name: "Ukraine Frontline", source: "DeepStateMap", count: data?.frontlines ? 1 : 0, icon: AlertTriangle },
+            { id: "gps_jamming", name: "GPS Jamming", source: "ADS-B NACp", count: data?.gps_jamming?.length || 0, icon: Radio },
+            { id: "firms", name: "Fire Hotspots (24h)", source: "NASA FIRMS VIIRS", count: data?.firms_fires?.length || 0, icon: Flame },
+        ]},
+        { name: "AVIATION", layers: [
+            { id: "flights", name: "Commercial Flights", source: "adsb.lol", count: data?.commercial_flights?.length || 0, icon: Plane },
+            { id: "private", name: "Private Flights", source: "adsb.lol", count: data?.private_flights?.length || 0, icon: Plane },
+            { id: "jets", name: "Private Jets", source: "adsb.lol", count: data?.private_jets?.length || 0, icon: Plane },
+            { id: "military", name: "Military Flights", source: "adsb.lol", count: data?.military_flights?.length || 0, icon: AlertTriangle },
+            { id: "tracked", name: "Tracked Aircraft", source: "Plane-Alert DB", count: data?.tracked_flights?.length || 0, icon: Eye },
+        ]},
+        { name: "MARITIME", layers: [
+            { id: "ships_military", name: "Military / Carriers", source: "AIS Stream", count: militaryShipCount, icon: Ship },
+            { id: "ships_cargo", name: "Cargo / Tankers", source: "AIS Stream", count: cargoShipCount, icon: Ship },
+            { id: "ships_civilian", name: "Civilian Vessels", source: "AIS Stream", count: civilianShipCount, icon: Anchor },
+            { id: "ships_passenger", name: "Cruise / Passenger", source: "AIS Stream", count: passengerShipCount, icon: Anchor },
+            { id: "ships_tracked_yachts", name: "Tracked Yachts", source: "Yacht-Alert DB", count: trackedYachtCount, icon: Eye },
+        ]},
+        { name: "SPACE & SENSORS", layers: [
+            { id: "satellites", name: "Satellites", source: data?.satellite_source === "celestrak" ? "CelesTrak SGP4" : data?.satellite_source === "tle_api" ? "TLE API · SGP4" : data?.satellite_source === "disk_cache" ? "Cached · SGP4 (est.)" : "CelesTrak SGP4", count: data?.satellites?.length || 0, icon: Satellite },
+            { id: "earthquakes", name: "Earthquakes (24h)", source: "USGS", count: data?.earthquakes?.length || 0, icon: Activity },
+            { id: "kiwisdr", name: "KiwiSDR Receivers", source: "KiwiSDR.com", count: data?.kiwisdr?.length || 0, icon: Radio },
+            { id: "cctv", name: "CCTV Mesh", source: "CCTV Mesh + Street View", count: data?.cctv?.length || 0, icon: Cctv },
+        ]},
+        { name: "INFRASTRUCTURE", layers: [
+            { id: "datacenters", name: "Data Centers", source: "DC Map (GitHub)", count: data?.datacenters?.length || 0, icon: Server },
+            { id: "power_plants", name: "Power Plants", source: "WRI (Static)", count: data?.power_plants?.length || 0, icon: Zap },
+            { id: "military_bases", name: "Military Bases", source: "OSINT (Static)", count: data?.military_bases?.length || 0, icon: Shield },
+            { id: "internet_outages", name: "Internet Outages", source: "IODA / Georgia Tech", count: data?.internet_outages?.length || 0, icon: Wifi },
+        ]},
+        { name: "OVERLAYS", layers: [
+            { id: "day_night", name: "Day / Night Cycle", source: "Solar Calc", count: null, icon: Sun },
+            { id: "highres_satellite", name: "High-Res Satellite", source: "Esri World Imagery", count: null, icon: Satellite },
+            { id: "gibs_imagery", name: "MODIS Terra (Daily)", source: "NASA GIBS", count: null, icon: Globe },
+        ]},
     ];
 
     const shipIcon = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1 .6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1" /><path d="M19.38 20A11.6 11.6 0 0 0 21 14l-9-4-9 4c0 2.9.94 5.34 2.81 7.76" /><path d="M19 13V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6" /></svg>;
@@ -383,136 +405,178 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                                     </div>
                                 )}
 
-                                {layers.map((layer, idx) => {
-                                    const Icon = layer.icon;
-                                    const active = activeLayers[layer.id as keyof typeof activeLayers] || false;
-                                    const isCycling = cyclerState.active && cyclerState.layerId === layer.id;
-                                    const canCycle = active && (layer.count ?? 0) > 0;
+                                {sections.map((section) => {
+                                    const isCollapsed = collapsedSections.has(section.name);
+                                    const activeCount = section.layers.filter(l => activeLayers[l.id as keyof typeof activeLayers]).length;
+                                    const totalCount = section.layers.reduce((sum, l) => sum + (l.count ?? 0), 0);
 
                                     return (
-                                        <div key={idx} className="flex flex-col">
+                                        <div key={section.name} className="flex flex-col">
+                                            {/* Section header */}
                                             <div
-                                                className="flex items-start justify-between group cursor-pointer"
-                                                onClick={() => setActiveLayers((prev: any) => ({ ...prev, [layer.id]: !active }))}
+                                                className="flex items-center justify-between cursor-pointer group py-1"
+                                                onClick={() => toggleSection(section.name)}
                                             >
-                                                <div className="flex gap-3">
-                                                    <div className={`mt-1 ${active ? 'text-cyan-400' : 'text-gray-600 group-hover:text-gray-400'} transition-colors`}>
-                                                        {(layer.id.startsWith('ships_')) ? shipIcon : <Icon size={16} strokeWidth={1.5} />}
-                                                    </div>
-                                                    <div className="flex flex-col">
-                                                        <span className={`text-sm font-medium ${active ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'} tracking-wide`}>{layer.name}</span>
-                                                        <span className="text-[9px] text-[var(--text-muted)] font-mono tracking-wider mt-0.5">{layer.source} · {active ? (() => {
-                                                            const fKey = FRESHNESS_MAP[layer.id];
-                                                            const freshness = fKey && data?.freshness?.[fKey];
-                                                            const rt = freshness ? relativeTime(freshness) : '';
-                                                            return rt ? <span className="text-cyan-500/70">{rt}</span> : 'LIVE';
-                                                        })() : 'OFF'}</span>
-                                                    </div>
-                                                </div>
                                                 <div className="flex items-center gap-2">
-                                                    {canCycle && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => { e.stopPropagation(); onCycleStart(layer.id); }}
-                                                            className={`p-1 rounded border transition-all ${
-                                                                isCycling
-                                                                    ? "border-cyan-500/50 text-cyan-400 bg-cyan-950/30"
-                                                                    : "border-transparent text-[var(--text-muted)] opacity-0 group-hover:opacity-100 hover:text-cyan-400 hover:border-cyan-800/50"
-                                                            }`}
-                                                            title="Browse items"
-                                                        >
-                                                            <Crosshair size={12} />
-                                                        </button>
+                                                    <span className="text-[9px] text-[var(--text-muted)] font-mono tracking-[0.15em] font-bold group-hover:text-cyan-400 transition-colors">{section.name}</span>
+                                                    {activeCount > 0 && totalCount > 0 && (
+                                                        <span className="text-[8px] text-cyan-500/60 font-mono">{totalCount.toLocaleString()}</span>
                                                     )}
-                                                    {active && (layer.count ?? 0) > 0 && (
-                                                        <span className="text-[10px] text-gray-300 font-mono">{(layer.count ?? 0).toLocaleString()}</span>
-                                                    )}
-                                                    <div className={`text-[9px] font-mono tracking-wider px-2 py-0.5 rounded-full border ${active
-                                                        ? 'border-cyan-500/50 text-cyan-400 bg-cyan-950/30 shadow-[0_0_10px_rgba(34,211,238,0.2)]'
-                                                        : 'border-[var(--border-primary)] text-[var(--text-muted)] bg-transparent'
-                                                        }`}>
-                                                        {active ? 'ON' : 'OFF'}
-                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-[8px] text-[var(--text-muted)] font-mono">{activeCount}/{section.layers.length}</span>
+                                                    {isCollapsed ? <ChevronDown size={12} className="text-[var(--text-muted)]" /> : <ChevronUp size={12} className="text-[var(--text-muted)]" />}
                                                 </div>
                                             </div>
-                                            {/* Cycling controls */}
-                                            {isCycling && (
-                                                <div className="ml-7 mt-2 flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                                                    <button
-                                                        type="button"
-                                                        onClick={onCyclePrev}
-                                                        className="w-6 h-6 flex items-center justify-center rounded border border-cyan-500/30 text-cyan-400 hover:bg-cyan-950/30 transition-colors"
+
+                                            {/* Section layers */}
+                                            <AnimatePresence initial={false}>
+                                                {!isCollapsed && (
+                                                    <motion.div
+                                                        initial={{ height: 0, opacity: 0 }}
+                                                        animate={{ height: "auto", opacity: 1 }}
+                                                        exit={{ height: 0, opacity: 0 }}
+                                                        transition={{ duration: 0.2 }}
+                                                        className="overflow-hidden"
                                                     >
-                                                        <ChevronLeftIcon size={12} />
-                                                    </button>
-                                                    <span className="text-[9px] text-cyan-400 font-mono tracking-wider min-w-[60px] text-center">
-                                                        {cyclerState.total > 0 ? `${cyclerState.index + 1} / ${cyclerState.total.toLocaleString()}` : "0 / 0"}
-                                                    </span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={onCycleNext}
-                                                        className="w-6 h-6 flex items-center justify-center rounded border border-cyan-500/30 text-cyan-400 hover:bg-cyan-950/30 transition-colors"
-                                                    >
-                                                        <ChevronRightIcon size={12} />
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => onCycleStart(layer.id)}
-                                                        className="text-[8px] font-mono text-[var(--text-muted)] hover:text-red-400 border border-[var(--border-primary)] hover:border-red-400/40 rounded px-1.5 py-0.5 transition-colors ml-auto"
-                                                    >
-                                                        STOP
-                                                    </button>
-                                                </div>
-                                            )}
-                                            {/* GIBS Imagery inline controls: time slider + play/pause + opacity */}
-                                            {active && layer.id === 'gibs_imagery' && gibsDate && setGibsDate && setGibsOpacity && (
-                                                <div className="ml-7 mt-2 flex flex-col gap-2" onClick={e => e.stopPropagation()}>
-                                                    <div className="flex items-center gap-2">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setGibsPlaying(p => !p)}
-                                                            className="w-5 h-5 flex items-center justify-center rounded border border-cyan-500/30 text-cyan-400 hover:bg-cyan-950/30 transition-colors"
-                                                        >
-                                                            {gibsPlaying ? <Pause size={10} /> : <Play size={10} />}
-                                                        </button>
-                                                        <input
-                                                            type="range"
-                                                            min={0}
-                                                            max={29}
-                                                            value={(() => {
-                                                                const yesterday = new Date();
-                                                                yesterday.setDate(yesterday.getDate() - 1);
-                                                                const selected = new Date(gibsDate + 'T00:00:00');
-                                                                const diff = Math.round((yesterday.getTime() - selected.getTime()) / 86400000);
-                                                                return 29 - Math.max(0, Math.min(29, diff));
-                                                            })()}
-                                                            onChange={e => {
-                                                                const daysAgo = 29 - parseInt(e.target.value);
-                                                                const d = new Date();
-                                                                d.setDate(d.getDate() - 1 - daysAgo);
-                                                                setGibsDate(d.toISOString().slice(0, 10));
-                                                            }}
-                                                            className="flex-1 h-1 accent-cyan-500 cursor-pointer"
-                                                        />
-                                                    </div>
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="text-[8px] text-cyan-400 font-mono">{gibsDate}</span>
-                                                        <div className="flex items-center gap-1">
-                                                            <span className="text-[8px] text-[var(--text-muted)] font-mono">OPC</span>
-                                                            <input
-                                                                type="range"
-                                                                min={0}
-                                                                max={100}
-                                                                value={Math.round((gibsOpacity ?? 0.6) * 100)}
-                                                                onChange={e => setGibsOpacity(parseInt(e.target.value) / 100)}
-                                                                className="w-16 h-1 accent-cyan-500 cursor-pointer"
-                                                            />
+                                                        <div className="flex flex-col gap-4 pl-1 pt-1 pb-2">
+                                                            {section.layers.map((layer) => {
+                                                                const Icon = layer.icon;
+                                                                const active = activeLayers[layer.id as keyof typeof activeLayers] || false;
+                                                                const isCycling = cyclerState.active && cyclerState.layerId === layer.id;
+                                                                const canCycle = active && (layer.count ?? 0) > 0;
+
+                                                                return (
+                                                                    <div key={layer.id} className="flex flex-col">
+                                                                        <div
+                                                                            className="flex items-start justify-between group cursor-pointer"
+                                                                            onClick={() => setActiveLayers((prev: any) => ({ ...prev, [layer.id]: !active }))}
+                                                                        >
+                                                                            <div className="flex gap-3">
+                                                                                <div className={`mt-1 ${active ? 'text-cyan-400' : 'text-gray-600 group-hover:text-gray-400'} transition-colors`}>
+                                                                                    {(layer.id.startsWith('ships_')) ? shipIcon : <Icon size={16} strokeWidth={1.5} />}
+                                                                                </div>
+                                                                                <div className="flex flex-col">
+                                                                                    <span className={`text-sm font-medium ${active ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'} tracking-wide`}>{layer.name}</span>
+                                                                                    <span className="text-[9px] text-[var(--text-muted)] font-mono tracking-wider mt-0.5">{layer.source} · {active ? (() => {
+                                                                                        const fKey = FRESHNESS_MAP[layer.id];
+                                                                                        const freshness = fKey && data?.freshness?.[fKey];
+                                                                                        const rt = freshness ? relativeTime(freshness) : '';
+                                                                                        return rt ? <span className="text-cyan-500/70">{rt}</span> : 'LIVE';
+                                                                                    })() : 'OFF'}</span>
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="flex items-center gap-2">
+                                                                                {canCycle && (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={(e) => { e.stopPropagation(); onCycleStart(layer.id); }}
+                                                                                        className={`p-1 rounded border transition-all ${
+                                                                                            isCycling
+                                                                                                ? "border-cyan-500/50 text-cyan-400 bg-cyan-950/30"
+                                                                                                : "border-transparent text-[var(--text-muted)] opacity-0 group-hover:opacity-100 hover:text-cyan-400 hover:border-cyan-800/50"
+                                                                                        }`}
+                                                                                        title="Browse items"
+                                                                                    >
+                                                                                        <Crosshair size={12} />
+                                                                                    </button>
+                                                                                )}
+                                                                                {active && (layer.count ?? 0) > 0 && (
+                                                                                    <span className="text-[10px] text-gray-300 font-mono">{(layer.count ?? 0).toLocaleString()}</span>
+                                                                                )}
+                                                                                <div className={`text-[9px] font-mono tracking-wider px-2 py-0.5 rounded-full border ${active
+                                                                                    ? 'border-cyan-500/50 text-cyan-400 bg-cyan-950/30 shadow-[0_0_10px_rgba(34,211,238,0.2)]'
+                                                                                    : 'border-[var(--border-primary)] text-[var(--text-muted)] bg-transparent'
+                                                                                    }`}>
+                                                                                    {active ? 'ON' : 'OFF'}
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                        {/* Cycling controls */}
+                                                                        {isCycling && (
+                                                                            <div className="ml-7 mt-2 flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={onCyclePrev}
+                                                                                    className="w-6 h-6 flex items-center justify-center rounded border border-cyan-500/30 text-cyan-400 hover:bg-cyan-950/30 transition-colors"
+                                                                                >
+                                                                                    <ChevronLeftIcon size={12} />
+                                                                                </button>
+                                                                                <span className="text-[9px] text-cyan-400 font-mono tracking-wider min-w-[60px] text-center">
+                                                                                    {cyclerState.total > 0 ? `${cyclerState.index + 1} / ${cyclerState.total.toLocaleString()}` : "0 / 0"}
+                                                                                </span>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={onCycleNext}
+                                                                                    className="w-6 h-6 flex items-center justify-center rounded border border-cyan-500/30 text-cyan-400 hover:bg-cyan-950/30 transition-colors"
+                                                                                >
+                                                                                    <ChevronRightIcon size={12} />
+                                                                                </button>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => onCycleStart(layer.id)}
+                                                                                    className="text-[8px] font-mono text-[var(--text-muted)] hover:text-red-400 border border-[var(--border-primary)] hover:border-red-400/40 rounded px-1.5 py-0.5 transition-colors ml-auto"
+                                                                                >
+                                                                                    STOP
+                                                                                </button>
+                                                                            </div>
+                                                                        )}
+                                                                        {/* GIBS Imagery inline controls */}
+                                                                        {active && layer.id === 'gibs_imagery' && gibsDate && setGibsDate && setGibsOpacity && (
+                                                                            <div className="ml-7 mt-2 flex flex-col gap-2" onClick={e => e.stopPropagation()}>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => setGibsPlaying(p => !p)}
+                                                                                        className="w-5 h-5 flex items-center justify-center rounded border border-cyan-500/30 text-cyan-400 hover:bg-cyan-950/30 transition-colors"
+                                                                                    >
+                                                                                        {gibsPlaying ? <Pause size={10} /> : <Play size={10} />}
+                                                                                    </button>
+                                                                                    <input
+                                                                                        type="range"
+                                                                                        min={0}
+                                                                                        max={29}
+                                                                                        value={(() => {
+                                                                                            const yesterday = new Date();
+                                                                                            yesterday.setDate(yesterday.getDate() - 1);
+                                                                                            const selected = new Date(gibsDate + 'T00:00:00');
+                                                                                            const diff = Math.round((yesterday.getTime() - selected.getTime()) / 86400000);
+                                                                                            return 29 - Math.max(0, Math.min(29, diff));
+                                                                                        })()}
+                                                                                        onChange={e => {
+                                                                                            const daysAgo = 29 - parseInt(e.target.value);
+                                                                                            const d = new Date();
+                                                                                            d.setDate(d.getDate() - 1 - daysAgo);
+                                                                                            setGibsDate(d.toISOString().slice(0, 10));
+                                                                                        }}
+                                                                                        className="flex-1 h-1 accent-cyan-500 cursor-pointer"
+                                                                                    />
+                                                                                </div>
+                                                                                <div className="flex items-center justify-between">
+                                                                                    <span className="text-[8px] text-cyan-400 font-mono">{gibsDate}</span>
+                                                                                    <div className="flex items-center gap-1">
+                                                                                        <span className="text-[8px] text-[var(--text-muted)] font-mono">OPC</span>
+                                                                                        <input
+                                                                                            type="range"
+                                                                                            min={0}
+                                                                                            max={100}
+                                                                                            value={Math.round((gibsOpacity ?? 0.6) * 100)}
+                                                                                            onChange={e => setGibsOpacity(parseInt(e.target.value) / 100)}
+                                                                                            className="w-16 h-1 accent-cyan-500 cursor-pointer"
+                                                                                        />
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })}
                                                         </div>
-                                                    </div>
-                                                </div>
-                                            )}
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
                                         </div>
-                                    )
+                                    );
                                 })}
 
                                 {/* POTUS Fleet — bottom section when inactive or hidden */}

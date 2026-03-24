@@ -9,6 +9,7 @@ import { interpolatePosition } from "@/utils/positioning";
 import { darkStyle, lightStyle } from "@/components/map/styles/mapStyles";
 import ScaleBar from "@/components/ScaleBar";
 import maplibregl from "maplibre-gl";
+import { showPulseAt, removePulse } from "@/components/map/PulseMarker";
 import { AlertTriangle, Radio, Globe, Activity, Play } from "lucide-react";
 import WikiImage from "@/components/WikiImage";
 import { useTheme } from "@/lib/ThemeContext";
@@ -253,6 +254,24 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
 
         return () => { isMounted = false; };
     }, [selectedEntity, data]);
+
+    // Pulse marker: show a pulsing ring at the selected entity's position
+    useEffect(() => {
+        const map = mapRef.current?.getMap();
+        if (!map) { removePulse(); return; }
+        if (!selectedEntity) { removePulse(); return; }
+
+        const lat = selectedEntity.extra?.lat ?? selectedEntity.extra?.geometry?.coordinates?.[1];
+        const lng = selectedEntity.extra?.lng ?? selectedEntity.extra?.lon ?? selectedEntity.extra?.geometry?.coordinates?.[0];
+
+        if (lat != null && lng != null) {
+            showPulseAt(map, lng, lat);
+        } else {
+            removePulse();
+        }
+
+        return () => removePulse();
+    }, [selectedEntity]);
 
     useEffect(() => {
         if (flyToLocation && mapRef.current) {

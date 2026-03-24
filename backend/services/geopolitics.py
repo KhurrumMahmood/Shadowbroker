@@ -265,6 +265,25 @@ def _parse_gdelt_export_zip(zip_bytes, conflict_codes, seen_locs, features, loc_
                     event_code = row[26][:2] if len(row[26]) >= 2 else ''
                     if event_code not in conflict_codes:
                         continue
+
+                    # Goldstein Scale: reject events that aren't hostile enough
+                    goldstein_raw = row[30].strip() if len(row) > 30 else ''
+                    if goldstein_raw:
+                        try:
+                            if float(goldstein_raw) > -3.0:
+                                continue
+                        except ValueError:
+                            pass
+
+                    # NumMentions: require >= 3 to filter single-source noise
+                    num_mentions_raw = row[31].strip() if len(row) > 31 else ''
+                    if num_mentions_raw:
+                        try:
+                            if int(num_mentions_raw) < 3:
+                                continue
+                        except ValueError:
+                            pass
+
                     lat = float(row[56]) if row[56] else None
                     lng = float(row[57]) if row[57] else None
                     if lat is None or lng is None or (lat == 0 and lng == 0):
@@ -446,7 +465,7 @@ def fetch_global_military_incidents():
         logger.info(f"Downloaded {successful}/{len(urls)} GDELT exports")
 
         # Parse all downloaded files
-        CONFLICT_CODES = {'14', '17', '18', '19', '20'}
+        CONFLICT_CODES = {'17', '18', '19', '20'}  # COERCE, ASSAULT, FIGHT, MASS VIOLENCE
         features = []
         seen_locs = set()
         loc_index = {}  # loc_key -> index in features

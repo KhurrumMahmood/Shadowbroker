@@ -119,19 +119,31 @@ export function useAIResultCycler(
     [flyToEntity],
   );
 
+  const resolveAndFly = useCallback(
+    (entity: SelectedEntity) => {
+      const found = findEntityInData(entity.type, String(entity.id), dataRef.current);
+      if (found) {
+        flyToEntity(toSelectedEntity(found.item, found.entityType));
+      } else {
+        flyToEntity(entity); // Fallback to stale if entity left viewport
+      }
+    },
+    [flyToEntity],
+  );
+
   const next = useCallback(() => {
     if (results.length === 0) return;
     const newIdx = (index + 1) % results.length;
     setIndex(newIdx);
-    flyToEntity(results[newIdx]);
-  }, [results, index, flyToEntity]);
+    resolveAndFly(results[newIdx]);
+  }, [results, index, resolveAndFly]);
 
   const prev = useCallback(() => {
     if (results.length === 0) return;
     const newIdx = (index - 1 + results.length) % results.length;
     setIndex(newIdx);
-    flyToEntity(results[newIdx]);
-  }, [results, index, flyToEntity]);
+    resolveAndFly(results[newIdx]);
+  }, [results, index, resolveAndFly]);
 
   const clear = useCallback(() => {
     setResultsState([]);
