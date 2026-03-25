@@ -1,0 +1,4 @@
+[
+  {"region_code": "TR-20", "region_name": "Denizli", "country_code": "TR", "country_name": "Turkey", "level": "warning", "datasource": "bgp", "severity": 55, "lat": 37.77, "lng": 29.09},
+  {"region_code": "US-CA", "region_name": "California", "country_code": "US", "country_name": "United States", "level": "normal", "datasource": "bgp", "severity": 5, "lat": 36.70, "lng": -119.80}
+]

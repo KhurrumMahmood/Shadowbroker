@@ -1,0 +1,9 @@
+[
+  {"name": "Al Udeid Air Base", "country": "United States", "branch": "Air Force", "lat": 25.12, "lng": 51.31},
+  {"name": "Al Dhafra Air Base", "country": "United States", "branch": "Air Force", "lat": 24.25, "lng": 54.55},
+  {"name": "NSA Bahrain", "country": "United States", "branch": "Navy", "lat": 26.24, "lng": 50.52},
+  {"name": "Ali Al Salem Air Base", "country": "United States", "branch": "Air Force", "lat": 29.35, "lng": 47.52},
+  {"name": "Al Minhad Air Base", "country": "United Arab Emirates", "branch": "Air Force", "lat": 25.02, "lng": 55.37},
+  {"name": "Bandar Abbas Air Base", "country": "Iran", "branch": "Air Force", "lat": 27.22, "lng": 56.23},
+  {"name": "Bushehr Air Base", "country": "Iran", "branch": "Air Force", "lat": 28.95, "lng": 50.83}
+]

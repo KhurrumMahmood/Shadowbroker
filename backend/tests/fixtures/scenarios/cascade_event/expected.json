@@ -1,0 +1,22 @@
+{
+  "scenario_name": "cascade_event",
+  "description": "Cascading infrastructure crisis — M6.2 earthquake near power plant triggers fires and internet outages in eastern Turkey",
+  "test_queries": [
+    {
+      "query": "Are there any cascading events happening? Earthquake, fire, outage chains?",
+      "required_mentions": ["earthquake", "fire", "outage", "Van", "Turkey", "power plant"],
+      "required_data_sources_queried": ["earthquakes", "firms_fires", "internet_outages", "power_plants"],
+      "risk_level_range": [6, 10],
+      "must_include_entity_types": ["earthquake"],
+      "max_latency_seconds": 10.0
+    },
+    {
+      "query": "What's the infrastructure impact of the Turkey earthquake?",
+      "required_mentions": ["earthquake", "Van", "power", "internet"],
+      "required_data_sources_queried": ["earthquakes", "power_plants", "internet_outages"],
+      "risk_level_range": [5, 10],
+      "must_include_entity_types": ["earthquake"],
+      "max_latency_seconds": 8.0
+    }
+  ]
+}

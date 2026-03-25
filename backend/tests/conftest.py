@@ -1,16 +1,29 @@
 import pytest
 from unittest.mock import patch, MagicMock
+from contextlib import ExitStack
 
 
 @pytest.fixture(autouse=True)
 def _suppress_background_services():
-    """Prevent real scheduler/stream/tracker from starting during tests."""
-    with patch("services.data_fetcher.start_scheduler"), \
-         patch("services.data_fetcher.stop_scheduler"), \
-         patch("services.ais_stream.start_ais_stream"), \
-         patch("services.ais_stream.stop_ais_stream"), \
-         patch("services.carrier_tracker.start_carrier_tracker"), \
-         patch("services.carrier_tracker.stop_carrier_tracker"):
+    """Prevent real scheduler/stream/tracker from starting during tests.
+
+    Gracefully skips patching if modules aren't importable (e.g. when
+    running isolated agent tests that don't need the full backend).
+    """
+    targets = [
+        "services.data_fetcher.start_scheduler",
+        "services.data_fetcher.stop_scheduler",
+        "services.ais_stream.start_ais_stream",
+        "services.ais_stream.stop_ais_stream",
+        "services.carrier_tracker.start_carrier_tracker",
+        "services.carrier_tracker.stop_carrier_tracker",
+    ]
+    with ExitStack() as stack:
+        for target in targets:
+            try:
+                stack.enter_context(patch(target))
+            except (AttributeError, ModuleNotFoundError):
+                pass
         yield
 
 

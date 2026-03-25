@@ -1,0 +1,10 @@
+[
+  {"icao24": "ae1234", "callsign": "FORTE12", "country": "United States", "model": "RQ-4B Global Hawk", "lat": 26.30, "lng": 56.10, "alt": 55000, "heading": 180, "military_type": "recon", "origin_name": "Al Dhafra AB", "dest_name": ""},
+  {"icao24": "ae5678", "callsign": "VADER31", "country": "United States", "model": "P-8A Poseidon", "lat": 26.50, "lng": 56.30, "alt": 25000, "heading": 90, "military_type": "maritime_patrol", "origin_name": "Al Udeid AB", "dest_name": ""},
+  {"icao24": "ae9012", "callsign": "REAPER1", "country": "United States", "model": "MQ-9 Reaper", "lat": 26.60, "lng": 56.40, "alt": 20000, "heading": 270, "military_type": "isr", "origin_name": "Ali Al Salem AB", "dest_name": ""},
+  {"icao24": "740100", "callsign": "IRIAF14", "country": "Iran", "model": "F-14A Tomcat", "lat": 26.80, "lng": 56.60, "alt": 15000, "heading": 200, "military_type": "fighter", "origin_name": "Bandar Abbas", "dest_name": ""},
+  {"icao24": "740200", "callsign": "IRIAF22", "country": "Iran", "model": "F-4E Phantom", "lat": 26.90, "lng": 56.70, "alt": 12000, "heading": 210, "military_type": "fighter", "origin_name": "Bushehr AB", "dest_name": ""},
+  {"icao24": "ae3456", "callsign": "TOPCAT1", "country": "United States", "model": "F/A-18E Super Hornet", "lat": 25.80, "lng": 55.70, "alt": 30000, "heading": 45, "military_type": "fighter", "origin_name": "USS Bataan", "dest_name": ""},
+  {"icao24": "43c100", "callsign": "RAF330", "country": "United Kingdom", "model": "Typhoon FGR4", "lat": 25.30, "lng": 55.20, "alt": 28000, "heading": 60, "military_type": "fighter", "origin_name": "Al Minhad AB", "dest_name": ""},
+  {"icao24": "ae7890", "callsign": "SHELL41", "country": "United States", "model": "KC-135R Stratotanker", "lat": 25.00, "lng": 54.50, "alt": 30000, "heading": 90, "military_type": "tanker", "origin_name": "Al Udeid AB", "dest_name": ""}
+]

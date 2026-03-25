@@ -1,0 +1,13 @@
+[
+  {"icao24": "780100", "callsign": "PLA001", "country": "China", "model": "J-16", "lat": 24.50, "lng": 119.50, "alt": 8000, "heading": 180, "military_type": "fighter", "origin_name": "Longtian AB", "dest_name": ""},
+  {"icao24": "780200", "callsign": "PLA002", "country": "China", "model": "J-16", "lat": 24.60, "lng": 119.60, "alt": 8500, "heading": 175, "military_type": "fighter", "origin_name": "Longtian AB", "dest_name": ""},
+  {"icao24": "780300", "callsign": "PLA003", "country": "China", "model": "H-6K", "lat": 25.00, "lng": 120.00, "alt": 10000, "heading": 160, "military_type": "bomber", "origin_name": "Nanchang AB", "dest_name": ""},
+  {"icao24": "780400", "callsign": "PLA004", "country": "China", "model": "Y-8Q", "lat": 24.80, "lng": 119.80, "alt": 6000, "heading": 190, "military_type": "maritime_patrol", "origin_name": "Leiyang AB", "dest_name": ""},
+  {"icao24": "780500", "callsign": "PLA005", "country": "China", "model": "KJ-500", "lat": 25.50, "lng": 119.00, "alt": 9000, "heading": 120, "military_type": "awacs", "origin_name": "Fuzhou AB", "dest_name": ""},
+  {"icao24": "ae1500", "callsign": "VADER22", "country": "United States", "model": "P-8A Poseidon", "lat": 25.00, "lng": 122.00, "alt": 25000, "heading": 240, "military_type": "maritime_patrol", "origin_name": "Kadena AB", "dest_name": ""},
+  {"icao24": "ae2500", "callsign": "FORTE13", "country": "United States", "model": "RQ-4B Global Hawk", "lat": 24.00, "lng": 121.00, "alt": 55000, "heading": 200, "military_type": "recon", "origin_name": "Andersen AFB", "dest_name": ""},
+  {"icao24": "840100", "callsign": "JSDF01", "country": "Japan", "model": "P-1", "lat": 25.30, "lng": 122.30, "alt": 20000, "heading": 210, "military_type": "maritime_patrol", "origin_name": "Naha AB", "dest_name": ""},
+  {"icao24": "840200", "callsign": "JSDF02", "country": "Japan", "model": "F-15J", "lat": 26.00, "lng": 127.50, "alt": 15000, "heading": 270, "military_type": "fighter", "origin_name": "Kadena AB", "dest_name": ""},
+  {"icao24": "350100", "callsign": "ROCAF1", "country": "Taiwan", "model": "F-16V", "lat": 24.00, "lng": 120.50, "alt": 12000, "heading": 270, "military_type": "fighter", "origin_name": "Chiayi AB", "dest_name": ""},
+  {"icao24": "350200", "callsign": "ROCAF2", "country": "Taiwan", "model": "Mirage 2000-5", "lat": 24.80, "lng": 121.00, "alt": 14000, "heading": 290, "military_type": "fighter", "origin_name": "Hsinchu AB", "dest_name": ""}
+]

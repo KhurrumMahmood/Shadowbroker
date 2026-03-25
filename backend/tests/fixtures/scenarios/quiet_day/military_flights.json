@@ -1,0 +1,4 @@
+[
+  {"icao24": "ae0001", "callsign": "RCH401", "country": "United States", "model": "C-17A Globemaster III", "lat": 49.00, "lng": 8.00, "alt": 35000, "heading": 90, "military_type": "cargo", "origin_name": "Dover AFB", "dest_name": "Ramstein AB"},
+  {"icao24": "ae0002", "callsign": "NAVY21", "country": "United States", "model": "P-8A Poseidon", "lat": 36.00, "lng": -6.00, "alt": 22000, "heading": 270, "military_type": "maritime_patrol", "origin_name": "Sigonella NAS", "dest_name": "Rota NS"}
+]

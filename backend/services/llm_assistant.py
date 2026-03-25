@@ -726,16 +726,17 @@ def _exec_web_search(args: dict) -> str:
 
 
 def execute_tool_call(name: str, args: dict, data: dict) -> str:
-    """Route a tool call to the right handler."""
-    if name == "query_data":
-        return _exec_query_data(args, data)
-    elif name == "aggregate_data":
-        return _exec_aggregate_data(args, data)
-    elif name == "web_search":
-        if not _web_search_available():
-            return json.dumps({"error": "web_search is not available (requires OpenRouter)"})
-        return _exec_web_search(args)
-    return json.dumps({"error": f"Unknown tool: {name}"})
+    """Route a tool call to the right handler.
+
+    Delegates to the ToolRegistry, wrapping the raw data dict in an
+    InMemoryDataSource for the registry's (args, ds) handler signature.
+    """
+    from services.agent.registry import create_default_registry
+    from services.agent.datasource import InMemoryDataSource
+
+    ds = InMemoryDataSource(data) if data else None
+    reg = create_default_registry()
+    return reg.execute(name, args, ds=ds)
 
 
 def _parse_directional_hints(query: str) -> dict:
@@ -1075,6 +1076,10 @@ def _call_provider(provider: dict, messages: list, live_data: dict | None,
     # Work on a copy of messages so tool-loop appends don't leak across providers
     msgs = list(messages)
     reasoning_steps: list[dict] = []
+    _tool_rounds = 0
+    _total_tool_calls = 0
+    _MAX_TOOL_ROUNDS = 3
+    _MAX_TOTAL_TOOL_CALLS = 10
 
     for _round in range(5):
         if deadline and _time.monotonic() >= deadline:
@@ -1216,7 +1221,10 @@ def _call_provider(provider: dict, messages: list, live_data: dict | None,
                 msgs.append({"role": "tool", "tool_call_id": tc["id"], "content": result_str})
                 reasoning_steps.append({"type": "tool_call", "content": f"{fn_name}({json.dumps(fn_args)[:500]})"})
                 reasoning_steps.append({"type": "tool_result", "content": result_str[:1000]})
-            tools = None
+                _total_tool_calls += 1
+            _tool_rounds += 1
+            if _tool_rounds >= _MAX_TOOL_ROUNDS or _total_tool_calls >= _MAX_TOTAL_TOOL_CALLS:
+                tools = None
             continue
 
         # --- XML-style tool calls in text content ---
@@ -1338,6 +1346,10 @@ def _call_provider_streaming(provider: dict, messages: list, live_data: dict | N
     tools = _build_tools() if live_data else None
     msgs = list(messages)
     reasoning_steps: list[dict] = []
+    _tool_rounds = 0
+    _total_tool_calls = 0
+    _MAX_TOOL_ROUNDS = 3
+    _MAX_TOTAL_TOOL_CALLS = 10
 
     yield _sse("status", {"step": "thinking", "detail": "Analyzing your query..."})
 
@@ -1481,6 +1493,7 @@ def _call_provider_streaming(provider: dict, messages: list, live_data: dict | N
                 msgs.append({"role": "tool", "tool_call_id": tc["id"], "content": result_str})
                 reasoning_steps.append({"type": "tool_call", "content": f"{fn_name}({json.dumps(fn_args)[:500]})"})
                 reasoning_steps.append({"type": "tool_result", "content": result_str[:1000]})
+                _total_tool_calls += 1
                 # Extract count for status
                 try:
                     r = json.loads(result_str)
@@ -1488,7 +1501,9 @@ def _call_provider_streaming(provider: dict, messages: list, live_data: dict | N
                     yield _sse("status", {"step": "tool_result", "detail": f"Found {total} results"})
                 except Exception:
                     yield _sse("status", {"step": "tool_result", "detail": "Processing results..."})
-            tools = None
+            _tool_rounds += 1
+            if _tool_rounds >= _MAX_TOOL_ROUNDS or _total_tool_calls >= _MAX_TOTAL_TOOL_CALLS:
+                tools = None
             yield _sse("status", {"step": "thinking", "detail": "Analyzing results..."})
             continue
 

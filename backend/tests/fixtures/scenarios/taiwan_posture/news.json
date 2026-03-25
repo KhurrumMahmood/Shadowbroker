@@ -1,0 +1,7 @@
+[
+  {"title": "PLA conducts large-scale exercises near Taiwan Strait", "link": "https://example.com/tw-1", "published": "2026-03-25T06:00:00Z", "source": "Reuters", "risk_score": 9, "coords": [24.0, 119.5], "cluster_count": 5, "lat": 24.0, "lng": 119.5},
+  {"title": "Taiwan scrambles jets as Chinese aircraft cross median line", "link": "https://example.com/tw-2", "published": "2026-03-25T05:30:00Z", "source": "AP News", "risk_score": 9, "coords": [24.5, 119.5], "cluster_count": 3, "lat": 24.5, "lng": 119.5},
+  {"title": "Japan deploys additional assets to Okinawa amid cross-strait tensions", "link": "https://example.com/tw-3", "published": "2026-03-25T04:00:00Z", "source": "NHK World", "risk_score": 7, "coords": [26.3, 127.8], "cluster_count": 2, "lat": 26.3, "lng": 127.8},
+  {"title": "USS Ronald Reagan carrier group enters Philippine Sea", "link": "https://example.com/tw-4", "published": "2026-03-25T03:00:00Z", "source": "USNI News", "risk_score": 7, "coords": [26.0, 123.0], "cluster_count": 2, "lat": 26.0, "lng": 123.0},
+  {"title": "Beijing warns of consequences if Taiwan provocation continues", "link": "https://example.com/tw-5", "published": "2026-03-25T02:00:00Z", "source": "SCMP", "risk_score": 8, "coords": [39.9, 116.4], "cluster_count": 1, "lat": 39.9, "lng": 116.4}
+]

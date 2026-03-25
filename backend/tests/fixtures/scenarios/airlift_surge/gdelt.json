@@ -1,0 +1,6 @@
+[
+  {"name": "Baghdad, Iraq", "count": 9, "action_geo_cc": "IQ", "lat": 33.31, "lng": 44.37, "source_url": "https://example.com/gdelt-al1"},
+  {"name": "Doha, Qatar", "count": 5, "action_geo_cc": "QA", "lat": 25.29, "lng": 51.53, "source_url": "https://example.com/gdelt-al2"},
+  {"name": "Kuwait City, Kuwait", "count": 4, "action_geo_cc": "KW", "lat": 29.37, "lng": 47.98, "source_url": "https://example.com/gdelt-al3"},
+  {"name": "Damascus, Syria", "count": 7, "action_geo_cc": "SY", "lat": 33.51, "lng": 36.29, "source_url": "https://example.com/gdelt-al4"}
+]

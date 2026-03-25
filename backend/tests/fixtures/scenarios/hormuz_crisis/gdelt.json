@@ -1,0 +1,9 @@
+[
+  {"name": "Bandar Abbas, Iran", "count": 8, "action_geo_cc": "IR", "lat": 27.19, "lng": 56.27, "source_url": "https://example.com/gdelt-1"},
+  {"name": "Tehran, Iran", "count": 12, "action_geo_cc": "IR", "lat": 35.69, "lng": 51.39, "source_url": "https://example.com/gdelt-2"},
+  {"name": "Strait of Hormuz", "count": 15, "action_geo_cc": "IR", "lat": 26.55, "lng": 56.25, "source_url": "https://example.com/gdelt-3"},
+  {"name": "Abu Dhabi, UAE", "count": 4, "action_geo_cc": "AE", "lat": 24.45, "lng": 54.65, "source_url": "https://example.com/gdelt-4"},
+  {"name": "Riyadh, Saudi Arabia", "count": 6, "action_geo_cc": "SA", "lat": 24.71, "lng": 46.67, "source_url": "https://example.com/gdelt-5"},
+  {"name": "Bushehr, Iran", "count": 5, "action_geo_cc": "IR", "lat": 28.97, "lng": 50.84, "source_url": "https://example.com/gdelt-6"},
+  {"name": "Doha, Qatar", "count": 3, "action_geo_cc": "QA", "lat": 25.29, "lng": 51.53, "source_url": "https://example.com/gdelt-7"}
+]

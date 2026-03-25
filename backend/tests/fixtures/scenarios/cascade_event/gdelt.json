@@ -1,0 +1,5 @@
+[
+  {"name": "Van, Turkey", "count": 22, "action_geo_cc": "TR", "lat": 38.49, "lng": 43.38, "source_url": "https://example.com/gdelt-cas1"},
+  {"name": "Ankara, Turkey", "count": 5, "action_geo_cc": "TR", "lat": 39.93, "lng": 32.86, "source_url": "https://example.com/gdelt-cas2"},
+  {"name": "Hakkari, Turkey", "count": 3, "action_geo_cc": "TR", "lat": 37.58, "lng": 43.74, "source_url": "https://example.com/gdelt-cas3"}
+]

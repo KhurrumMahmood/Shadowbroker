@@ -1,0 +1,4 @@
+[
+  {"region_code": "IR-07", "region_name": "Hormozgan", "country_code": "IR", "country_name": "Iran", "level": "critical", "datasource": "bgp", "severity": 65, "lat": 27.19, "lng": 56.27},
+  {"region_code": "IR-23", "region_name": "Bushehr", "country_code": "IR", "country_name": "Iran", "level": "warning", "datasource": "bgp", "severity": 35, "lat": 28.97, "lng": 50.84}
+]

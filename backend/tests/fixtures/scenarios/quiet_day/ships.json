@@ -1,0 +1,7 @@
+[
+  {"mmsi": "100000001", "name": "MAERSK SHANGHAI", "type": "cargo", "destination": "ROTTERDAM", "country": "Denmark", "lat": 51.90, "lng": 3.50, "sog": 14.0, "cog": 0, "callsign": "MS1"},
+  {"mmsi": "100000002", "name": "COSCO PACIFIC", "type": "cargo", "destination": "HAMBURG", "country": "China", "lat": 53.50, "lng": 9.90, "sog": 12.0, "cog": 45, "callsign": "CP1"},
+  {"mmsi": "100000003", "name": "JADE TANKER", "type": "tanker", "destination": "HOUSTON", "country": "Liberia", "lat": 28.50, "lng": -89.00, "sog": 11.5, "cog": 270, "callsign": "JT1"},
+  {"mmsi": "100000004", "name": "PACIFIC PRINCESS", "type": "passenger", "destination": "MIAMI", "country": "Bahamas", "lat": 25.80, "lng": -80.10, "sog": 18.0, "cog": 180, "callsign": "PP2"},
+  {"mmsi": "100000005", "name": "BLUE HORIZON", "type": "cargo", "destination": "SINGAPORE", "country": "Marshall Islands", "lat": 1.30, "lng": 103.80, "sog": 10.0, "cog": 90, "callsign": "BH1"}
+]

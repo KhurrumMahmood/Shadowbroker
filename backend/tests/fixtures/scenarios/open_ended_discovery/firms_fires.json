@@ -1,0 +1,5 @@
+[
+  {"lat": 37.48, "lng": 29.05, "frp": 35.0, "brightness": 330.0, "confidence": "high", "daynight": "D", "acq_date": "2026-03-25", "acq_time": "0900"},
+  {"lat": 37.52, "lng": 28.98, "frp": 22.0, "brightness": 315.0, "confidence": "nominal", "daynight": "D", "acq_date": "2026-03-25", "acq_time": "0930"},
+  {"lat": -15.00, "lng": 28.00, "frp": 3.0, "brightness": 290.0, "confidence": "nominal", "daynight": "D", "acq_date": "2026-03-25", "acq_time": "1200"}
+]

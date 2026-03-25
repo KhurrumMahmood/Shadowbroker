@@ -1,0 +1,7 @@
+[
+  {"id": 39232, "name": "USA 245 (KH-11)", "country": "USA", "mission": "military_recon", "sat_type": "KH-11 Reconnaissance", "lat": 24.30, "lng": 120.10, "alt_km": 262.0, "speed_knots": 14200, "heading": 195.0},
+  {"id": 44874, "name": "USA 314 (KH-11)", "country": "USA", "mission": "military_recon", "sat_type": "KH-11 Reconnaissance", "lat": 28.50, "lng": 118.00, "alt_km": 258.0, "speed_knots": 14180, "heading": 200.0},
+  {"id": 40258, "name": "YAOGAN 26", "country": "China", "mission": "military_recon", "sat_type": "Remote Sensing / ELINT", "lat": 23.90, "lng": 119.80, "alt_km": 490.0, "speed_knots": 13800, "heading": 165.0},
+  {"id": 43613, "name": "YAOGAN 30D", "country": "China", "mission": "military_sigint", "sat_type": "SIGINT Constellation", "lat": 25.10, "lng": 121.50, "alt_km": 600.0, "speed_knots": 13600, "heading": 170.0},
+  {"id": 36508, "name": "KONDOR 1", "country": "Russia", "mission": "military_sar", "sat_type": "SAR Reconnaissance", "lat": 22.50, "lng": 117.00, "alt_km": 510.0, "speed_knots": 13750, "heading": 180.0}
+]

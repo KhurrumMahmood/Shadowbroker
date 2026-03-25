@@ -1,0 +1,4 @@
+[
+  {"name": "Brussels, Belgium", "count": 2, "action_geo_cc": "BE", "lat": 50.85, "lng": 4.35, "source_url": "https://example.com/gdelt-q1"},
+  {"name": "Washington, DC", "count": 3, "action_geo_cc": "US", "lat": 38.91, "lng": -77.04, "source_url": "https://example.com/gdelt-q2"}
+]

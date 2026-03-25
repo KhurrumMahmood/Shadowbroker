@@ -1,0 +1,8 @@
+[
+  {"icao24": "ae9001", "callsign": "RCH501", "country": "United States", "model": "C-17A Globemaster III", "lat": 48.00, "lng": 11.00, "alt": 35000, "heading": 95, "military_type": "cargo"},
+  {"icao24": "ae9002", "callsign": "RCH505", "country": "United States", "model": "C-17A Globemaster III", "lat": 44.00, "lng": 20.00, "alt": 36000, "heading": 100, "military_type": "cargo"},
+  {"icao24": "ae9003", "callsign": "RCH510", "country": "United States", "model": "C-17A Globemaster III", "lat": 40.00, "lng": 30.00, "alt": 34000, "heading": 105, "military_type": "cargo"},
+  {"icao24": "ae9004", "callsign": "FORTE15", "country": "United States", "model": "RQ-4B Global Hawk", "lat": 45.00, "lng": 35.00, "alt": 55000, "heading": 180, "military_type": "recon"},
+  {"icao24": "ae9005", "callsign": "NAVY42", "country": "United States", "model": "P-8A Poseidon", "lat": 36.00, "lng": 30.00, "alt": 22000, "heading": 270, "military_type": "maritime_patrol"},
+  {"icao24": "4ca001", "callsign": "SWD101", "country": "Sweden", "model": "Gripen E", "lat": 59.00, "lng": 18.00, "alt": 30000, "heading": 45, "military_type": "fighter"}
+]

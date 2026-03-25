@@ -1,0 +1,12 @@
+[
+  {"mmsi": "413000001", "name": "PLAN TYPE 055", "type": "military_vessel", "destination": "", "country": "China", "lat": 24.50, "lng": 119.50, "sog": 16.0, "cog": 180, "callsign": "PLA1", "plan_vessel": true},
+  {"mmsi": "413000002", "name": "CCG 5901", "type": "military_vessel", "destination": "", "country": "China", "lat": 24.80, "lng": 119.80, "sog": 12.0, "cog": 170, "callsign": "CCG2", "plan_vessel": true},
+  {"mmsi": "413000003", "name": "PLAN TYPE 052D", "type": "military_vessel", "destination": "", "country": "China", "lat": 24.30, "lng": 119.30, "sog": 18.0, "cog": 190, "callsign": "PLA3", "plan_vessel": true},
+  {"mmsi": "413000004", "name": "FUJIAN (CV-18)", "type": "carrier", "destination": "", "country": "China", "lat": 24.00, "lng": 118.50, "sog": 20.0, "cog": 160, "callsign": "PLAC", "plan_vessel": true},
+  {"mmsi": "431000001", "name": "JS IZUMO (DDH-183)", "type": "military_vessel", "destination": "", "country": "Japan", "lat": 25.50, "lng": 122.00, "sog": 14.0, "cog": 200, "callsign": "JMSDF1"},
+  {"mmsi": "431000002", "name": "JS MAYA (DDG-179)", "type": "military_vessel", "destination": "", "country": "Japan", "lat": 25.80, "lng": 122.50, "sog": 16.0, "cog": 210, "callsign": "JMSDF2"},
+  {"mmsi": "368000001", "name": "USS RONALD REAGAN (CVN-76)", "type": "carrier", "destination": "", "country": "United States", "lat": 26.00, "lng": 123.00, "sog": 18.0, "cog": 240, "callsign": "NRRG", "estimated": true, "source": "OSINT estimated position"},
+  {"mmsi": "416000001", "name": "ROCS TIAN DAN (PFG2-1110)", "type": "military_vessel", "destination": "", "country": "Taiwan", "lat": 24.20, "lng": 120.50, "sog": 15.0, "cog": 270, "callsign": "ROC1"},
+  {"mmsi": "500000001", "name": "EVER GOLDEN", "type": "cargo", "destination": "KAOHSIUNG", "country": "Taiwan", "lat": 23.50, "lng": 120.00, "sog": 14.5, "cog": 0, "callsign": "EVGD"},
+  {"mmsi": "500000002", "name": "PACIFIC PEARL", "type": "tanker", "destination": "XIAMEN", "country": "Liberia", "lat": 24.10, "lng": 118.20, "sog": 12.0, "cog": 90, "callsign": "PP1"}
+]

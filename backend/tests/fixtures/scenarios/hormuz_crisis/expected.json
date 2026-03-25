@@ -1,0 +1,22 @@
+{
+  "scenario_name": "hormuz_crisis",
+  "description": "High tension in the Strait of Hormuz — tanker seizure, military escalation, GPS jamming, oil price spike",
+  "test_queries": [
+    {
+      "query": "Is the Strait of Hormuz at risk right now? What's the impact on oil?",
+      "required_mentions": ["tanker", "Hormuz", "Iran", "GPS jamming", "military", "oil"],
+      "required_data_sources_queried": ["ships", "military_flights", "news", "gps_jamming"],
+      "risk_level_range": [7, 10],
+      "must_include_entity_types": ["ship", "military_flight"],
+      "max_latency_seconds": 10.0
+    },
+    {
+      "query": "What military activity is happening near Iran?",
+      "required_mentions": ["P-8", "Global Hawk", "Iran", "patrol"],
+      "required_data_sources_queried": ["military_flights", "military_bases"],
+      "risk_level_range": [6, 10],
+      "must_include_entity_types": ["military_flight"],
+      "max_latency_seconds": 8.0
+    }
+  ]
+}

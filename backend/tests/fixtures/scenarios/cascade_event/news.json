@@ -1,0 +1,6 @@
+[
+  {"title": "Magnitude 6.2 earthquake strikes eastern Turkey", "link": "https://example.com/cas-1", "published": "2026-03-25T08:15:00Z", "source": "Reuters", "risk_score": 8, "coords": [38.80, 43.40], "cluster_count": 6, "lat": 38.80, "lng": 43.40},
+  {"title": "Fires reported near Van after strong earthquake", "link": "https://example.com/cas-2", "published": "2026-03-25T09:00:00Z", "source": "BBC News", "risk_score": 7, "coords": [38.80, 43.40], "cluster_count": 3, "lat": 38.80, "lng": 43.40},
+  {"title": "Internet disruptions across eastern Turkey following quake", "link": "https://example.com/cas-3", "published": "2026-03-25T10:00:00Z", "source": "Al Jazeera", "risk_score": 6, "coords": [38.80, 43.40], "cluster_count": 2, "lat": 38.80, "lng": 43.40},
+  {"title": "Turkish authorities assess infrastructure damage in Van province", "link": "https://example.com/cas-4", "published": "2026-03-25T11:00:00Z", "source": "Anadolu Agency", "risk_score": 5, "coords": [38.50, 43.38], "cluster_count": 1, "lat": 38.50, "lng": 43.38}
+]

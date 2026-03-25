@@ -1,0 +1,22 @@
+{
+  "scenario_name": "open_ended_discovery",
+  "description": "Mixed signals: C-17 airlift surge over Europe, earthquake+fire+outage cascade in Turkey, dark vessel in Gulf, normal traffic elsewhere. Agent should discover the patterns without being told where to look.",
+  "test_queries": [
+    {
+      "query": "What's unusual right now? Any developing situations I should know about?",
+      "required_mentions": ["C-17", "Turkey", "earthquake"],
+      "required_data_sources_queried": ["military_flights", "earthquakes"],
+      "risk_level_range": [4, 8],
+      "must_include_entity_types": ["military_flight"],
+      "max_latency_seconds": 10.0
+    },
+    {
+      "query": "Are there any compound events or cascade situations developing?",
+      "required_mentions": ["earthquake", "fire", "Turkey"],
+      "required_data_sources_queried": ["earthquakes", "firms_fires", "internet_outages"],
+      "risk_level_range": [5, 9],
+      "must_include_entity_types": [],
+      "max_latency_seconds": 10.0
+    }
+  ]
+}

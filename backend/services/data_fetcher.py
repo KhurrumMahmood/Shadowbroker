@@ -52,6 +52,26 @@ from services.fetchers.geo import (  # noqa: F401
 logger = logging.getLogger(__name__)
 
 
+def _update_agent_stores():
+    """Update SnapshotStore and BaselineStore with current data.
+
+    Called after each fast-tier refresh. Records a snapshot and updates
+    baselines for entity counts across all list-valued categories.
+    """
+    try:
+        from services.agent.stores import snapshot_store, baseline_store
+
+        with _data_lock:
+            data_copy = {k: v for k, v in latest_data.items() if isinstance(v, list)}
+
+        snapshot_store.record(data_copy)
+
+        for category, items in data_copy.items():
+            baseline_store.update(f"{category}_count", float(len(items)))
+    except Exception as e:
+        logger.debug(f"Agent store update skipped: {e}")
+
+
 def run_cctv_ingest_cycle():
     """Populate the CCTV database, then refresh the in-memory cache."""
     logger.info("CCTV ingest cycle starting...")
@@ -97,6 +117,7 @@ def update_fast_data():
         concurrent.futures.wait(futures)
     with _data_lock:
         latest_data['last_updated'] = datetime.utcnow().isoformat()
+    _update_agent_stores()
     logger.info("Fast-tier update complete.")
 
 def update_slow_data():

@@ -1,0 +1,4 @@
+[
+  {"lat": 24.5, "lng": 119.5, "severity": "medium", "ratio": 0.52, "degraded": 8, "total": 15},
+  {"lat": 25.5, "lng": 120.5, "severity": "low", "ratio": 0.30, "degraded": 3, "total": 10}
+]

@@ -1,0 +1,7 @@
+[
+  {"name": "Taiwan Strait", "count": 18, "action_geo_cc": "TW", "lat": 24.00, "lng": 119.50, "source_url": "https://example.com/gdelt-tw1"},
+  {"name": "Taipei, Taiwan", "count": 7, "action_geo_cc": "TW", "lat": 25.03, "lng": 121.57, "source_url": "https://example.com/gdelt-tw2"},
+  {"name": "Fujian, China", "count": 9, "action_geo_cc": "CN", "lat": 26.07, "lng": 119.30, "source_url": "https://example.com/gdelt-tw3"},
+  {"name": "Beijing, China", "count": 14, "action_geo_cc": "CN", "lat": 39.90, "lng": 116.41, "source_url": "https://example.com/gdelt-tw4"},
+  {"name": "Okinawa, Japan", "count": 4, "action_geo_cc": "JP", "lat": 26.33, "lng": 127.80, "source_url": "https://example.com/gdelt-tw5"}
+]

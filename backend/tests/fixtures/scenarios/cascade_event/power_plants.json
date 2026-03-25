@@ -1,0 +1,5 @@
+[
+  {"name": "Van Thermal Power Plant", "country": "Turkey", "fuel_type": "Natural Gas", "lat": 38.52, "lng": 43.35},
+  {"name": "Agri Hydroelectric Station", "country": "Turkey", "fuel_type": "Hydro", "lat": 39.70, "lng": 43.10},
+  {"name": "Mus Wind Farm", "country": "Turkey", "fuel_type": "Wind", "lat": 38.75, "lng": 41.50}
+]

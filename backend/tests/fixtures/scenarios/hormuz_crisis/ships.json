@@ -1,0 +1,16 @@
+[
+  {"mmsi": "256789001", "name": "PACIFIC TANKER", "type": "tanker", "destination": "FUJAIRAH", "country": "Iran", "lat": 26.55, "lng": 56.28, "sog": 11.2, "cog": 45, "callsign": "PT1"},
+  {"mmsi": "256789002", "name": "HORMUZ CARRIER", "type": "tanker", "destination": "MUMBAI", "country": "Iran", "lat": 26.42, "lng": 56.15, "sog": 9.8, "cog": 120, "callsign": "HC1"},
+  {"mmsi": "256789003", "name": "GULF SPIRIT", "type": "tanker", "destination": "SINGAPORE", "country": "Liberia", "lat": 26.60, "lng": 56.40, "sog": 12.1, "cog": 90, "callsign": "GS1"},
+  {"mmsi": "256789004", "name": "NOOR 1", "type": "tanker", "destination": "", "country": "Iran", "lat": 26.35, "lng": 56.05, "sog": 0.5, "cog": 0, "callsign": "NR1"},
+  {"mmsi": "256789005", "name": "DENA", "type": "tanker", "destination": "FOR ORDERS", "country": "Iran", "lat": 26.70, "lng": 56.50, "sog": 3.2, "cog": 180, "callsign": "DN1"},
+  {"mmsi": "256789006", "name": "STENA IMPERO II", "type": "tanker", "destination": "RAS TANURA", "country": "United Kingdom", "lat": 26.50, "lng": 56.30, "sog": 14.0, "cog": 270, "callsign": "SI2"},
+  {"mmsi": "256789007", "name": "AL JABIRAH", "type": "tanker", "destination": "BASRAH", "country": "Saudi Arabia", "lat": 26.80, "lng": 56.60, "sog": 10.5, "cog": 315, "callsign": "AJ1"},
+  {"mmsi": "256789008", "name": "EVER GLORY", "type": "cargo", "destination": "JEBEL ALI", "country": "Singapore", "lat": 25.90, "lng": 56.10, "sog": 15.0, "cog": 0, "callsign": "EG1"},
+  {"mmsi": "256789009", "name": "IRIS", "type": "military_vessel", "destination": "", "country": "Iran", "lat": 26.45, "lng": 56.20, "sog": 18.5, "cog": 60, "callsign": "IRIS"},
+  {"mmsi": "256789010", "name": "IRGCN PATROL 7", "type": "military_vessel", "destination": "", "country": "Iran", "lat": 26.52, "lng": 56.32, "sog": 22.0, "cog": 90, "callsign": "IP7"},
+  {"mmsi": "256789011", "name": "USS BATAAN (LHD-5)", "type": "carrier", "destination": "", "country": "United States", "lat": 25.50, "lng": 55.80, "sog": 15.0, "cog": 45, "callsign": "NBAT", "estimated": true, "source": "OSINT estimated position"},
+  {"mmsi": "256789012", "name": "FS CHEVALIER PAUL", "type": "military_vessel", "destination": "", "country": "France", "lat": 25.60, "lng": 55.90, "sog": 12.0, "cog": 90, "callsign": "FCP1"},
+  {"mmsi": "256789013", "name": "CRUDE VOYAGER", "type": "tanker", "destination": "KHARG ISLAND", "country": "Malta", "lat": 27.10, "lng": 56.80, "sog": 8.5, "cog": 200, "callsign": "CV1"},
+  {"mmsi": "256789014", "name": "OCEAN TRADER", "type": "cargo", "destination": "DUBAI", "country": "Panama", "lat": 25.20, "lng": 55.30, "sog": 11.0, "cog": 0, "callsign": "OT1"}
+]

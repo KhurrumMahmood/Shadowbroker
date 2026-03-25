@@ -1,0 +1,7 @@
+[
+  {"mmsi": "100001", "name": "CARGO PACIFIC", "type": "cargo", "destination": "SINGAPORE", "country": "Liberia", "lat": 1.20, "lng": 103.80, "sog": 12.0, "cog": 180},
+  {"mmsi": "100002", "name": "TANKER GULF", "type": "tanker", "destination": "FUJAIRAH", "country": "Iran", "lat": 26.50, "lng": 56.30, "sog": 10.0, "cog": 90},
+  {"mmsi": "100003", "name": "SHADOW VESSEL", "type": "tanker", "destination": "", "country": "Unknown", "lat": 26.55, "lng": 56.25, "sog": 0.3, "cog": 0},
+  {"mmsi": "100004", "name": "NORDIC CARRIER", "type": "cargo", "destination": "ROTTERDAM", "country": "Norway", "lat": 51.90, "lng": 4.50, "sog": 14.0, "cog": 0},
+  {"mmsi": "100005", "name": "MAERSK LION", "type": "cargo", "destination": "HAMBURG", "country": "Denmark", "lat": 53.50, "lng": 9.90, "sog": 8.0, "cog": 45}
+]

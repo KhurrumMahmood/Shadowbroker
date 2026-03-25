@@ -1,0 +1,10 @@
+[
+  {"name": "Kadena Air Base", "country": "United States", "branch": "Air Force", "lat": 26.35, "lng": 127.77},
+  {"name": "Yokosuka Naval Base", "country": "United States", "branch": "Navy", "lat": 35.28, "lng": 139.67},
+  {"name": "Andersen Air Force Base", "country": "United States", "branch": "Air Force", "lat": 13.58, "lng": 144.92},
+  {"name": "Naha Air Base", "country": "Japan", "branch": "Air Force", "lat": 26.21, "lng": 127.65},
+  {"name": "Longtian Air Base", "country": "China", "branch": "Air Force", "lat": 25.67, "lng": 119.40},
+  {"name": "Fuzhou Air Base", "country": "China", "branch": "Air Force", "lat": 26.00, "lng": 119.30},
+  {"name": "Chiayi Air Base", "country": "Taiwan", "branch": "Air Force", "lat": 23.46, "lng": 120.40},
+  {"name": "Hsinchu Air Base", "country": "Taiwan", "branch": "Air Force", "lat": 24.82, "lng": 120.94}
+]

@@ -1,0 +1,5 @@
+[
+  {"title": "Pentagon announces increased troop rotations to CENTCOM AOR", "link": "https://example.com/al-1", "published": "2026-03-25T06:00:00Z", "source": "Defense One", "risk_score": 6, "coords": [38.90, -77.04], "cluster_count": 2, "lat": 38.90, "lng": -77.04},
+  {"title": "US Air Mobility Command increases strategic airlift operations", "link": "https://example.com/al-2", "published": "2026-03-25T04:00:00Z", "source": "Air Force Times", "risk_score": 5, "coords": [39.13, -75.47], "cluster_count": 1, "lat": 39.13, "lng": -75.47},
+  {"title": "Coalition forces reinforce positions in Persian Gulf", "link": "https://example.com/al-3", "published": "2026-03-25T03:00:00Z", "source": "USNI News", "risk_score": 7, "coords": [25.12, 51.31], "cluster_count": 3, "lat": 25.12, "lng": 51.31}
+]

@@ -1,0 +1,8 @@
+[
+  {"title": "Iran seizes tanker in Strait of Hormuz as tensions escalate", "link": "https://example.com/hormuz-1", "published": "2026-03-25T08:00:00Z", "source": "Reuters", "risk_score": 9, "coords": [26.5, 56.3], "cluster_count": 4, "lat": 26.5, "lng": 56.3},
+  {"title": "US Navy increases patrols in Persian Gulf amid Iran standoff", "link": "https://example.com/hormuz-2", "published": "2026-03-25T07:30:00Z", "source": "AP News", "risk_score": 8, "coords": [25.5, 55.8], "cluster_count": 3, "lat": 25.5, "lng": 55.8},
+  {"title": "IRGC threatens to close Strait of Hormuz if sanctions tighten", "link": "https://example.com/hormuz-3", "published": "2026-03-25T06:00:00Z", "source": "Al Jazeera", "risk_score": 9, "coords": [26.5, 56.3], "cluster_count": 2, "lat": 26.5, "lng": 56.3},
+  {"title": "Oil prices surge 4% on Hormuz disruption fears", "link": "https://example.com/hormuz-4", "published": "2026-03-25T09:00:00Z", "source": "Bloomberg", "risk_score": 7, "coords": null, "cluster_count": 1, "lat": null, "lng": null},
+  {"title": "UK warship deployed to escort tankers through Hormuz", "link": "https://example.com/hormuz-5", "published": "2026-03-25T05:00:00Z", "source": "BBC News", "risk_score": 7, "coords": [26.5, 56.3], "cluster_count": 2, "lat": 26.5, "lng": 56.3},
+  {"title": "GCC states raise maritime security alert level", "link": "https://example.com/hormuz-6", "published": "2026-03-25T04:00:00Z", "source": "Gulf News", "risk_score": 6, "coords": [25.3, 55.3], "cluster_count": 1, "lat": 25.3, "lng": 55.3}
+]

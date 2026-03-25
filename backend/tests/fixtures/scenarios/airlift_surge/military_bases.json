@@ -1,0 +1,10 @@
+[
+  {"name": "Dover Air Force Base", "country": "United States", "branch": "Air Force", "lat": 39.13, "lng": -75.47},
+  {"name": "McGuire Air Force Base", "country": "United States", "branch": "Air Force", "lat": 40.02, "lng": -74.59},
+  {"name": "Ramstein Air Base", "country": "United States", "branch": "Air Force", "lat": 49.44, "lng": 7.60},
+  {"name": "RAF Mildenhall", "country": "United States", "branch": "Air Force", "lat": 52.36, "lng": 0.49},
+  {"name": "Incirlik Air Base", "country": "United States", "branch": "Air Force", "lat": 37.00, "lng": 35.43},
+  {"name": "Al Udeid Air Base", "country": "United States", "branch": "Air Force", "lat": 25.12, "lng": 51.31},
+  {"name": "Al Dhafra Air Base", "country": "United States", "branch": "Air Force", "lat": 24.25, "lng": 54.55},
+  {"name": "Ali Al Salem Air Base", "country": "United States", "branch": "Air Force", "lat": 29.35, "lng": 47.52}
+]

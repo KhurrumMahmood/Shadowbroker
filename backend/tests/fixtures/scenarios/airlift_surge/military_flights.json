@@ -1,0 +1,14 @@
+[
+  {"icao24": "ae8001", "callsign": "RCH401", "country": "United States", "model": "C-17A Globemaster III", "lat": 49.50, "lng": 8.00, "alt": 35000, "heading": 95, "military_type": "cargo", "origin_name": "Dover AFB", "dest_name": "Ramstein AB"},
+  {"icao24": "ae8002", "callsign": "RCH405", "country": "United States", "model": "C-17A Globemaster III", "lat": 48.00, "lng": 12.00, "alt": 36000, "heading": 100, "military_type": "cargo", "origin_name": "McGuire AFB", "dest_name": "Incirlik AB"},
+  {"icao24": "ae8003", "callsign": "RCH411", "country": "United States", "model": "C-17A Globemaster III", "lat": 41.00, "lng": 28.00, "alt": 34000, "heading": 105, "military_type": "cargo", "origin_name": "Ramstein AB", "dest_name": "Incirlik AB"},
+  {"icao24": "ae8004", "callsign": "RCH418", "country": "United States", "model": "C-17A Globemaster III", "lat": 37.00, "lng": 35.00, "alt": 35000, "heading": 110, "military_type": "cargo", "origin_name": "Ramstein AB", "dest_name": "Al Udeid AB"},
+  {"icao24": "ae8005", "callsign": "RCH422", "country": "United States", "model": "C-17A Globemaster III", "lat": 33.00, "lng": 42.00, "alt": 36000, "heading": 115, "military_type": "cargo", "origin_name": "Incirlik AB", "dest_name": "Al Udeid AB"},
+  {"icao24": "ae8006", "callsign": "RCH430", "country": "United States", "model": "C-17A Globemaster III", "lat": 29.00, "lng": 47.00, "alt": 34000, "heading": 120, "military_type": "cargo", "origin_name": "Incirlik AB", "dest_name": "Al Udeid AB"},
+  {"icao24": "ae8007", "callsign": "RCH435", "country": "United States", "model": "C-17A Globemaster III", "lat": 26.00, "lng": 50.00, "alt": 35000, "heading": 100, "military_type": "cargo", "origin_name": "Ramstein AB", "dest_name": "Al Udeid AB"},
+  {"icao24": "ae8008", "callsign": "RCH440", "country": "United States", "model": "C-17A Globemaster III", "lat": 52.00, "lng": -2.00, "alt": 37000, "heading": 90, "military_type": "cargo", "origin_name": "Dover AFB", "dest_name": "Ramstein AB"},
+  {"icao24": "ae8009", "callsign": "RCH445", "country": "United States", "model": "C-5M Super Galaxy", "lat": 45.00, "lng": 5.00, "alt": 33000, "heading": 100, "military_type": "cargo", "origin_name": "Dover AFB", "dest_name": "Ramstein AB"},
+  {"icao24": "ae8010", "callsign": "SHELL51", "country": "United States", "model": "KC-135R Stratotanker", "lat": 42.00, "lng": 20.00, "alt": 30000, "heading": 100, "military_type": "tanker", "origin_name": "RAF Mildenhall", "dest_name": ""},
+  {"icao24": "ae8011", "callsign": "SHELL52", "country": "United States", "model": "KC-10A Extender", "lat": 38.00, "lng": 30.00, "alt": 32000, "heading": 105, "military_type": "tanker", "origin_name": "Incirlik AB", "dest_name": ""},
+  {"icao24": "ae0050", "callsign": "NAVY35", "country": "United States", "model": "P-8A Poseidon", "lat": 36.00, "lng": -5.50, "alt": 22000, "heading": 270, "military_type": "maritime_patrol", "origin_name": "Sigonella NAS", "dest_name": "Rota NS"}
+]

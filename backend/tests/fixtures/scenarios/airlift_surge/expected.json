@@ -1,0 +1,22 @@
+{
+  "scenario_name": "airlift_surge",
+  "description": "Strategic airlift surge — 8+ C-17s on eastbound vectors from CONUS through Europe to the Gulf, supported by tankers",
+  "test_queries": [
+    {
+      "query": "Are C-17s surging toward the Gulf? Show me the airlift corridor.",
+      "required_mentions": ["C-17", "airlift", "Ramstein", "Al Udeid", "eastbound"],
+      "required_data_sources_queried": ["military_flights", "military_bases"],
+      "risk_level_range": [5, 9],
+      "must_include_entity_types": ["military_flight"],
+      "max_latency_seconds": 10.0
+    },
+    {
+      "query": "What military airlift activity is happening right now?",
+      "required_mentions": ["C-17", "cargo", "RCH"],
+      "required_data_sources_queried": ["military_flights"],
+      "risk_level_range": [4, 9],
+      "must_include_entity_types": ["military_flight"],
+      "max_latency_seconds": 8.0
+    }
+  ]
+}

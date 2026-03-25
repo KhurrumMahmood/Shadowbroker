@@ -1,0 +1,22 @@
+{
+  "scenario_name": "quiet_day",
+  "description": "Normal baseline — routine traffic, minor seismic activity, low-risk news, no anomalies",
+  "test_queries": [
+    {
+      "query": "Is there anything unusual happening right now?",
+      "required_mentions": ["routine", "normal"],
+      "required_data_sources_queried": ["ships", "military_flights", "earthquakes"],
+      "risk_level_range": [0, 3],
+      "must_include_entity_types": [],
+      "max_latency_seconds": 8.0
+    },
+    {
+      "query": "Give me a global situation overview",
+      "required_mentions": ["cargo", "earthquake"],
+      "required_data_sources_queried": ["ships", "earthquakes", "news"],
+      "risk_level_range": [0, 3],
+      "must_include_entity_types": [],
+      "max_latency_seconds": 8.0
+    }
+  ]
+}

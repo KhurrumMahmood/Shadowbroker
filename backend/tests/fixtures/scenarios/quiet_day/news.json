@@ -1,0 +1,5 @@
+[
+  {"title": "EU trade negotiations continue in Brussels", "link": "https://example.com/q-1", "published": "2026-03-25T10:00:00Z", "source": "Reuters", "risk_score": 2, "coords": [50.85, 4.35], "cluster_count": 1, "lat": 50.85, "lng": 4.35},
+  {"title": "Climate summit opens in Geneva", "link": "https://example.com/q-2", "published": "2026-03-25T09:00:00Z", "source": "BBC News", "risk_score": 1, "coords": [46.20, 6.14], "cluster_count": 1, "lat": 46.20, "lng": 6.14},
+  {"title": "Tech stocks rally on positive earnings reports", "link": "https://example.com/q-3", "published": "2026-03-25T08:00:00Z", "source": "Bloomberg", "risk_score": 1, "coords": null, "cluster_count": 1, "lat": null, "lng": null}
+]

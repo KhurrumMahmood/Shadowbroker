@@ -1,0 +1,5 @@
+[
+  {"region_code": "TR-65", "region_name": "Van", "country_code": "TR", "country_name": "Turkey", "level": "critical", "datasource": "bgp", "severity": 78, "lat": 38.49, "lng": 43.38},
+  {"region_code": "TR-30", "region_name": "Hakkari", "country_code": "TR", "country_name": "Turkey", "level": "warning", "datasource": "bgp", "severity": 42, "lat": 37.58, "lng": 43.74},
+  {"region_code": "TR-04", "region_name": "Agri", "country_code": "TR", "country_name": "Turkey", "level": "warning", "datasource": "ping-slash24", "severity": 28, "lat": 39.72, "lng": 43.05}
+]

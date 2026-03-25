@@ -1,0 +1,22 @@
+{
+  "scenario_name": "taiwan_posture",
+  "description": "Elevated military posture around Taiwan — PLA exercises, multi-country naval presence, recon satellites overhead",
+  "test_queries": [
+    {
+      "query": "Current military posture around Taiwan",
+      "required_mentions": ["China", "Taiwan", "Japan", "carrier", "fighter"],
+      "required_data_sources_queried": ["ships", "military_flights", "satellites"],
+      "risk_level_range": [7, 10],
+      "must_include_entity_types": ["ship", "military_flight"],
+      "max_latency_seconds": 10.0
+    },
+    {
+      "query": "How many PLA aircraft are operating near the Taiwan Strait?",
+      "required_mentions": ["China", "J-16", "H-6"],
+      "required_data_sources_queried": ["military_flights"],
+      "risk_level_range": [5, 10],
+      "must_include_entity_types": ["military_flight"],
+      "max_latency_seconds": 8.0
+    }
+  ]
+}
