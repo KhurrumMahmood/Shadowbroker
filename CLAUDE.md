@@ -150,22 +150,38 @@ The backend runs on Railway as a single Docker service. The frontend is bundled 
 
 ### Railway CLI Deploy
 ```bash
-# IMPORTANT: railway up uploads from CWD — must be run from the service's directory
-cd backend && railway up --detach    # backend service
-cd frontend && railway up --detach   # frontend service (if separate)
+# CRITICAL: railway up walks up to the git root for its upload context, NOT CWD.
+# You MUST use --path-as-root to force it to use the CWD as the build root.
+# Without --path-as-root, Railway uploads the entire repo and may auto-detect
+# the wrong builder (e.g., Railpack picks up start.sh instead of Dockerfile).
+
+railway service backend   # switch to the correct service first
+cd backend && railway up --path-as-root . --detach
+
+railway service frontend  # switch before deploying frontend
+cd frontend && railway up --path-as-root . --detach
 ```
 
 ### Railway Config
+- **`RAILWAY_ROOT_DIRECTORY=frontend`** is set on the frontend service so GitHub-triggered deploys find `frontend/Dockerfile`
 - **`RAILWAY_ROOT_DIRECTORY=backend`** is set on the backend service so GitHub-triggered deploys find `backend/Dockerfile`
-- **`RAILWAY_DOCKERFILE_PATH=Dockerfile`** — relative to root directory
-- For `railway up`, CWD determines the build context (the root directory variable only applies to GitHub-triggered deploys)
-- Railway auto-redeploys when variables are changed
+- **`RAILWAY_DOCKERFILE_PATH=Dockerfile`** — relative to root directory (backend only)
+- For `railway up`, use `--path-as-root .` to ensure CWD is the build context (otherwise Railway uses the git root, causing Railpack to detect `start.sh` instead of the Dockerfile)
+- Railway auto-redeploys when variables are changed — this can override an in-progress `railway up` deploy
 
 ### Railway Variables
 Set via `railway variables set KEY=VALUE` or the dashboard. Key Railway-specific vars:
+
+**Backend service:**
 - `PORT=8000` — Railway routes traffic to this port
 - `RAILWAY_ROOT_DIRECTORY=backend` — tells Railway where to find the Dockerfile for GitHub deploys
+- `RAILWAY_DOCKERFILE_PATH=Dockerfile` — relative to root directory
 - `NIXPACKS_NO_INSTALL=1` — forces Dockerfile-based builds (disables Nixpacks auto-detection)
+
+**Frontend service:**
+- `PORT=3000` — Railway routes traffic to this port
+- `RAILWAY_ROOT_DIRECTORY=frontend` — tells Railway where to find the Dockerfile for GitHub deploys
+- `BACKEND_URL=http://backend.railway.internal:8000` — internal Railway networking
 
 All other env vars (API keys, LLM config) are set as Railway service variables and injected at runtime.
 

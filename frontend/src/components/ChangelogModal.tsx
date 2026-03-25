@@ -57,10 +57,6 @@ const CONTRIBUTORS = [
 
 export function useChangelog() {
     const [show, setShow] = useState(false);
-    useEffect(() => {
-        const seen = localStorage.getItem(STORAGE_KEY);
-        if (!seen) setShow(true);
-    }, []);
     return { showChangelog: show, setShowChangelog: setShow };
 }
 
