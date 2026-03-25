@@ -13,7 +13,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-_TIMEOUT = 30  # seconds per LLM call
+_TIMEOUT = 45  # seconds per LLM call (thinking models need more time)
 
 
 def call_llm_simple(
@@ -62,6 +62,10 @@ def call_llm_simple(
         if tools and round_num < max_tool_rounds:
             body["tools"] = tools
 
+        url = f"{base_url}/chat/completions"
+        n_tools = len(body.get("tools", []))
+        logger.info(f"LLM call round={round_num} model={model} tools_in_body={n_tools}")
+
         try:
             resp = httpx.post(
                 f"{base_url}/chat/completions",
@@ -87,19 +91,27 @@ def call_llm_simple(
                 }
 
         if resp.status_code != 200:
+            try:
+                err_body = resp.text[:500]
+            except Exception:
+                err_body = "(unreadable)"
+            logger.error(
+                f"LLM HTTP {resp.status_code} for model={model}: {err_body}"
+            )
             return {
                 "content": "",
                 "tool_calls_made": tool_calls_made,
-                "error": f"LLM returned HTTP {resp.status_code}",
+                "error": f"LLM returned HTTP {resp.status_code}: {err_body}",
             }
 
         data = resp.json()
         choice = data.get("choices", [{}])[0]
         msg = choice.get("message", {})
 
-        # Check for tool calls
+        # Check for tool calls (only process if we actually sent tools)
         msg_tool_calls = msg.get("tool_calls")
-        if msg_tool_calls and tool_executor:
+        tools_were_sent = "tools" in body
+        if msg_tool_calls and tool_executor and tools_were_sent:
             # Add assistant message with tool calls
             messages.append(msg)
 

@@ -136,10 +136,17 @@ class Orchestrator:
 
         yield _sse("result", {
             "summary": final.summary,
+            "layers": final.layers,
+            "viewport": final.viewport,
+            "highlight_entities": [],
+            "result_entities": final.result_entities,
+            "filters": final.filters,
             "duration_ms": final.duration_ms,
-            "provider": final.provider,
-            "sub_agent_count": len(sub_results),
-            "successful_count": len([r for r in sub_results if r.success]),
+            "provider": f"orchestrator/{final.provider}",
+            "_orchestrator": {
+                "sub_agent_count": len(sub_results),
+                "successful_count": len([r for r in sub_results if r.success]),
+            },
         })
 
     def _dispatch_parallel(

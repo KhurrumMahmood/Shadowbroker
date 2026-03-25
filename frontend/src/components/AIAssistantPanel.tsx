@@ -229,6 +229,19 @@ export default function AIAssistantPanel({
               const status = JSON.parse(eventData);
               setProgressText(status.detail || "Working...");
             } catch { /* ignore parse errors */ }
+          } else if (eventType === "plan") {
+            try {
+              const plan = JSON.parse(eventData);
+              const count = plan.sub_tasks?.length || 0;
+              setProgressText(`Analyzing across ${count} domains...`);
+            } catch { /* ignore parse errors */ }
+          } else if (eventType === "sub_result") {
+            try {
+              const sub = JSON.parse(eventData);
+              if (sub.summary) {
+                setProgressText(sub.summary.slice(0, 80) + (sub.summary.length > 80 ? "..." : ""));
+              }
+            } catch { /* ignore parse errors */ }
           } else if (eventType === "result") {
             try {
               const raw = JSON.parse(eventData);

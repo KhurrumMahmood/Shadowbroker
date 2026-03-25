@@ -1288,20 +1288,82 @@ def _call_provider(provider: dict, messages: list, live_data: dict | None,
     return result
 
 
+def _try_orchestrator(query: str, live_data: dict | None) -> dict | None:
+    """Try to handle a compound query via the multi-agent orchestrator.
+
+    Returns a standard response dict if the query is compound and succeeds,
+    or None if the query is simple or orchestration fails.
+    """
+    try:
+        from services.agent.router import QueryRouter, QueryComplexity
+        from services.agent.orchestrator import Orchestrator
+        from services.agent.datasource import InMemoryDataSource
+
+        router = QueryRouter()
+        plan = router.classify(query)
+
+        if plan.complexity != QueryComplexity.COMPOUND:
+            return None
+
+        logger.info(f"[orchestrator] Compound query detected — {len(plan.sub_tasks)} sub-tasks, domains={plan.domains_detected}")
+
+        # Use last provider (OpenRouter) for sub-agents; fall back to first
+        provider = _PROVIDERS[-1] if _PROVIDERS else None
+        if not provider:
+            return None
+
+        ds = InMemoryDataSource(live_data) if live_data else None
+        orch = Orchestrator(
+            provider=provider,
+            ds=ds,
+            total_budget_seconds=min(60.0, _OVERALL_BUDGET_S * 0.5),
+            use_llm_synthesis=True,
+        )
+        result = orch.run(query, plan)
+
+        # Format as standard response dict
+        return {
+            "summary": result.summary,
+            "layers": result.layers,
+            "viewport": result.viewport,
+            "highlight_entities": [],
+            "result_entities": result.result_entities,
+            "filters": result.filters,
+            "duration_ms": result.duration_ms,
+            "provider": f"orchestrator/{result.provider}",
+            "_orchestrator": {
+                "complexity": plan.complexity.value,
+                "domains": plan.domains_detected,
+                "sub_agents": len(result.sub_results),
+                "successful": len([r for r in result.sub_results if r.success]),
+            },
+        }
+    except Exception as e:
+        logger.warning(f"[orchestrator] Failed, falling back to simple path: {e}")
+        return None
+
+
 def call_llm(query: str, data_summary: dict, viewport: dict | None = None,
              conversation: list | None = None,
              search_results: dict | None = None,
              live_data: dict | None = None) -> dict:
     """Call the LLM with optional tool use and return a parsed structured response.
 
-    Tries providers in order (Cerebras → OpenRouter). Falls back on connection/timeout
-    errors. Content-filter errors are NOT retried (they'll fail on any provider).
+    Compound queries are routed to the multi-agent orchestrator.
+    Simple queries use the existing single-loop provider path.
+    Falls back on connection/timeout errors.
 
     Raises RuntimeError if no LLM is configured.
     """
     if not _PROVIDERS:
         raise RuntimeError("LLM not configured — set CEREBRAS_API_KEY or LLM_API_KEY")
 
+    # Try orchestrator for compound queries
+    orch_result = _try_orchestrator(query, live_data)
+    if orch_result is not None:
+        return orch_result
+
+    # Simple path — existing behavior
     messages = _build_messages(query, data_summary, viewport, conversation, search_results)
 
     t0 = _time.monotonic()
@@ -1582,13 +1644,40 @@ def call_llm_streaming(query: str, data_summary: dict, viewport: dict | None = N
                        live_data: dict | None = None):
     """Streaming version of call_llm — yields SSE event strings.
 
-    Tries providers in order. Falls back on connection errors.
+    Compound queries are routed to the multi-agent orchestrator with
+    progressive plan/sub_result/result events.
+    Simple queries use the existing single-loop provider path.
     The final event is either 'result' or 'error'.
     """
     if not _PROVIDERS:
         yield _sse("error", {"error": "LLM not configured", "error_type": "connection"})
         return
 
+    # Try orchestrator for compound queries
+    try:
+        from services.agent.router import QueryRouter, QueryComplexity
+        from services.agent.orchestrator import Orchestrator
+        from services.agent.datasource import InMemoryDataSource
+
+        router = QueryRouter()
+        plan = router.classify(query)
+
+        if plan.complexity == QueryComplexity.COMPOUND:
+            logger.info(f"[orchestrator/stream] Compound query — {len(plan.sub_tasks)} sub-tasks")
+            provider = _PROVIDERS[-1]
+            ds = InMemoryDataSource(live_data) if live_data else None
+            orch = Orchestrator(
+                provider=provider,
+                ds=ds,
+                total_budget_seconds=min(60.0, _OVERALL_BUDGET_S * 0.5),
+                use_llm_synthesis=True,
+            )
+            yield from orch.run_streaming(query, plan)
+            return
+    except Exception as e:
+        logger.warning(f"[orchestrator/stream] Failed, falling back to simple path: {e}")
+
+    # Simple path — existing behavior
     messages = _build_messages(query, data_summary, viewport, conversation, search_results)
 
     t0 = _time.monotonic()
