@@ -61,7 +61,8 @@ export default function FindLocateBar({ data, onLocate, onFilter }: FindLocateBa
             abortRef.current = controller;
             try {
                 const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`, { signal: controller.signal });
-                if (!res.ok || seq !== seqRef.current) return;
+                if (seq !== seqRef.current) return;
+                if (!res.ok) { setLocationResults([]); return; }
                 const data = await res.json();
                 if (seq !== seqRef.current) return; // stale
                 setLocationResults((data.results || []).map((loc: any) => ({

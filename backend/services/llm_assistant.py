@@ -215,7 +215,7 @@ countries"). Returns grouped counts.
 {"- Use web_search to research current events, geopolitics, sanctions, conflicts, or context " +
 "that live data feeds don't contain. Great for answering 'why' questions (e.g. 'why are there " +
 "fewer flights over Pakistan?'). Only search when the query needs external context — don't " +
-"search for data that's already in the live feeds." if _web_search_available() else ""}\
+"search for data that's already in the live feeds." if _web_search_available() else ""}
 - You may call multiple tools in parallel to gather data, then produce the final JSON response.
 - For simple queries, the SEARCH RESULTS above may be sufficient — use tools when you need precision.
 
