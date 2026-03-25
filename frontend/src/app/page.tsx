@@ -29,6 +29,7 @@ import { useCategoryCycler, toSelectedEntity } from "@/hooks/useCategoryCycler";
 import { useAIResultCycler, findEntityInData } from "@/hooks/useAIResultCycler";
 import BoxSelectSummary from "@/components/BoxSelectSummary";
 import AIAssistantPanel from "@/components/AIAssistantPanel";
+import IntelFeedPanel from "@/components/IntelFeedPanel";
 import ViewportBriefPanel from "@/components/ViewportBriefPanel";
 import type { BriefData } from "@/components/ViewportBriefPanel";
 import type { BoxSelectResult } from "@/components/map/hooks/useBoxSelect";
@@ -211,6 +212,8 @@ export default function Dashboard() {
 
   // AI assistant
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [intelFeedOpen, setIntelFeedOpen] = useState(false);
+  const [intelAlertCount, setIntelAlertCount] = useState(0);
   const [briefOpen, setBriefOpen] = useState(false);
   const [briefData, setBriefData] = useState<BriefData | null>(null);
   const [briefLoading, setBriefLoading] = useState(false);
@@ -489,6 +492,23 @@ export default function Dashboard() {
               {/* Divider */}
               <div className="w-px h-8 bg-[var(--border-primary)]" />
 
+              {/* Intel Feed toggle */}
+              <div
+                className="flex flex-col items-center cursor-pointer relative"
+                onClick={() => setIntelFeedOpen(o => !o)}
+              >
+                <div className="text-[8px] text-[var(--text-muted)] font-mono tracking-[0.2em]">INTEL</div>
+                <div className={`text-[11px] font-mono font-bold ${intelFeedOpen ? "text-cyan-400" : intelAlertCount > 0 ? "text-red-400" : "text-[var(--text-secondary)]"}`}>
+                  {intelFeedOpen ? "OPEN" : intelAlertCount > 0 ? intelAlertCount : "FEED"}
+                </div>
+                {!intelFeedOpen && intelAlertCount > 0 && (
+                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                )}
+              </div>
+
+              {/* Divider */}
+              <div className="w-px h-8 bg-[var(--border-primary)]" />
+
               {/* Viewport Brief toggle */}
               <div
                 className="flex flex-col items-center cursor-pointer"
@@ -559,6 +579,15 @@ export default function Dashboard() {
         onAIResultClear={aiCycler.clear}
         viewport={viewBoundsRef.current}
         data={data}
+      />
+
+      {/* INTELLIGENCE FEED PANEL */}
+      <IntelFeedPanel
+        isOpen={intelFeedOpen}
+        onClose={() => setIntelFeedOpen(false)}
+        onFlyTo={(lat, lng, zoom) => setFlyToLocation({ lat, lng, zoom, ts: Date.now() })}
+        alertCount={intelAlertCount}
+        onAlertCountChange={setIntelAlertCount}
       />
 
       {/* VIEWPORT BRIEFING PANEL */}

@@ -72,6 +72,28 @@ def _update_agent_stores():
         logger.debug(f"Agent store update skipped: {e}")
 
 
+def _run_alert_engine():
+    """Run proactive alert checkers against current data.
+
+    Called after slow-tier refresh (every 5 min) — that's when GDELT,
+    outages, fires, and other contextual data needed by checkers is fresh.
+    """
+    try:
+        from services.agent.alert_engine import AlertEngine
+        from services.agent.datasource import InMemoryDataSource
+
+        with _data_lock:
+            data_copy = dict(latest_data)
+
+        ds = InMemoryDataSource(data_copy)
+        engine = AlertEngine()
+        count = engine.run(ds)
+        if count > 0:
+            logger.info(f"Alert engine: {count} new alert(s) generated")
+    except Exception as e:
+        logger.debug(f"Alert engine skipped: {e}")
+
+
 def run_cctv_ingest_cycle():
     """Populate the CCTV database, then refresh the in-memory cache."""
     logger.info("CCTV ingest cycle starting...")
@@ -143,6 +165,7 @@ def update_slow_data():
         futures = [executor.submit(func) for func in slow_funcs]
         concurrent.futures.wait(futures)
     logger.info("Slow-tier update complete.")
+    _run_alert_engine()
 
 def _load_static_infrastructure():
     """Load static datasets that don't change at runtime. Called once at startup."""

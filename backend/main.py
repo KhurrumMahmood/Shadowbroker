@@ -669,6 +669,33 @@ async def list_artifacts():
     return get_artifact_store().list()
 
 
+@app.get("/api/alerts")
+async def list_alerts(limit: int = 50):
+    """List recent proactive alerts, newest first."""
+    from services.agent.alerts import get_alert_store
+    return get_alert_store().list(limit=min(limit, 200))
+
+
+@app.get("/api/alerts/{alert_id}")
+async def get_alert(alert_id: str):
+    """Get a specific alert by ID."""
+    from services.agent.alerts import get_alert_store
+    alert = get_alert_store().get(alert_id)
+    if alert is None:
+        return JSONResponse({"error": "Alert not found"}, status_code=404)
+    return {
+        "id": alert.alert_id,
+        "alert_type": alert.alert_type,
+        "severity": alert.severity.value,
+        "title": alert.title,
+        "description": alert.description,
+        "lat": alert.lat,
+        "lng": alert.lng,
+        "data": alert.data,
+        "created_at": alert.created_at,
+    }
+
+
 class BriefRequest(BaseModel):
     south: float
     west: float
