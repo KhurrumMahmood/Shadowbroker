@@ -127,7 +127,9 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
         return results;
     }, [data?.tracked_flights]);
 
-    const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(["EXTRAS"]));
+    const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
+        new Set(["INTELLIGENCE & THREATS", "MARITIME", "SPACE & SENSORS", "INFRASTRUCTURE", "EXTRAS", "OVERLAYS"])
+    );
     const toggleSection = (name: string) => {
         setCollapsedSections(prev => {
             const next = new Set(prev);
@@ -519,21 +521,21 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                                     const totalCount = section.layers.reduce((sum, l) => sum + (l.count ?? 0), 0);
 
                                     return (
-                                        <div key={section.name} className="flex flex-col">
+                                        <div key={section.name} className="flex flex-col border-b border-[var(--border-primary)]/30 last:border-b-0">
                                             {/* Section header */}
                                             <div
-                                                className="flex items-center justify-between cursor-pointer group py-1"
+                                                className="flex items-center justify-between cursor-pointer group px-2 py-2 rounded-t bg-[var(--bg-secondary)]/40 hover:bg-[var(--bg-secondary)]/60 transition-colors"
                                                 onClick={() => toggleSection(section.name)}
                                             >
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-[9px] text-[var(--text-muted)] font-mono tracking-[0.15em] font-bold group-hover:text-cyan-400 transition-colors">{section.name}</span>
+                                                    <span className={`text-[10px] font-mono tracking-[0.15em] font-bold transition-colors ${activeCount > 0 ? 'text-cyan-400/80 group-hover:text-cyan-300' : 'text-[var(--text-secondary)] group-hover:text-cyan-400'}`}>{section.name}</span>
                                                     {activeCount > 0 && totalCount > 0 && (
                                                         <span className="text-[8px] text-cyan-500/60 font-mono">{totalCount.toLocaleString()}</span>
                                                     )}
                                                 </div>
                                                 <div className="flex items-center gap-1.5">
                                                     <span className="text-[8px] text-[var(--text-muted)] font-mono">{activeCount}/{section.layers.length}</span>
-                                                    {isCollapsed ? <ChevronDown size={12} className="text-[var(--text-muted)]" /> : <ChevronUp size={12} className="text-[var(--text-muted)]" />}
+                                                    {isCollapsed ? <ChevronDown size={14} className="text-[var(--text-muted)] group-hover:text-cyan-400 transition-colors" /> : <ChevronUp size={14} className="text-[var(--text-muted)] group-hover:text-cyan-400 transition-colors" />}
                                                 </div>
                                             </div>
 
