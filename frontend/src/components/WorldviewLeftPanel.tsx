@@ -167,8 +167,11 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
         // INFRASTRUCTURE — by country
         const inf: Record<string, number> = {};
         for (const dc of data?.datacenters ?? []) if (dc.country) inf[dc.country] = (inf[dc.country] || 0) + 1;
-        for (const pp of data?.power_plants ?? []) if (pp.country) inf[pp.country] = (inf[pp.country] || 0) + 1;
         for (const mb of data?.military_bases ?? []) if (mb.country) inf[mb.country] = (inf[mb.country] || 0) + 1;
+
+        // EXTRAS — by country
+        const ext: Record<string, number> = {};
+        for (const pp of data?.power_plants ?? []) if (pp.country) ext[pp.country] = (ext[pp.country] || 0) + 1;
 
         return {
             "AVIATION": top5(av),
@@ -176,6 +179,7 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
             "INTELLIGENCE & THREATS": top5(intel),
             "SPACE & SENSORS": top5(sp),
             "INFRASTRUCTURE": top5(inf),
+            "EXTRAS": top5(ext),
         } as Record<string, [string, number][]>;
     }, [data?.commercial_flights, data?.private_flights, data?.private_jets, data?.military_flights, data?.tracked_flights, data?.ships, data?.gdelt, data?.satellites, data?.datacenters, data?.power_plants, data?.military_bases]);
 
@@ -225,8 +229,12 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
         const ifF = sectionFilter["INFRASTRUCTURE"];
         if (ifF) {
             counts["datacenters"] = (data?.datacenters ?? []).filter(d => d.country === ifF).length;
-            counts["power_plants"] = (data?.power_plants ?? []).filter(p => p.country === ifF).length;
             counts["military_bases"] = (data?.military_bases ?? []).filter(b => b.country === ifF).length;
+        }
+
+        const exF = sectionFilter["EXTRAS"];
+        if (exF) {
+            counts["power_plants"] = (data?.power_plants ?? []).filter(p => p.country === exF).length;
         }
 
         return counts;

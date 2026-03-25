@@ -94,6 +94,14 @@ _FILTER_KEYS = [
 ]
 
 
+def _web_search_available() -> bool:
+    """True when OpenRouter + API key are configured (web_search uses Perplexity via OpenRouter)."""
+    return bool(
+        os.environ.get("LLM_API_KEY")
+        and "openrouter" in os.environ.get("LLM_BASE_URL", "").lower()
+    )
+
+
 def build_system_prompt(data_summary: dict, search_results: dict | None = None) -> str:
     """Build the system prompt describing available data and expected response format."""
     counts = "\n".join(
@@ -198,16 +206,16 @@ GUIDELINES:
 - Keep responses factual — describe what the data shows, not speculation.
 - Lat must be -90 to 90, lng -180 to 180, zoom 2 to 14.
 
-TOOLS — you have query_data, aggregate_data, and web_search functions:
+TOOLS — you have query_data, aggregate_data{", and web_search" if _web_search_available() else ""} functions:
 - Use query_data to filter entities by specific field values (case-insensitive substring match) and/or \
 by geographic proximity. Prefer this over the SEARCH RESULTS when the query needs precise field matching \
 (e.g. origin vs destination), or when results above show UNKNOWN fields.
 - Use aggregate_data to count/group entities (e.g. "how many airlines fly from London", "top destination \
 countries"). Returns grouped counts.
-- Use web_search to research current events, geopolitics, sanctions, conflicts, or context \
-that live data feeds don't contain. Great for answering "why" questions (e.g. "why are there \
-fewer flights over Pakistan?"). Only search when the query needs external context — don't \
-search for data that's already in the live feeds.
+{"- Use web_search to research current events, geopolitics, sanctions, conflicts, or context " +
+"that live data feeds don't contain. Great for answering 'why' questions (e.g. 'why are there " +
+"fewer flights over Pakistan?'). Only search when the query needs external context — don't " +
+"search for data that's already in the live feeds." if _web_search_available() else ""}\
 - You may call multiple tools in parallel to gather data, then produce the final JSON response.
 - For simple queries, the SEARCH RESULTS above may be sufficient — use tools when you need precision.
 
@@ -504,7 +512,7 @@ def _build_tools() -> list:
         },
     ]
     # Only expose web_search when OpenRouter + API key are available
-    if os.environ.get("LLM_API_KEY") and "openrouter" in os.environ.get("LLM_BASE_URL", "").lower():
+    if _web_search_available():
         tools.append({
             "type": "function",
             "function": {
@@ -663,7 +671,10 @@ def _parse_inline_tool_calls(text: str) -> list[tuple[str, dict]]:
         # First token is the function name
         parts = re.split(r'<arg_key>', block, maxsplit=1)
         fn_name = parts[0].strip()
-        if not fn_name or fn_name not in ("query_data", "aggregate_data", "web_search"):
+        allowed = {"query_data", "aggregate_data"}
+        if _web_search_available():
+            allowed.add("web_search")
+        if not fn_name or fn_name not in allowed:
             continue
 
         # Parse key-value pairs
@@ -721,6 +732,8 @@ def execute_tool_call(name: str, args: dict, data: dict) -> str:
     elif name == "aggregate_data":
         return _exec_aggregate_data(args, data)
     elif name == "web_search":
+        if not _web_search_available():
+            return json.dumps({"error": "web_search is not available (requires OpenRouter)"})
         return _exec_web_search(args)
     return json.dumps({"error": f"Unknown tool: {name}"})
 

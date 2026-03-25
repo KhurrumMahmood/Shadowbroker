@@ -54,14 +54,14 @@ export default function FindLocateBar({ data, onLocate, onFilter }: FindLocateBa
     const fetchLocations = useCallback((q: string) => {
         if (debounceRef.current) clearTimeout(debounceRef.current);
         if (abortRef.current) abortRef.current.abort();
-        if (q.length < 3) { setLocationResults([]); return; }
+        if (q.length < 3) { ++seqRef.current; setLocationResults([]); return; }
         const seq = ++seqRef.current;
         debounceRef.current = setTimeout(async () => {
             const controller = new AbortController();
             abortRef.current = controller;
             try {
                 const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`, { signal: controller.signal });
-                if (!res.ok || seq !== seqRef.current) { setLocationResults([]); return; }
+                if (!res.ok || seq !== seqRef.current) return;
                 const data = await res.json();
                 if (seq !== seqRef.current) return; // stale
                 setLocationResults((data.results || []).map((loc: any) => ({
