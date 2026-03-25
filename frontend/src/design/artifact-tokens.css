@@ -1,0 +1,166 @@
+/*
+ * ShadowBroker artifact design tokens.
+ *
+ * Injected into every agent-generated artifact iframe to ensure visual
+ * consistency with the dashboard. Artifacts should use these CSS custom
+ * properties instead of hardcoding colors.
+ *
+ * Usage in artifacts:
+ *   background: var(--sb-bg-primary);
+ *   color: var(--sb-text-primary);
+ *   border: 1px solid var(--sb-border-accent);
+ */
+
+:root {
+  /* Backgrounds */
+  --sb-bg-primary: #000000;
+  --sb-bg-secondary: rgb(5, 5, 8);
+  --sb-bg-tertiary: rgb(12, 12, 16);
+  --sb-bg-panel: rgba(0, 0, 0, 0.85);
+  --sb-bg-hover: rgba(8, 51, 68, 0.2);
+
+  /* Text */
+  --sb-text-primary: rgb(243, 244, 246);
+  --sb-text-secondary: rgb(34, 211, 238);
+  --sb-text-muted: rgb(8, 145, 178);
+  --sb-text-heading: rgb(236, 254, 255);
+
+  /* Borders */
+  --sb-border-primary: rgb(10, 12, 15);
+  --sb-border-secondary: rgb(20, 24, 28);
+  --sb-border-accent: rgba(8, 145, 178, 0.4);
+
+  /* Cyan Palette */
+  --sb-cyan-50: #ecfeff;
+  --sb-cyan-100: #cffafe;
+  --sb-cyan-200: #a5f3fc;
+  --sb-cyan-300: #67e8f9;
+  --sb-cyan-400: #22d3ee;
+  --sb-cyan-500: #06b6d4;
+  --sb-cyan-600: #0891b2;
+  --sb-cyan-700: #0e7490;
+  --sb-cyan-800: #155e75;
+  --sb-cyan-900: #164e63;
+  --sb-cyan-950: #083344;
+
+  /* Domain Colors */
+  --sb-color-aviation: #22d3ee;
+  --sb-color-military: #facc15;
+  --sb-color-maritime: #60a5fa;
+  --sb-color-seismic: #fbbf24;
+  --sb-color-fire: #f87171;
+  --sb-color-infrastructure: #a78bfa;
+  --sb-color-intelligence: #4ade80;
+  --sb-color-markets: #34d399;
+  --sb-color-outages: #f87171;
+  --sb-color-tracked: #f472b6;
+
+  /* Shadows */
+  --sb-shadow-panel: 0 4px 30px rgba(0, 0, 0, 0.2);
+  --sb-shadow-floating: 0 4px 30px rgba(0, 0, 0, 0.5);
+  --sb-shadow-glow: 0 0 20px rgba(0, 255, 255, 0.1);
+
+  /* Typography */
+  --sb-font-mono: 'Geist Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --sb-font-sans: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+  --sb-text-xs: 12px;
+  --sb-text-sm: 11px;
+  --sb-text-base: 10px;
+  --sb-text-meta: 9px;
+  --sb-text-micro: 8px;
+  --sb-tracking-heading: 0.2em;
+  --sb-tracking-label: 0.15em;
+  --sb-tracking-body: 0.1em;
+}
+
+/* Base styles for artifacts */
+body {
+  margin: 0;
+  padding: 12px;
+  background: var(--sb-bg-primary);
+  color: var(--sb-text-primary);
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-base);
+  letter-spacing: var(--sb-tracking-body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* Utility classes for artifacts */
+.sb-card {
+  background: var(--sb-bg-secondary);
+  border: 1px solid var(--sb-border-accent);
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: var(--sb-shadow-panel);
+}
+
+.sb-heading {
+  color: var(--sb-text-heading);
+  font-size: var(--sb-text-xs);
+  letter-spacing: var(--sb-tracking-heading);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.sb-label {
+  color: var(--sb-text-muted);
+  font-size: var(--sb-text-meta);
+  letter-spacing: var(--sb-tracking-label);
+  text-transform: uppercase;
+}
+
+.sb-value {
+  color: var(--sb-text-secondary);
+  font-size: var(--sb-text-sm);
+}
+
+.sb-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: var(--sb-text-micro);
+  letter-spacing: var(--sb-tracking-label);
+  text-transform: uppercase;
+}
+
+.sb-badge-critical { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+.sb-badge-elevated { background: rgba(250, 204, 21, 0.2); color: #facc15; border: 1px solid rgba(250, 204, 21, 0.3); }
+.sb-badge-normal   { background: rgba(34, 211, 238, 0.2); color: #22d3ee; border: 1px solid rgba(34, 211, 238, 0.3); }
+.sb-badge-low      { background: rgba(52, 211, 153, 0.2); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3); }
+
+.sb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--sb-text-base);
+}
+
+.sb-table th {
+  color: var(--sb-text-muted);
+  font-size: var(--sb-text-meta);
+  letter-spacing: var(--sb-tracking-label);
+  text-transform: uppercase;
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--sb-border-accent);
+}
+
+.sb-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--sb-border-primary);
+  color: var(--sb-text-primary);
+}
+
+.sb-table tr:hover td {
+  background: var(--sb-bg-hover);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(8, 145, 178, 0.3); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(8, 145, 178, 0.5); }

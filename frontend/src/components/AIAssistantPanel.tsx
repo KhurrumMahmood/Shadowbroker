@@ -13,6 +13,7 @@ import {
   saveConversation as saveConv,
 } from "@/hooks/useConversationStore";
 import type { StoredMessage, StoredAction, StoredConversation } from "@/types/aiConversation";
+import ArtifactPanel from "@/components/ArtifactPanel";
 
 function generateId(): string {
   return crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -72,6 +73,7 @@ export default function AIAssistantPanel({
   const [flashEntity, setFlashEntity] = useState<string | null>(null);
   const [expandedReasoning, setExpandedReasoning] = useState<Set<number>>(new Set());
   const [prevMode, setPrevMode] = useState<PanelMode>("chat");
+  const [activeArtifact, setActiveArtifact] = useState<{ id: string; title?: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const store = useConversationStore();
@@ -240,6 +242,13 @@ export default function AIAssistantPanel({
               const sub = JSON.parse(eventData);
               if (sub.summary) {
                 setProgressText(sub.summary.slice(0, 80) + (sub.summary.length > 80 ? "..." : ""));
+              }
+            } catch { /* ignore parse errors */ }
+          } else if (eventType === "artifact") {
+            try {
+              const art = JSON.parse(eventData);
+              if (art.artifact_id) {
+                setActiveArtifact({ id: art.artifact_id, title: art.title });
               }
             } catch { /* ignore parse errors */ }
           } else if (eventType === "result") {
@@ -770,10 +779,22 @@ export default function AIAssistantPanel({
                             SHOW {msg.action.result_entities.length} RESULTS
                           </button>
                         )}
+                        {msg.action.artifact_id && (
+                          <button type="button" onClick={(e) => { e.stopPropagation(); setActiveArtifact({ id: msg.action!.artifact_id!, title: msg.action!.artifact_title }); }} className={`${chipClass} border-purple-600/50 text-purple-300`}>
+                            VIEW ARTIFACT
+                          </button>
+                        )}
                         <button type="button" onClick={(e) => { e.stopPropagation(); applyAction(msg.action!); }} className={`${chipClass} border-cyan-600/50 text-cyan-300`}>
                           REPLAY ALL
                         </button>
                       </div>
+                    )}
+                    {msg.action?.artifact_id && activeArtifact?.id === msg.action.artifact_id && (
+                      <ArtifactPanel
+                        artifactId={activeArtifact.id}
+                        artifactTitle={activeArtifact.title}
+                        onClose={() => setActiveArtifact(null)}
+                      />
                     )}
                   </div>
                 ))

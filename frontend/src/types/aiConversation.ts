@@ -5,6 +5,8 @@ export interface StoredAction {
   filters?: Record<string, string[]>;
   result_entities?: Array<{ type: string; id: string | number }>;
   highlight_entities?: Array<{ type: string; id: string | number }>;
+  artifact_id?: string;
+  artifact_title?: string;
 }
 
 export interface StoredMessage {

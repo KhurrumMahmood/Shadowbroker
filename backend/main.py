@@ -651,6 +651,24 @@ async def assistant_query_stream(request: Request, body: AssistantQuery):
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
+@app.get("/api/artifacts/{artifact_id}")
+async def get_artifact(artifact_id: str):
+    """Serve a generated artifact by ID as an HTML page."""
+    from services.agent.artifacts import get_artifact_store
+    store = get_artifact_store()
+    art = store.get(artifact_id)
+    if art is None:
+        return JSONResponse({"error": "Artifact not found"}, status_code=404)
+    return Response(content=art.html, media_type="text/html")
+
+
+@app.get("/api/artifacts")
+async def list_artifacts():
+    """List all available artifacts (metadata only)."""
+    from services.agent.artifacts import get_artifact_store
+    return get_artifact_store().list()
+
+
 class BriefRequest(BaseModel):
     south: float
     west: float

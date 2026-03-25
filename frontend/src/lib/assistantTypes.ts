@@ -31,6 +31,8 @@ export interface AssistantResponse {
   reasoning_steps?: ReasoningStep[];
   duration_ms?: number;
   provider?: string;
+  artifact_id?: string;
+  artifact_title?: string;
 }
 
 /**
@@ -170,6 +172,11 @@ export function extractStoredAction(
   }
   if (resp.highlight_entities.length > 0) {
     action.highlight_entities = resp.highlight_entities;
+    hasAction = true;
+  }
+  if (resp.artifact_id) {
+    action.artifact_id = resp.artifact_id;
+    action.artifact_title = resp.artifact_title;
     hasAction = true;
   }
 
