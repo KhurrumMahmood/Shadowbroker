@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from services.agent.llm import call_llm_simple
 from services.agent.router import QueryPlan, SubTask
 from services.agent.sub_agent import SubAgent, SubAgentResult
+from services.agent.artifact_agent import ArtifactAgent
+from services.agent.artifacts import get_artifact_store, Artifact
 
 logger = logging.getLogger(__name__)
 
@@ -46,11 +48,13 @@ class Orchestrator:
         ds,
         total_budget_seconds: float = 30.0,
         use_llm_synthesis: bool = False,
+        generate_artifact: bool = False,
     ):
         self.provider = provider
         self.ds = ds
         self.total_budget = total_budget_seconds
         self.use_llm_synthesis = use_llm_synthesis
+        self.generate_artifact = generate_artifact
 
     def run(self, query: str, plan: QueryPlan) -> OrchestratorResult:
         """Execute a compound query plan.
@@ -134,7 +138,24 @@ class Orchestrator:
         final.duration_ms = int((time.monotonic() - start) * 1000)
         final.provider = self.provider.get("model", "")
 
-        yield _sse("result", {
+        # Generate artifact if enabled and we have successful sub-results
+        artifact_id = None
+        artifact_title = None
+        successful = [r for r in sub_results if r.success]
+        if self.generate_artifact and successful:
+            try:
+                artifact_id, artifact_title = self._generate_artifact(
+                    query, successful, final.summary,
+                )
+                if artifact_id:
+                    yield _sse("artifact", {
+                        "artifact_id": artifact_id,
+                        "title": artifact_title,
+                    })
+            except Exception as e:
+                logger.warning(f"Artifact generation failed: {e}")
+
+        result_data: dict = {
             "summary": final.summary,
             "layers": final.layers,
             "viewport": final.viewport,
@@ -145,9 +166,14 @@ class Orchestrator:
             "provider": f"orchestrator/{final.provider}",
             "_orchestrator": {
                 "sub_agent_count": len(sub_results),
-                "successful_count": len([r for r in sub_results if r.success]),
+                "successful_count": len(successful),
             },
-        })
+        }
+        if artifact_id:
+            result_data["artifact_id"] = artifact_id
+            result_data["artifact_title"] = artifact_title
+
+        yield _sse("result", result_data)
 
     def _dispatch_parallel(
         self, sub_tasks: list[SubTask], deadline: float
@@ -294,3 +320,44 @@ class Orchestrator:
         except Exception as e:
             logger.warning(f"Synthesis failed: {e}")
             return None
+
+    def _generate_artifact(
+        self,
+        query: str,
+        successful: list[SubAgentResult],
+        synthesis_summary: str,
+    ) -> tuple[str | None, str | None]:
+        """Generate an HTML artifact from sub-agent findings. Returns (artifact_id, title)."""
+        findings = "\n".join(
+            f"[{r.sub_task_intent}] {r.summary}" for r in successful
+        )
+        # Collect entity data for the artifact
+        data_context = {
+            "entities": [
+                ref for r in successful for ref in r.entity_references
+            ][:20],  # Cap to avoid token limits
+        }
+
+        agent = ArtifactAgent(
+            provider=self.provider,
+            query=query,
+            sub_results_summary=f"{synthesis_summary}\n\nDetails:\n{findings}",
+            data_context=data_context,
+            deadline=time.monotonic() + 15.0,
+        )
+        result = agent.run()
+
+        if not result.success or not result.html:
+            logger.warning(f"Artifact generation failed: {result.error}")
+            return None, None
+
+        store = get_artifact_store()
+        artifact = Artifact(
+            html=result.html,
+            title=result.title,
+            query=query,
+            artifact_type=result.artifact_type,
+        )
+        artifact_id = store.save(artifact)
+        logger.info(f"Artifact generated: {artifact_id} ({result.artifact_type})")
+        return artifact_id, result.title

@@ -1671,6 +1671,7 @@ def call_llm_streaming(query: str, data_summary: dict, viewport: dict | None = N
                 ds=ds,
                 total_budget_seconds=min(60.0, _OVERALL_BUDGET_S * 0.5),
                 use_llm_synthesis=True,
+                generate_artifact=True,
             )
             yield from orch.run_streaming(query, plan)
             return
