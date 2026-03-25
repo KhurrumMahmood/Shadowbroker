@@ -1,6 +1,6 @@
 # ShadowBroker Frontend
 
-Next.js 16 dashboard with MapLibre GL, Cesium, and Framer Motion.
+Next.js 16 dashboard with MapLibre GL and Framer Motion.
 
 ## Development
 
