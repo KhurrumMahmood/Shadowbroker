@@ -127,7 +127,7 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
         return results;
     }, [data?.tracked_flights]);
 
-    const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+    const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(["EXTRAS"]));
     const toggleSection = (name: string) => {
         setCollapsedSections(prev => {
             const next = new Set(prev);
@@ -264,9 +264,11 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
         ]},
         { name: "INFRASTRUCTURE", layers: [
             { id: "datacenters", name: "Data Centers", source: "DC Map (GitHub)", count: data?.datacenters?.length || 0, icon: Server },
-            { id: "power_plants", name: "Power Plants", source: "WRI (Static)", count: data?.power_plants?.length || 0, icon: Zap },
             { id: "military_bases", name: "Military Bases", source: "OSINT (Static)", count: data?.military_bases?.length || 0, icon: Shield },
             { id: "internet_outages", name: "Internet Outages", source: "IODA / Georgia Tech", count: data?.internet_outages?.length || 0, icon: Wifi },
+        ]},
+        { name: "EXTRAS", layers: [
+            { id: "power_plants", name: "Power Plants", source: "WRI (Static)", count: data?.power_plants?.length || 0, icon: Zap },
         ]},
         { name: "OVERLAYS", layers: [
             { id: "day_night", name: "Day / Night Cycle", source: "Solar Calc", count: null, icon: Sun },

@@ -51,6 +51,35 @@ from services.fetchers.geo import (  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
+
+def run_cctv_ingest_cycle():
+    """Populate the CCTV database, then refresh the in-memory cache."""
+    logger.info("CCTV ingest cycle starting...")
+    from services.cctv_pipeline import (
+        TFLJamCamIngestor, LTASingaporeIngestor,
+        AustinTXIngestor, NYCDOTIngestor,
+        SpainDGTIngestor, MadridCCTVIngestor,
+        MalagaCCTVIngestor, VigoCCTVIngestor,
+        VitoriaGasteizCCTVIngestor,
+    )
+
+    for ingestor_cls in (
+        TFLJamCamIngestor,
+        LTASingaporeIngestor,
+        AustinTXIngestor,
+        NYCDOTIngestor,
+        SpainDGTIngestor,
+        MadridCCTVIngestor,
+        MalagaCCTVIngestor,
+        VigoCCTVIngestor,
+        VitoriaGasteizCCTVIngestor,
+    ):
+        ingestor_cls().ingest()
+
+    fetch_cctv()
+    logger.info("CCTV ingest cycle complete.")
+
+
 # ---------------------------------------------------------------------------
 # Scheduler & Orchestration
 # ---------------------------------------------------------------------------
@@ -128,21 +157,12 @@ def start_scheduler():
     _scheduler.add_job(fetch_gdelt, 'interval', minutes=15, id='gdelt', max_instances=1, misfire_grace_time=120)
     _scheduler.add_job(update_liveuamap, 'interval', minutes=15, id='liveuamap', max_instances=1, misfire_grace_time=120)
 
-    # CCTV pipeline refresh — every 10 minutes
-    # Instantiate once and reuse — avoids re-creating DB connections on every tick
-    from services.cctv_pipeline import (
-        TFLJamCamIngestor, LTASingaporeIngestor,
-        AustinTXIngestor, NYCDOTIngestor,
+    # CCTV pipeline refresh — hydrate DB-backed cameras immediately, then every 10 minutes.
+    _scheduler.add_job(
+        run_cctv_ingest_cycle, 'interval', minutes=10,
+        id='cctv_ingest', max_instances=1, misfire_grace_time=120,
+        next_run_time=datetime.utcnow(),
     )
-    _cctv_tfl = TFLJamCamIngestor()
-    _cctv_lta = LTASingaporeIngestor()
-    _cctv_atx = AustinTXIngestor()
-    _cctv_nyc = NYCDOTIngestor()
-    _now = datetime.now()
-    _scheduler.add_job(_cctv_tfl.ingest, 'interval', minutes=10, id='cctv_tfl', max_instances=1, misfire_grace_time=120, next_run_time=_now)
-    _scheduler.add_job(_cctv_lta.ingest, 'interval', minutes=10, id='cctv_lta', max_instances=1, misfire_grace_time=120, next_run_time=_now)
-    _scheduler.add_job(_cctv_atx.ingest, 'interval', minutes=10, id='cctv_atx', max_instances=1, misfire_grace_time=120, next_run_time=_now)
-    _scheduler.add_job(_cctv_nyc.ingest, 'interval', minutes=10, id='cctv_nyc', max_instances=1, misfire_grace_time=120, next_run_time=_now)
 
     _scheduler.start()
     logger.info("Scheduler started.")
