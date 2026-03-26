@@ -42,25 +42,33 @@ function tryParseJSON<T>(json: string): T | null {
  * Maps raw DashboardData into the shape each artifact expects.
  * Falls back to the full data object for unknown artifacts.
  */
-/**
- * Maps raw DashboardData into the shape each artifact expects.
- * Falls back to the full data object for unknown artifacts.
- */
 function mapDataForArtifact(registryName: string | undefined, dashData: DashboardData): unknown {
   const ships = dashData.ships || [];
   const milFlights = dashData.military_flights || [];
-  const gdelt = dashData.gdelt || [];
-  const jamming = dashData.gps_jamming || [];
   const fires = dashData.firms_fires || [];
   const news = dashData.news || [];
   const earthquakes = dashData.earthquakes || [];
 
-  // Tracked = yachts, military, carriers (enriched ships)
+  // GDELT arrives as GeoJSON Features — flatten to { event_type, goldstein_scale, lat, lng }
+  const gdeltEvents = (dashData.gdelt || []).map((f) => ({
+    event_type: f.properties.name,
+    goldstein_scale: undefined as number | undefined,
+    lat: f.geometry.coordinates[1],
+    lng: f.geometry.coordinates[0],
+    source_url: f.properties._urls_list?.[0],
+  }));
+
+  // GPS jamming has { lat, lng, severity, ratio } — map severity to approximate radius
+  const jammingZones = (dashData.gps_jamming || []).map((j) => ({
+    lat: j.lat,
+    lng: j.lng,
+    radius: j.severity === "high" ? 100 : j.severity === "medium" ? 60 : 30,
+  }));
+
   const trackedShips = ships.filter((s) =>
     s.yacht_alert || s.plan_name || s.type === "military_vessel" || s.type === "carrier"
   );
 
-  // Carriers specifically
   const carriers = ships
     .filter((s) => s.type === "carrier")
     .map((s) => ({ name: s.name, lat: s.lat, lng: s.lng, status: s.desc || s.destination || undefined }));
@@ -71,8 +79,8 @@ function mapDataForArtifact(registryName: string | undefined, dashData: Dashboar
         ships,
         tracked_ships: trackedShips,
         military_flights: milFlights,
-        gdelt_events: gdelt,
-        gps_jamming: jamming,
+        gdelt_events: gdeltEvents,
+        gps_jamming: jammingZones,
         fires,
         oil_prices: dashData.oil ? {
           wti: dashData.oil.WTI ? { price: dashData.oil.WTI.price, change_pct: dashData.oil.WTI.change_percent } : undefined,
@@ -82,8 +90,8 @@ function mapDataForArtifact(registryName: string | undefined, dashData: Dashboar
     case "threat-convergence-panel":
       return {
         military_flights: milFlights,
-        gdelt_events: gdelt,
-        gps_jamming: jamming,
+        gdelt_events: gdeltEvents,
+        gps_jamming: jammingZones,
         fires,
         ships,
       };
@@ -91,9 +99,9 @@ function mapDataForArtifact(registryName: string | undefined, dashData: Dashboar
       return {
         ships,
         military_flights: milFlights,
-        gdelt_events: gdelt,
+        gdelt_events: gdeltEvents,
         fires,
-        gps_jamming: jamming,
+        gps_jamming: jammingZones,
         news,
       };
     case "tracked-entity-dashboard":
@@ -104,9 +112,9 @@ function mapDataForArtifact(registryName: string | undefined, dashData: Dashboar
       };
     case "risk-pulse-ticker":
       return {
-        gdelt_events: gdelt,
+        gdelt_events: gdeltEvents,
         military_flights: milFlights,
-        gps_jamming: jamming,
+        gps_jamming: jammingZones,
         fires,
         earthquakes,
         news,
@@ -181,15 +189,21 @@ export default function AIAssistantPanel({
   const store = useConversationStore();
 
   /** Live dashboard data mapped to the shape the active artifact expects.
-   *  When useDummyData is set (by the LLM on explicit user request), returns fixture data instead. */
+   *  When useDummyData is set (by the LLM on explicit user request), loads fixture data instead. */
+  const [dummyDataOverride, setDummyDataOverride] = useState<unknown>(undefined);
+  useEffect(() => {
+    if (!activeArtifact?.useDummyData || !activeArtifact?.registryName) {
+      setDummyDataOverride(undefined);
+      return;
+    }
+    getDummyData(activeArtifact.registryName).then((d) => setDummyDataOverride(d));
+  }, [activeArtifact?.useDummyData, activeArtifact?.registryName]);
+
   const artifactData = useMemo(() => {
     if (!activeArtifact) return undefined;
-    if (activeArtifact.useDummyData && activeArtifact.registryName) {
-      const dummy = getDummyData(activeArtifact.registryName);
-      if (dummy) return dummy;
-    }
+    if (dummyDataOverride) return dummyDataOverride;
     return mapDataForArtifact(activeArtifact.registryName, data);
-  }, [activeArtifact, data, activeArtifact?.registryName, activeArtifact?.useDummyData]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeArtifact, data, dummyDataOverride]);
 
   useEffect(() => {
     if (isOpen && mode === "chat") inputRef.current?.focus();
@@ -392,8 +406,12 @@ export default function AIAssistantPanel({
       if (!handled) {
         appendError("Connection lost before receiving a response.");
       }
-    } catch {
-      appendError("Connection error — is the backend running?");
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        // User sent a new query; silently ignore the aborted stream
+      } else {
+        appendError("Connection error — is the backend running?");
+      }
     } finally {
       setLoading(false);
       setProgressText(null);

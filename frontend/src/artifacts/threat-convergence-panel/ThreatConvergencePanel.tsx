@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import * as d3 from "d3";
 import { useArtifactData } from "@/artifacts/_shared/useArtifactData";
@@ -133,11 +134,11 @@ function safeNum(v: unknown): number {
   return typeof v === "number" && isFinite(v) ? v : 0;
 }
 
-function safeLat(obj: Record<string, unknown>): number {
+function safeLat(obj: { lat?: number; latitude?: number }): number {
   return safeNum(obj.lat ?? obj.latitude);
 }
 
-function safeLng(obj: Record<string, unknown>): number {
+function safeLng(obj: { lng?: number; lon?: number; longitude?: number }): number {
   return safeNum(obj.lng ?? obj.longitude ?? obj.lon);
 }
 
@@ -223,7 +224,7 @@ function computeConvergence(data: ConvergenceData, activeFilters: Record<string,
 
   // Military flights
   for (const f of data.military_flights || []) {
-    addEvent("military", safeLat(f as never), safeLng(f as never), {
+    addEvent("military", safeLat(f), safeLng(f), {
       name: f.callsign || f.registration || "UNKNOWN",
       type: f.type || f.aircraft_type || "MIL",
     });
@@ -231,7 +232,7 @@ function computeConvergence(data: ConvergenceData, activeFilters: Record<string,
 
   // GDELT conflict events
   for (const g of data.gdelt_events || []) {
-    addEvent("conflict", safeLat(g as never), safeLng(g as never), {
+    addEvent("conflict", safeLat(g), safeLng(g), {
       name: g.event_type || g.EventCode || "CONFLICT",
       type: `GOLDSTEIN:${g.goldstein_scale ?? g.GoldsteinScale ?? "?"}`,
     });
@@ -239,7 +240,7 @@ function computeConvergence(data: ConvergenceData, activeFilters: Record<string,
 
   // GPS jamming
   for (const j of data.gps_jamming || []) {
-    addEvent("jamming", safeLat(j as never), safeLng(j as never), {
+    addEvent("jamming", safeLat(j), safeLng(j), {
       name: "JAMMING ZONE",
       type: `R:${j.radius ?? "?"}km`,
     });
@@ -247,7 +248,7 @@ function computeConvergence(data: ConvergenceData, activeFilters: Record<string,
 
   // Fires
   for (const fi of data.fires || []) {
-    addEvent("fire", safeLat(fi as never), safeLng(fi as never), {
+    addEvent("fire", safeLat(fi), safeLng(fi), {
       name: "FIRE",
       type: `BRT:${fi.brightness ?? fi.bright_ti4 ?? "?"}`,
     });
@@ -256,8 +257,8 @@ function computeConvergence(data: ConvergenceData, activeFilters: Record<string,
   // Ships — military always count, commercial only if >10 in cell (congestion)
   const shipCells: Record<string, Ship[]> = {};
   for (const s of data.ships || []) {
-    const sLat = safeLat(s as never);
-    const sLng = safeLng(s as never);
+    const sLat = safeLat(s);
+    const sLng = safeLng(s);
     if (sLat === 0 && sLng === 0) continue;
     const ck = cellKey(sLat, sLng);
     if (!shipCells[ck]) shipCells[ck] = [];
@@ -269,7 +270,7 @@ function computeConvergence(data: ConvergenceData, activeFilters: Record<string,
     for (const ms of cellShips) {
       const st = (ms.type || ms.shipType || "").toString().toLowerCase();
       if (st.includes("military") || st.includes("navy") || st.includes("war") || st === "35" || st === "55") {
-        addEvent("military", safeLat(ms as never), safeLng(ms as never), {
+        addEvent("military", safeLat(ms), safeLng(ms), {
           name: ms.name || ms.shipName || "WARSHIP",
           type: "NAVAL",
         });
@@ -310,21 +311,31 @@ function computeConvergence(data: ConvergenceData, activeFilters: Record<string,
   return zones.slice(0, 8);
 }
 
+const SEVERITY_COLORS: Record<Severity, { solid: string; dim: string }> = {
+  critical: { solid: "#f87171", dim: "rgba(248,113,113,0.15)" },
+  elevated: { solid: "#fbbf24", dim: "rgba(251,191,36,0.12)" },
+  normal:   { solid: "#22d3ee", dim: "rgba(34,211,238,0.10)" },
+};
+
 function severityColor(s: Severity): string {
-  if (s === "critical") return "#f87171";
-  if (s === "elevated") return "#fbbf24";
-  return "#22d3ee";
+  return SEVERITY_COLORS[s].solid;
 }
 
 function severityColorDim(s: Severity): string {
-  if (s === "critical") return "rgba(248,113,113,0.15)";
-  if (s === "elevated") return "rgba(251,191,36,0.12)";
-  return "rgba(34,211,238,0.10)";
+  return SEVERITY_COLORS[s].dim;
 }
 
 function badgeClass(severity: Severity): string {
   return `sb-badge-${severity}`;
 }
+
+const SECTION_LABEL: CSSProperties = {
+  fontSize: 8,
+  letterSpacing: "0.15em",
+  textTransform: "uppercase",
+  color: "rgba(243,244,246,0.5)",
+  marginBottom: 3,
+};
 
 /* ── Component ── */
 
@@ -349,9 +360,18 @@ export default function ThreatConvergencePanel({ initialData }: Props) {
     return computeConvergence(data, activeFilters);
   }, [data, activeFilters]);
 
+  // Sync selectedZone when zones recompute (data refresh or filter change)
+  useEffect(() => {
+    if (selectedZone) {
+      const updated = zones.find((z) => z.key === selectedZone.key);
+      setSelectedZone(updated ?? (zones.length > 0 ? zones[0] : null));
+    } else if (zones.length > 0) {
+      setSelectedZone(zones[0]);
+    }
+  }, [zones]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const toggleFilter = useCallback((key: string) => {
     setActiveFilters((prev) => ({ ...prev, [key]: !prev[key] }));
-    setSelectedZone(null);
   }, []);
 
   // Re-trigger D3 when container gets real dimensions after animation
@@ -505,15 +525,10 @@ export default function ThreatConvergencePanel({ initialData }: Props) {
 
     simulationRef.current = sim as unknown as d3.Simulation<d3.SimulationNodeDatum, undefined>;
 
-    // Auto-select first zone
-    if (zones.length > 0 && !selectedZone) {
-      setSelectedZone(zones[0]);
-    }
-
     return () => {
       sim.stop();
     };
-  }, [zones, vizSize]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [zones, vizSize]);
 
   const handleExport = useCallback(() => {
     if (zones.length === 0) return;
@@ -730,7 +745,7 @@ export default function ThreatConvergencePanel({ initialData }: Props) {
               <>
                 {/* Convergence Score */}
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 8, letterSpacing: "0.15em", textTransform: "uppercase", color: "rgba(243,244,246,0.5)", marginBottom: 3 }}>
+                  <div style={SECTION_LABEL}>
                     Convergence Score
                   </div>
                   <div style={{ fontSize: 20, fontWeight: "bold", letterSpacing: "0.08em" }}>
@@ -743,7 +758,7 @@ export default function ThreatConvergencePanel({ initialData }: Props) {
 
                 {/* Active Domains */}
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 8, letterSpacing: "0.15em", textTransform: "uppercase", color: "rgba(243,244,246,0.5)", marginBottom: 3 }}>
+                  <div style={SECTION_LABEL}>
                     Active Domains
                   </div>
                   <div style={{ fontSize: 11 }}>{selectedZone.domainCount} / {DOMAIN_KEYS.length}</div>
@@ -751,7 +766,7 @@ export default function ThreatConvergencePanel({ initialData }: Props) {
 
                 {/* Convergence Signature */}
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 8, letterSpacing: "0.15em", textTransform: "uppercase", color: "rgba(243,244,246,0.5)", marginBottom: 3 }}>
+                  <div style={SECTION_LABEL}>
                     Convergence Signature
                   </div>
                   <span style={{
@@ -772,7 +787,7 @@ export default function ThreatConvergencePanel({ initialData }: Props) {
 
                 {/* Coordinates */}
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 8, letterSpacing: "0.15em", textTransform: "uppercase", color: "rgba(243,244,246,0.5)", marginBottom: 3 }}>
+                  <div style={SECTION_LABEL}>
                     Coordinates
                   </div>
                   <div style={{ fontSize: 11 }}>{selectedZone.lat.toFixed(2)}, {selectedZone.lng.toFixed(2)} (cell {CELL_SIZE}&deg;)</div>
@@ -780,7 +795,7 @@ export default function ThreatConvergencePanel({ initialData }: Props) {
 
                 {/* Total Events */}
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 8, letterSpacing: "0.15em", textTransform: "uppercase", color: "rgba(243,244,246,0.5)", marginBottom: 3 }}>
+                  <div style={SECTION_LABEL}>
                     Total Events
                   </div>
                   <div style={{ fontSize: 11 }}>{selectedZone.totalCount}</div>
@@ -788,7 +803,7 @@ export default function ThreatConvergencePanel({ initialData }: Props) {
 
                 {/* Domain Breakdown */}
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 8, letterSpacing: "0.15em", textTransform: "uppercase", color: "rgba(243,244,246,0.5)", marginBottom: 3 }}>
+                  <div style={SECTION_LABEL}>
                     DOMAIN BREAKDOWN
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>

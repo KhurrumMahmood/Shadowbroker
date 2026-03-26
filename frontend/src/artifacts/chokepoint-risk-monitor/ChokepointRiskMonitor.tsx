@@ -171,7 +171,7 @@ function calcStats(cp: Chokepoint, data: ChokeData): ChokepointStats {
 
   const milPts = Math.min(allMilitary.length * 2, 10);
   const conflictPts = Math.min(gdelt.length * 3, 15);
-  const jamPts = jamming.length * 5;
+  const jamPts = Math.min(jamming.length * 5, 15);
   const firePts = Math.min(fires.length, 5);
   const totalRisk = milPts + conflictPts + jamPts + firePts;
 
@@ -220,6 +220,14 @@ function hexPoints(r: number): string {
 
 function badgeClass(level: RiskLevel): string {
   return `sb-badge-${level.toLowerCase()}`;
+}
+
+function formatOilPrice(oil: OilPrice | undefined): string {
+  if (!oil) return "--";
+  const price = (oil.price || 0).toFixed(2);
+  const pct = oil.change_pct || 0;
+  const sign = pct >= 0 ? "+" : "";
+  return `$${price} (${sign}${pct.toFixed(1)}%)`;
 }
 
 /* ── Component ── */
@@ -288,10 +296,11 @@ export default function ChokepointRiskMonitor({ initialData }: Props) {
     const path = d3.geoPath().projection(projection);
     const mapGroup = svgSel.append("g");
 
-    // Load world outline
-    d3.json<Topology<{ land: GeometryCollection }>>("https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json")
+    // Load world outline (with abort on unmount/re-render)
+    const abortCtl = new AbortController();
+    d3.json<Topology<{ land: GeometryCollection }>>("https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json", { signal: abortCtl.signal })
       .then((world) => {
-        if (!world) return;
+        if (!world || abortCtl.signal.aborted) return;
         const land = feature(world, world.objects.land);
         mapGroup.append("path")
           .datum(land)
@@ -302,6 +311,7 @@ export default function ChokepointRiskMonitor({ initialData }: Props) {
       })
       .catch(() => { /* render without world outline */ })
       .finally(() => {
+        if (abortCtl.signal.aborted) return;
         drawConnections(mapGroup, projection);
         drawChokepoints(mapGroup, projection);
       });
@@ -415,6 +425,7 @@ export default function ChokepointRiskMonitor({ initialData }: Props) {
         .attr("letter-spacing", "0.1em")
         .text("LOW");
     }
+    return () => { abortCtl.abort(); };
   }, [containerSize]); // Re-render when container resizes (e.g., animation settles)
 
   // Update nodes when stats change
@@ -538,11 +549,7 @@ export default function ChokepointRiskMonitor({ initialData }: Props) {
     }
 
     if (data?.oil_prices) {
-      const wti = data.oil_prices.wti;
-      const brent = data.oil_prices.brent;
-      const wtiStr = wti ? `$${(wti.price || 0).toFixed(2)} (${(wti.change_pct || 0) >= 0 ? "+" : ""}${(wti.change_pct || 0).toFixed(1)}%)` : "--";
-      const brentStr = brent ? `$${(brent.price || 0).toFixed(2)} (${(brent.change_pct || 0) >= 0 ? "+" : ""}${(brent.change_pct || 0).toFixed(1)}%)` : "--";
-      lines.push(`OIL: WTI ${wtiStr} | BRENT ${brentStr}`);
+      lines.push(`OIL: WTI ${formatOilPrice(data.oil_prices.wti)} | BRENT ${formatOilPrice(data.oil_prices.brent)}`);
     }
 
     navigator.clipboard.writeText(lines.join("\n")).then(() => {
@@ -646,24 +653,20 @@ export default function ChokepointRiskMonitor({ initialData }: Props) {
         </div>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
           <div style={S.oilPrices}>
-            <div style={S.oilItem}>
-              <span style={S.oilLabel}>WTI</span>
-              <span style={S.oilPrice}>{wti ? `$${(wti.price || 0).toFixed(2)}` : "--"}</span>
-              {wti && (
-                <span style={(wti.change_pct || 0) >= 0 ? S.oilUp : S.oilDown}>
-                  {(wti.change_pct || 0) >= 0 ? "+" : ""}{(wti.change_pct || 0).toFixed(1)}%
-                </span>
-              )}
-            </div>
-            <div style={S.oilItem}>
-              <span style={S.oilLabel}>BRENT</span>
-              <span style={S.oilPrice}>{brent ? `$${(brent.price || 0).toFixed(2)}` : "--"}</span>
-              {brent && (
-                <span style={(brent.change_pct || 0) >= 0 ? S.oilUp : S.oilDown}>
-                  {(brent.change_pct || 0) >= 0 ? "+" : ""}{(brent.change_pct || 0).toFixed(1)}%
-                </span>
-              )}
-            </div>
+            {([["WTI", wti], ["BRENT", brent]] as const).map(([label, oil]) => {
+              const pct = oil?.change_pct || 0;
+              return (
+                <div key={label} style={S.oilItem}>
+                  <span style={S.oilLabel}>{label}</span>
+                  <span style={S.oilPrice}>{oil ? `$${(oil.price || 0).toFixed(2)}` : "--"}</span>
+                  {oil && (
+                    <span style={pct >= 0 ? S.oilUp : S.oilDown}>
+                      {pct >= 0 ? "+" : ""}{pct.toFixed(1)}%
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
           <div style={S.timestamp}>
             {hasData ? `DATA AS OF ${new Date().toUTCString().replace("GMT", "UTC")}` : "DATA AS OF -- (NO FEED)"}
