@@ -60,11 +60,16 @@ export default function ArtifactPanel({
       });
   }, [isReact, registryName]);
 
-  const loadArtifact = useCallback(async (id: string) => {
+  const loadArtifact = useCallback(async (id: string, regName?: string, version?: number) => {
     setLoading(true);
     setError(null);
     try {
-      const resp = await fetch(`/api/artifacts/${id}`);
+      // Registry artifacts use /api/artifacts/registry/{name}/v/{version}
+      // Ephemeral artifacts use /api/artifacts/{id}
+      const url = regName
+        ? `/api/artifacts/registry/${regName}/v/${version || 1}`
+        : `/api/artifacts/${id}`;
+      const resp = await fetch(url);
       if (!resp.ok) {
         setError(`Artifact not found (${resp.status})`);
         setLoading(false);
@@ -102,14 +107,14 @@ export default function ArtifactPanel({
 
   useEffect(() => {
     if (artifactId && !isReact) {
-      loadArtifact(artifactId);
+      loadArtifact(artifactId, registryName, artifactVersion);
     }
     return () => {
       if (iframeRef.current) {
         iframeRef.current.onload = null;
       }
     };
-  }, [artifactId, isReact, loadArtifact]);
+  }, [artifactId, isReact, registryName, artifactVersion, loadArtifact]);
 
   /** Send data to the artifact iframe via postMessage */
   const sendData = useCallback((payload: unknown) => {
