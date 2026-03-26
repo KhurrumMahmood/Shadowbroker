@@ -1,7 +1,7 @@
 """WHO Disease Outbreak News (DON) fetcher."""
 import logging
 from services.fetchers.retry import with_retry
-from services.fetchers._store import latest_data, _mark_fresh
+from services.fetchers._store import latest_data, _mark_fresh, _data_lock
 from services.network_utils import fetch_with_curl
 
 logger = logging.getLogger(__name__)
@@ -71,7 +71,8 @@ def fetch_disease_outbreaks():
             "source": "WHO DON",
         })
 
-    latest_data["disease_outbreaks"] = outbreaks
+    with _data_lock:
+        latest_data["disease_outbreaks"] = outbreaks
     if outbreaks:
         _mark_fresh("disease_outbreaks")
     logger.info(f"WHO DON: {len(outbreaks)} outbreaks fetched")

@@ -630,7 +630,7 @@ def _build_data_summary(data: dict) -> dict:
     if corrs:
         summary["top_correlations"] = [
             {"type": c.get("type"), "distance_km": c.get("distance_km"),
-             "entity": c.get("callsign") or c.get("region_name", ""),
+             "entity": (c.get("entity") or {}).get("flight") or c.get("entity_name") or c.get("conflict_location", "?"),
              "gdelt_count": c.get("gdelt_count", 0)}
             for c in corrs[:3]
         ]

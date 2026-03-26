@@ -448,7 +448,8 @@ _SEARCH_CONFIG = {
             "title": n.get("title", ""),
             "source": n.get("source", ""),
             "risk_score": n.get("risk_score", 0),
-            "lat": n.get("lat"), "lng": n.get("lng"),
+            "lat": n["coords"][0] if n.get("coords") else None,
+            "lng": n["coords"][1] if n.get("coords") else None,
         },
     },
     "gdelt": {

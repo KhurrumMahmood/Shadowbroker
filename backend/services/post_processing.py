@@ -97,6 +97,7 @@ def compute_cross_domain_correlations(
     ranked = sorted(hotspots.items(), key=lambda x: len(x[1]), reverse=True)[:10]
 
     correlations = []
+    fire_grid = grid_cluster(fires, 3.0, lat_key="lat", lon_key="lng")
 
     for (hlat, hlon), events in ranked:
         geo_label = _geo_label(events)
@@ -123,7 +124,6 @@ def compute_cross_domain_correlations(
                 })
 
         # Fires near conflict
-        fire_grid = grid_cluster(fires, 3.0, lat_key="lat", lon_key="lng")
         for (flat, flon), fire_list in fire_grid.items():
             d = haversine(hlat, hlon, flat, flon)
             if d <= FIRE_CORRELATION_RADIUS_KM:

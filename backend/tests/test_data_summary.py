@@ -68,8 +68,9 @@ class TestBuildDataSummary:
     # ── correlations ───────────────────────────────────────────────
     def test_summary_includes_correlations(self):
         corrs = [
-            {"type": "military_near_conflict", "distance_km": 100, "callsign": "DUKE01", "gdelt_count": 8},
-            {"type": "fires_near_conflict", "distance_km": 50, "region_name": "Sudan", "gdelt_count": 12},
+            {"type": "military_near_conflict", "distance_km": 100,
+             "entity": {"flight": "DUKE01", "type": "C-17", "operator": "US"}, "gdelt_count": 8},
+            {"type": "outage_near_conflict", "distance_km": 50, "entity_name": "Sudan", "gdelt_count": 12},
         ]
         s = _build_data_summary({"correlations": corrs})
         assert "top_correlations" in s
@@ -78,7 +79,7 @@ class TestBuildDataSummary:
         assert s["top_correlations"][1]["entity"] == "Sudan"
 
     def test_summary_correlations_max_3(self):
-        corrs = [{"type": "t", "distance_km": 1, "callsign": f"C{i}", "gdelt_count": 1} for i in range(10)]
+        corrs = [{"type": "t", "distance_km": 1, "conflict_location": f"C{i}", "gdelt_count": 1} for i in range(10)]
         s = _build_data_summary({"correlations": corrs})
         assert len(s["top_correlations"]) == 3
 
