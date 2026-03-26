@@ -128,6 +128,17 @@ class TestStreamingEvents:
 class TestStreamingArtifacts:
     """Tests for artifact generation during streaming."""
 
+    @pytest.fixture(autouse=True)
+    def mock_registry(self):
+        """Prevent streaming tests from writing to the real artifact registry."""
+        mock_reg = MagicMock()
+        mock_reg.search.return_value = []
+        mock_reg.get_registry_summary.return_value = "No saved artifacts."
+        mock_reg.save_artifact.return_value = None
+        with patch("services.agent.orchestrator.get_artifact_registry", return_value=mock_reg):
+            with patch("services.agent.orchestrator.extract_tags_from_query", return_value=[]):
+                yield mock_reg
+
     @patch("services.agent.orchestrator.ArtifactAgent")
     @patch("services.agent.orchestrator.get_artifact_store")
     @patch("services.agent.orchestrator.SubAgent")

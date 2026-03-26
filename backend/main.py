@@ -696,6 +696,34 @@ async def get_alert(alert_id: str):
     }
 
 
+@app.get("/api/artifacts/registry")
+async def get_artifact_registry():
+    """Return the artifact registry for browsing or agent use."""
+    from services.agent.artifact_registry import get_artifact_registry
+    return get_artifact_registry().list_all()
+
+
+@app.get("/api/artifacts/registry/{name}")
+async def get_artifact_registry_entry(name: str):
+    """Get metadata and version history for a specific artifact."""
+    from services.agent.artifact_registry import get_artifact_registry
+    result = get_artifact_registry().get_latest_version(name)
+    if result is None:
+        return JSONResponse({"error": "Artifact not found in registry"}, status_code=404)
+    _, meta = result
+    return meta
+
+
+@app.get("/api/artifacts/registry/{name}/v/{version}")
+async def get_artifact_version(name: str, version: int):
+    """Get a specific version of a registered artifact."""
+    from services.agent.artifact_registry import get_artifact_registry
+    html = get_artifact_registry().get_version(name, version)
+    if html is None:
+        return JSONResponse({"error": "Version not found"}, status_code=404)
+    return Response(content=html, media_type="text/html")
+
+
 class BriefRequest(BaseModel):
     south: float
     west: float

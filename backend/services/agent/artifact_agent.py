@@ -51,6 +51,8 @@ class ArtifactAgentResult:
     error: str | None = None
     artifact_type: str = ""
     duration_ms: int = 0
+    reuse_artifact: str | None = None  # Set when agent decides to reuse an existing artifact
+    suggested_tags: list[str] | None = None
 
 
 class ArtifactAgent:
@@ -63,12 +65,16 @@ class ArtifactAgent:
         sub_results_summary: str,
         data_context: dict | None = None,
         deadline: float = 0.0,
+        registry=None,
+        enhance_artifact: str | None = None,
     ):
         self.provider = provider
         self.query = query
         self.sub_results_summary = sub_results_summary
         self.data_context = data_context or {}
         self.deadline = deadline or (time.monotonic() + 30.0)
+        self.registry = registry
+        self.enhance_artifact = enhance_artifact
 
     def run(self) -> ArtifactAgentResult:
         start = time.monotonic()
@@ -100,6 +106,15 @@ class ArtifactAgent:
             )
 
         content = llm_result["content"]
+
+        # Check if the LLM decided to reuse an existing artifact
+        reuse_name = self._check_reuse_decision(content)
+        if reuse_name:
+            return ArtifactAgentResult(
+                html="", title="", success=True,
+                reuse_artifact=reuse_name,
+            )
+
         html = self._extract_html(content)
         title = self._generate_title()
 
@@ -111,17 +126,45 @@ class ArtifactAgent:
         )
 
     def _build_messages(self) -> list[dict]:
+        # Build system prompt with registry awareness
+        system_content = _SYSTEM_PROMPT
+
+        if self.registry:
+            registry_summary = self.registry.get_registry_summary()
+            system_content += f"""
+
+ARTIFACT REGISTRY:
+{registry_summary}
+
+DECISION: Before generating new HTML, check if an existing artifact matches this query.
+- If an existing artifact is a STRONG match, respond with ONLY this JSON (no code block):
+  {{"action": "reuse", "artifact_name": "<name>"}}
+- If you want to ENHANCE an existing artifact, generate the improved HTML.
+- If nothing matches, generate new HTML as usual.
+"""
+
         user_content = f"Query: {self.query}\n\nAnalysis findings:\n{self.sub_results_summary}"
 
+        # Enhancement mode: include existing HTML
+        if self.enhance_artifact and self.registry:
+            result = self.registry.get_latest_version(self.enhance_artifact)
+            if result:
+                existing_html, meta = result
+                user_content += (
+                    f"\n\nENHANCEMENT MODE: Improve this existing artifact "
+                    f"({self.enhance_artifact} v{meta['current_version']}).\n"
+                    f"Existing HTML:\n```html\n{existing_html}\n```\n"
+                    f"Keep the same structure but apply the requested changes."
+                )
+
         if self.data_context:
-            # Truncate data to avoid token limits
             data_str = json.dumps(self.data_context, default=str)
             if len(data_str) > 4000:
                 data_str = data_str[:4000] + "..."
             user_content += f"\n\nStructured data:\n{data_str}"
 
         return [
-            {"role": "system", "content": _SYSTEM_PROMPT},
+            {"role": "system", "content": system_content},
             {"role": "user", "content": user_content},
         ]
 
@@ -155,6 +198,22 @@ class ArtifactAgent:
         if len(q) > 50:
             q = q[:47] + "..."
         return q
+
+    def _check_reuse_decision(self, content: str) -> str | None:
+        """Check if the LLM decided to reuse an existing artifact."""
+        content = content.strip()
+        # Try to parse as JSON reuse decision
+        try:
+            parsed = json.loads(content)
+            if isinstance(parsed, dict) and parsed.get("action") == "reuse":
+                name = parsed.get("artifact_name", "")
+                if name and self.registry:
+                    # Verify the artifact actually exists
+                    if self.registry.get_latest_version(name) is not None:
+                        return name
+        except (json.JSONDecodeError, ValueError):
+            pass
+        return None
 
     def _detect_type(self) -> str:
         """Detect artifact type from query keywords."""

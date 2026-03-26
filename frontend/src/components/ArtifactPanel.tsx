@@ -8,6 +8,7 @@ interface ArtifactPanelProps {
   artifactId: string | null;
   artifactTitle?: string;
   onClose: () => void;
+  data?: unknown;
 }
 
 /**
@@ -17,11 +18,13 @@ interface ArtifactPanelProps {
  * and renders in a sandboxed iframe. Supports expand/collapse and
  * data injection via postMessage.
  */
-export default function ArtifactPanel({ artifactId, artifactTitle, onClose }: ArtifactPanelProps) {
+export default function ArtifactPanel({ artifactId, artifactTitle, onClose, data }: ArtifactPanelProps) {
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [iframeReady, setIframeReady] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const pendingDataRef = useRef<unknown>(undefined);
 
   const loadArtifact = useCallback(async (id: string) => {
     setLoading(true);
@@ -44,6 +47,17 @@ export default function ArtifactPanel({ artifactId, artifactTitle, onClose }: Ar
       // Write to iframe via srcdoc
       const iframe = iframeRef.current;
       if (iframe) {
+        setIframeReady(false);
+        iframe.onload = () => {
+          setIframeReady(true);
+          // Send any pending data after iframe loads
+          if (pendingDataRef.current !== undefined) {
+            iframe.contentWindow?.postMessage(
+              { type: "shadowbroker:data", payload: pendingDataRef.current },
+              "*"
+            );
+          }
+        };
         iframe.srcdoc = injectedHtml;
       }
       setLoading(false);
@@ -60,12 +74,20 @@ export default function ArtifactPanel({ artifactId, artifactTitle, onClose }: Ar
   }, [artifactId, loadArtifact]);
 
   /** Send data to the artifact iframe via postMessage */
-  const sendData = useCallback((data: unknown) => {
+  const sendData = useCallback((payload: unknown) => {
     iframeRef.current?.contentWindow?.postMessage(
-      { type: "shadowbroker:data", payload: data },
+      { type: "shadowbroker:data", payload },
       "*"
     );
   }, []);
+
+  // Track pending data and send when iframe is ready
+  useEffect(() => {
+    pendingDataRef.current = data;
+    if (iframeReady && data !== undefined) {
+      sendData(data);
+    }
+  }, [data, iframeReady, sendData]);
 
   if (!artifactId) return null;
 

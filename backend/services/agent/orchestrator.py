@@ -12,6 +12,7 @@ from services.agent.router import QueryPlan, SubTask
 from services.agent.sub_agent import SubAgent, SubAgentResult
 from services.agent.artifact_agent import ArtifactAgent
 from services.agent.artifacts import get_artifact_store, Artifact
+from services.agent.artifact_registry import get_artifact_registry, extract_tags_from_query
 
 logger = logging.getLogger(__name__)
 
@@ -331,12 +332,16 @@ class Orchestrator:
         findings = "\n".join(
             f"[{r.sub_task_intent}] {r.summary}" for r in successful
         )
-        # Collect entity data for the artifact
         data_context = {
             "entities": [
                 ref for r in successful for ref in r.entity_references
-            ][:20],  # Cap to avoid token limits
+            ][:20],
         }
+
+        # Query the artifact registry for potential reuse
+        registry = get_artifact_registry()
+        query_tags = extract_tags_from_query(query)
+        matches = registry.search(query_tags, min_score=2) if query_tags else []
 
         agent = ArtifactAgent(
             provider=self.provider,
@@ -344,20 +349,55 @@ class Orchestrator:
             sub_results_summary=f"{synthesis_summary}\n\nDetails:\n{findings}",
             data_context=data_context,
             deadline=time.monotonic() + 15.0,
+            registry=registry,
         )
         result = agent.run()
 
-        if not result.success or not result.html:
+        if not result.success:
             logger.warning(f"Artifact generation failed: {result.error}")
             return None, None
 
+        # Agent decided to reuse an existing artifact
+        if result.reuse_artifact:
+            existing = registry.get_latest_version(result.reuse_artifact)
+            if existing:
+                html, meta = existing
+                store = get_artifact_store()
+                artifact = Artifact(
+                    html=html, title=meta["title"],
+                    query=query, artifact_type="reused",
+                )
+                artifact_id = store.save(artifact)
+                logger.info(f"Artifact reused: {result.reuse_artifact} → {artifact_id}")
+                return artifact_id, meta["title"]
+
+        if not result.html:
+            return None, None
+
+        # Save to ephemeral store for immediate serving
         store = get_artifact_store()
         artifact = Artifact(
-            html=result.html,
-            title=result.title,
-            query=query,
-            artifact_type=result.artifact_type,
+            html=result.html, title=result.title,
+            query=query, artifact_type=result.artifact_type,
         )
         artifact_id = store.save(artifact)
+
+        # Also persist to the registry for future reuse
+        slug = result.title.lower().replace(" ", "-")[:40] if result.title else "artifact"
+        slug = "".join(c for c in slug if c.isalnum() or c == "-").strip("-")
+        try:
+            registry.save_artifact(
+                name=slug,
+                title=result.title,
+                description=f"Auto-generated from: {query[:100]}",
+                tags=query_tags,
+                data_signature=result.artifact_type,
+                html=result.html,
+                note=f"Generated for query: {query[:80]}",
+            )
+            logger.info(f"Artifact persisted to registry: {slug}")
+        except Exception as e:
+            logger.debug(f"Registry save skipped: {e}")
+
         logger.info(f"Artifact generated: {artifact_id} ({result.artifact_type})")
         return artifact_id, result.title
