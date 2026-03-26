@@ -130,9 +130,14 @@ def run_tests():
         # ─── TEST 5: Intel Feed toggle button exists ─────────────
         print("\n--- Test 5: Intel Feed UI toggle ---")
         try:
-            intel_label = page.locator("text=INTEL").first
+            # The top-bar INTEL toggle has "FEED" or alert count beneath it
+            # Use the one inside the top bar (not the sidebar vertical label)
+            intel_toggle = page.locator("div.cursor-pointer:has(div:text('INTEL'))").filter(has_text="FEED").first
+            if intel_toggle.count() == 0:
+                # Might show alert count instead of FEED
+                intel_toggle = page.locator("div.cursor-pointer:has(div:text('INTEL'))").last
             report("INTEL toggle label exists",
-                   intel_label.is_visible(),
+                   intel_toggle.is_visible(),
                    "not found")
         except Exception as e:
             report("INTEL toggle label", False, str(e))
@@ -140,10 +145,12 @@ def run_tests():
         # ─── TEST 6: Intel Feed panel opens on click ─────────────
         print("\n--- Test 6: Intel Feed panel opens ---")
         try:
-            # Click the INTEL toggle area
-            intel_toggle = page.locator("text=INTEL").first
+            # Click the top-bar INTEL toggle (has "FEED" or count below it)
+            intel_toggle = page.locator("div.cursor-pointer:has(div:text('INTEL'))").filter(has_text="FEED").first
+            if intel_toggle.count() == 0:
+                intel_toggle = page.locator("div.cursor-pointer:has(div:text('INTEL'))").last
             intel_toggle.click()
-            page.wait_for_timeout(500)
+            page.wait_for_timeout(1000)
 
             # Check panel appeared
             intel_header = page.locator("text=INTELLIGENCE FEED").first
@@ -152,9 +159,6 @@ def run_tests():
                    "panel not visible")
 
             # Check it shows NO ACTIVE ALERTS or has alert items
-            no_alerts = page.locator("text=NO ACTIVE ALERTS")
-            scanning = page.locator("text=SCANNING")
-            has_content = no_alerts.count() > 0 or scanning.count() > 0 or page.locator("[class*='alert_type']").count() > 0
             report("Intel Feed shows content (no alerts or alert list)",
                    True,  # If panel opened, this is sufficient
                    "")
@@ -164,7 +168,9 @@ def run_tests():
         # ─── TEST 7: Intel Feed panel closes ─────────────────────
         print("\n--- Test 7: Intel Feed panel closes ---")
         try:
-            close_btn = page.locator("text=INTELLIGENCE FEED").locator("..").locator("..").locator("button").first
+            # Close button is the X icon button in the header row
+            # INTELLIGENCE FEED is in span > div > div (header row with button)
+            close_btn = page.locator("text=INTELLIGENCE FEED").locator("..").locator("..").locator("button")
             close_btn.click()
             page.wait_for_timeout(500)
             intel_header = page.locator("text=INTELLIGENCE FEED")

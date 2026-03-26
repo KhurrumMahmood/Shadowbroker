@@ -557,13 +557,14 @@ async def system_update(request: Request):
 # AI Assistant
 # ---------------------------------------------------------------------------
 from pydantic import BaseModel, field_validator
-from starlette.responses import StreamingResponse
+from starlette.responses import StreamingResponse, JSONResponse
 from services.llm_assistant import call_llm, call_llm_streaming, search_entities, build_briefing_context, build_briefing_prompt, ContentFilterError, LLMConnectionError
 
 class AssistantQuery(BaseModel):
     query: str
     viewport: dict | None = None
     conversation: list | None = None
+    active_artifact: dict | None = None
 
     @field_validator("query")
     @classmethod
@@ -643,6 +644,7 @@ async def assistant_query_stream(request: Request, body: AssistantQuery):
             conversation=body.conversation,
             search_results=search_results,
             live_data=data,
+            active_artifact=body.active_artifact,
         )
 
     return StreamingResponse(
@@ -650,6 +652,62 @@ async def assistant_query_stream(request: Request, body: AssistantQuery):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+@app.get("/api/artifacts")
+async def list_artifacts():
+    """List all available artifacts (metadata only)."""
+    from services.agent.artifacts import get_artifact_store
+    return get_artifact_store().list()
+
+
+@app.get("/api/artifacts/registry")
+async def get_artifact_registry():
+    """Return the artifact registry for browsing or agent use."""
+    from services.agent.artifact_registry import get_artifact_registry
+    return get_artifact_registry().list_all()
+
+
+@app.get("/api/artifacts/registry/search")
+async def search_artifact_registry(tags: str = ""):
+    """Search artifacts by tags, ranked by match count."""
+    from services.agent.artifact_registry import get_artifact_registry
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()]
+    if not tag_list:
+        return []
+    return get_artifact_registry().search(tag_list)
+
+
+@app.get("/api/artifacts/registry/{name}/versions")
+async def list_artifact_versions(name: str):
+    """List all versions of a registered artifact."""
+    from services.agent.artifact_registry import get_artifact_registry
+    result = get_artifact_registry().get_latest_version(name)
+    if result is None:
+        return JSONResponse({"error": "Artifact not found in registry"}, status_code=404)
+    _, meta = result
+    return meta.get("versions", [])
+
+
+@app.get("/api/artifacts/registry/{name}")
+async def get_artifact_registry_entry(name: str):
+    """Get metadata and version history for a specific artifact."""
+    from services.agent.artifact_registry import get_artifact_registry
+    result = get_artifact_registry().get_latest_version(name)
+    if result is None:
+        return JSONResponse({"error": "Artifact not found in registry"}, status_code=404)
+    _, meta = result
+    return meta
+
+
+@app.get("/api/artifacts/registry/{name}/v/{version}")
+async def get_artifact_version(name: str, version: int):
+    """Get a specific version of a registered artifact."""
+    from services.agent.artifact_registry import get_artifact_registry
+    html = get_artifact_registry().get_version(name, version)
+    if html is None:
+        return JSONResponse({"error": "Version not found"}, status_code=404)
+    return Response(content=html, media_type="text/html")
+
 
 @app.get("/api/artifacts/{artifact_id}")
 async def get_artifact(artifact_id: str):
@@ -660,13 +718,6 @@ async def get_artifact(artifact_id: str):
     if art is None:
         return JSONResponse({"error": "Artifact not found"}, status_code=404)
     return Response(content=art.html, media_type="text/html")
-
-
-@app.get("/api/artifacts")
-async def list_artifacts():
-    """List all available artifacts (metadata only)."""
-    from services.agent.artifacts import get_artifact_store
-    return get_artifact_store().list()
 
 
 @app.get("/api/alerts")
@@ -694,34 +745,6 @@ async def get_alert(alert_id: str):
         "data": alert.data,
         "created_at": alert.created_at,
     }
-
-
-@app.get("/api/artifacts/registry")
-async def get_artifact_registry():
-    """Return the artifact registry for browsing or agent use."""
-    from services.agent.artifact_registry import get_artifact_registry
-    return get_artifact_registry().list_all()
-
-
-@app.get("/api/artifacts/registry/{name}")
-async def get_artifact_registry_entry(name: str):
-    """Get metadata and version history for a specific artifact."""
-    from services.agent.artifact_registry import get_artifact_registry
-    result = get_artifact_registry().get_latest_version(name)
-    if result is None:
-        return JSONResponse({"error": "Artifact not found in registry"}, status_code=404)
-    _, meta = result
-    return meta
-
-
-@app.get("/api/artifacts/registry/{name}/v/{version}")
-async def get_artifact_version(name: str, version: int):
-    """Get a specific version of a registered artifact."""
-    from services.agent.artifact_registry import get_artifact_registry
-    html = get_artifact_registry().get_version(name, version)
-    if html is None:
-        return JSONResponse({"error": "Version not found"}, status_code=404)
-    return Response(content=html, media_type="text/html")
 
 
 class BriefRequest(BaseModel):

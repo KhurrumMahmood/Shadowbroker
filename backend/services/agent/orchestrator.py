@@ -50,12 +50,14 @@ class Orchestrator:
         total_budget_seconds: float = 30.0,
         use_llm_synthesis: bool = False,
         generate_artifact: bool = False,
+        enhance_artifact_name: str | None = None,
     ):
         self.provider = provider
         self.ds = ds
         self.total_budget = total_budget_seconds
         self.use_llm_synthesis = use_llm_synthesis
         self.generate_artifact = generate_artifact
+        self.enhance_artifact_name = enhance_artifact_name
 
     def run(self, query: str, plan: QueryPlan) -> OrchestratorResult:
         """Execute a compound query plan.
@@ -142,17 +144,23 @@ class Orchestrator:
         # Generate artifact if enabled and we have successful sub-results
         artifact_id = None
         artifact_title = None
+        artifact_registry_name = None
+        artifact_version = None
         successful = [r for r in sub_results if r.success]
         if self.generate_artifact and successful:
             try:
-                artifact_id, artifact_title = self._generate_artifact(
-                    query, successful, final.summary,
-                )
+                artifact_id, artifact_title, artifact_registry_name, artifact_version = \
+                    self._generate_artifact(query, successful, final.summary)
                 if artifact_id:
-                    yield _sse("artifact", {
+                    art_event: dict = {
                         "artifact_id": artifact_id,
                         "title": artifact_title,
-                    })
+                    }
+                    if artifact_registry_name:
+                        art_event["registry_name"] = artifact_registry_name
+                    if artifact_version is not None:
+                        art_event["version"] = artifact_version
+                    yield _sse("artifact", art_event)
             except Exception as e:
                 logger.warning(f"Artifact generation failed: {e}")
 
@@ -327,8 +335,11 @@ class Orchestrator:
         query: str,
         successful: list[SubAgentResult],
         synthesis_summary: str,
-    ) -> tuple[str | None, str | None]:
-        """Generate an HTML artifact from sub-agent findings. Returns (artifact_id, title)."""
+    ) -> tuple[str | None, str | None, str | None, int | None]:
+        """Generate an HTML artifact from sub-agent findings.
+
+        Returns (artifact_id, title, registry_name, version).
+        """
         findings = "\n".join(
             f"[{r.sub_task_intent}] {r.summary}" for r in successful
         )
@@ -350,12 +361,13 @@ class Orchestrator:
             data_context=data_context,
             deadline=time.monotonic() + 15.0,
             registry=registry,
+            enhance_artifact=self.enhance_artifact_name,
         )
         result = agent.run()
 
         if not result.success:
             logger.warning(f"Artifact generation failed: {result.error}")
-            return None, None
+            return None, None, None, None
 
         # Agent decided to reuse an existing artifact
         if result.reuse_artifact:
@@ -369,10 +381,10 @@ class Orchestrator:
                 )
                 artifact_id = store.save(artifact)
                 logger.info(f"Artifact reused: {result.reuse_artifact} → {artifact_id}")
-                return artifact_id, meta["title"]
+                return artifact_id, meta["title"], result.reuse_artifact, meta.get("current_version")
 
         if not result.html:
-            return None, None
+            return None, None, None, None
 
         # Save to ephemeral store for immediate serving
         store = get_artifact_store()
@@ -382,9 +394,24 @@ class Orchestrator:
         )
         artifact_id = store.save(artifact)
 
-        # Also persist to the registry for future reuse
+        # Enhancement path: create new version of existing artifact
+        if self.enhance_artifact_name:
+            try:
+                version = registry.create_version(
+                    name=self.enhance_artifact_name,
+                    html=result.html,
+                    note=f"Enhanced for: {query[:80]}",
+                )
+                logger.info(f"Artifact enhanced: {self.enhance_artifact_name} → v{version}")
+                return artifact_id, result.title, self.enhance_artifact_name, version
+            except Exception as e:
+                logger.warning(f"Version creation failed, falling back to new artifact: {e}")
+
+        # New artifact path: persist to the registry for future reuse
         slug = result.title.lower().replace(" ", "-")[:40] if result.title else "artifact"
         slug = "".join(c for c in slug if c.isalnum() or c == "-").strip("-")
+        registry_name = None
+        version = None
         try:
             registry.save_artifact(
                 name=slug,
@@ -395,9 +422,11 @@ class Orchestrator:
                 html=result.html,
                 note=f"Generated for query: {query[:80]}",
             )
+            registry_name = slug
+            version = 1
             logger.info(f"Artifact persisted to registry: {slug}")
         except Exception as e:
             logger.debug(f"Registry save skipped: {e}")
 
         logger.info(f"Artifact generated: {artifact_id} ({result.artifact_type})")
-        return artifact_id, result.title
+        return artifact_id, result.title, registry_name, version

@@ -1,3 +1,52 @@
 {
-  "artifacts": []
+  "artifacts": [
+    {
+      "name": "what-ships-and-flights-are-near-the-stra",
+      "title": "What ships and flights are near the Strait of H...",
+      "description": "Auto-generated from: What ships and flights are near the Strait of Hormuz?",
+      "tags": [
+        "maritime",
+        "ship",
+        "ships",
+        "aviation",
+        "flight",
+        "flights",
+        "map",
+        "hormuz",
+        "chokepoint",
+        "convergence"
+      ],
+      "data_signature": "analysis",
+      "current_version": 1,
+      "type": "html",
+      "created_by_admin": false,
+      "created_at": "2026-03-26T04:05:04.179028+00:00",
+      "updated_at": "2026-03-26T04:05:04.179028+00:00"
+    },
+    {
+      "name": "what-ships-and-flights-are-near-hormuz",
+      "title": "What ships and flights are near Hormuz? Compare...",
+      "description": "Auto-generated from: What ships and flights are near Hormuz? Compare military posture.",
+      "tags": [
+        "maritime",
+        "ship",
+        "ships",
+        "aviation",
+        "flight",
+        "flights",
+        "military",
+        "mil",
+        "map",
+        "compare",
+        "hormuz",
+        "convergence"
+      ],
+      "data_signature": "comparison",
+      "current_version": 1,
+      "type": "html",
+      "created_by_admin": false,
+      "created_at": "2026-03-26T05:37:19.957096+00:00",
+      "updated_at": "2026-03-26T05:37:19.957096+00:00"
+    }
+  ]
 }

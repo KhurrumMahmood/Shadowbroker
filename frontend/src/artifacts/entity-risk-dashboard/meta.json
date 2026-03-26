@@ -1,0 +1,11 @@
+{
+  "name": "entity-risk-dashboard",
+  "title": "Entity Risk Dashboard",
+  "description": "Sortable entity table with domain-colored badges and risk levels",
+  "tags": ["entities", "risk", "dashboard", "table"],
+  "data_signature": "entities",
+  "type": "react",
+  "accepts_data": {
+    "entities": "Array of { name, domain, type, risk_level, lat, lng, summary }"
+  }
+}

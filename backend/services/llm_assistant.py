@@ -1641,7 +1641,8 @@ def _call_provider_streaming(provider: dict, messages: list, live_data: dict | N
 def call_llm_streaming(query: str, data_summary: dict, viewport: dict | None = None,
                        conversation: list | None = None,
                        search_results: dict | None = None,
-                       live_data: dict | None = None):
+                       live_data: dict | None = None,
+                       active_artifact: dict | None = None):
     """Streaming version of call_llm — yields SSE event strings.
 
     Compound queries are routed to the multi-agent orchestrator with
@@ -1672,6 +1673,7 @@ def call_llm_streaming(query: str, data_summary: dict, viewport: dict | None = N
                 total_budget_seconds=min(60.0, _OVERALL_BUDGET_S * 0.5),
                 use_llm_synthesis=True,
                 generate_artifact=True,
+                enhance_artifact_name=active_artifact.get("name") if active_artifact else None,
             )
             yield from orch.run_streaming(query, plan)
             return

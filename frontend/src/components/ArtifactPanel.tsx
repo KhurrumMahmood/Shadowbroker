@@ -1,30 +1,56 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, Suspense, lazy, type ComponentType } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import artifactTokensCSS from "@/design/artifact-tokens.css?raw";
+
+/** Static map of React artifact components. Each new React artifact needs a one-line addition. */
+const REACT_ARTIFACTS: Record<string, () => Promise<{ default: ComponentType<{ initialData?: unknown }> }>> = {
+  "entity-risk-dashboard": () => import("@/artifacts/entity-risk-dashboard/EntityRiskDashboard"),
+};
 
 interface ArtifactPanelProps {
   artifactId: string | null;
   artifactTitle?: string;
+  artifactVersion?: number;
+  artifactType?: "html" | "react";
+  registryName?: string;
   onClose: () => void;
   data?: unknown;
 }
 
 /**
- * Sandboxed iframe renderer for agent-generated HTML artifacts.
- *
- * Loads artifact HTML from /api/artifacts/{id}, injects design tokens,
- * and renders in a sandboxed iframe. Supports expand/collapse and
- * data injection via postMessage.
+ * Renders agent-generated artifacts — either as a sandboxed iframe (HTML)
+ * or as a directly-imported React component.
  */
-export default function ArtifactPanel({ artifactId, artifactTitle, onClose, data }: ArtifactPanelProps) {
+export default function ArtifactPanel({
+  artifactId, artifactTitle, artifactVersion, artifactType, registryName, onClose, data,
+}: ArtifactPanelProps) {
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [iframeReady, setIframeReady] = useState(false);
+  const [ReactComponent, setReactComponent] = useState<ComponentType<{ initialData?: unknown }> | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const pendingDataRef = useRef<unknown>(undefined);
+
+  const isReact = artifactType === "react" && registryName && registryName in REACT_ARTIFACTS;
+
+  // Load React component
+  useEffect(() => {
+    if (!isReact || !registryName) return;
+    setLoading(true);
+    setError(null);
+    REACT_ARTIFACTS[registryName]()
+      .then((mod) => {
+        setReactComponent(() => mod.default);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("Failed to load React artifact");
+        setLoading(false);
+      });
+  }, [isReact, registryName]);
 
   const loadArtifact = useCallback(async (id: string) => {
     setLoading(true);
@@ -50,7 +76,6 @@ export default function ArtifactPanel({ artifactId, artifactTitle, onClose, data
         setIframeReady(false);
         iframe.onload = () => {
           setIframeReady(true);
-          // Send any pending data after iframe loads
           if (pendingDataRef.current !== undefined) {
             iframe.contentWindow?.postMessage(
               { type: "shadowbroker:data", payload: pendingDataRef.current },
@@ -68,10 +93,10 @@ export default function ArtifactPanel({ artifactId, artifactTitle, onClose, data
   }, []);
 
   useEffect(() => {
-    if (artifactId) {
+    if (artifactId && !isReact) {
       loadArtifact(artifactId);
     }
-  }, [artifactId, loadArtifact]);
+  }, [artifactId, isReact, loadArtifact]);
 
   /** Send data to the artifact iframe via postMessage */
   const sendData = useCallback((payload: unknown) => {
@@ -116,6 +141,11 @@ export default function ArtifactPanel({ artifactId, artifactTitle, onClose, data
                   {artifactTitle}
                 </span>
               )}
+              {artifactVersion != null && (
+                <span className="text-[7px] font-mono tracking-[0.15em] text-cyan-400 bg-cyan-900/40 px-1.5 py-0.5 rounded border border-cyan-800/40">
+                  V{artifactVersion}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-1">
               <button
@@ -151,13 +181,21 @@ export default function ArtifactPanel({ artifactId, artifactTitle, onClose, data
                 </span>
               </div>
             )}
-            <iframe
-              ref={iframeRef}
-              className="w-full h-full border-0"
-              sandbox="allow-scripts"
-              title={artifactTitle || "Agent artifact"}
-              style={{ minHeight: expanded ? "100%" : "280px", background: "#000" }}
-            />
+            {isReact && ReactComponent ? (
+              <div style={{ minHeight: expanded ? "100%" : "280px", padding: 12, background: "#000" }}>
+                <Suspense fallback={null}>
+                  <ReactComponent initialData={data} />
+                </Suspense>
+              </div>
+            ) : (
+              <iframe
+                ref={iframeRef}
+                className="w-full h-full border-0"
+                sandbox="allow-scripts"
+                title={artifactTitle || "Agent artifact"}
+                style={{ minHeight: expanded ? "100%" : "280px", background: "#000" }}
+              />
+            )}
           </div>
         </div>
       </motion.div>

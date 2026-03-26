@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Send, Bot, User, Loader2, ChevronLeft, ChevronRight, XCircle, Plus, Trash2, ArrowLeft, Zap } from "lucide-react";
+import { X, Send, Bot, User, Loader2, ChevronLeft, ChevronRight, XCircle, Plus, Trash2, ArrowLeft, Zap, Layers } from "lucide-react";
 import { validateAssistantResponse, extractStoredAction, type AssistantResponse } from "@/lib/assistantTypes";
 import type { DashboardData } from "@/types/dashboard";
 import type { AIResultState } from "@/hooks/useAIResultCycler";
@@ -14,6 +14,7 @@ import {
 } from "@/hooks/useConversationStore";
 import type { StoredMessage, StoredAction, StoredConversation } from "@/types/aiConversation";
 import ArtifactPanel from "@/components/ArtifactPanel";
+import ArtifactBrowser from "@/components/ArtifactBrowser";
 
 function generateId(): string {
   return crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -47,7 +48,7 @@ interface AIAssistantPanelProps {
   data: DashboardData;
 }
 
-type PanelMode = "chat" | "history" | "actions";
+type PanelMode = "chat" | "history" | "actions" | "artifacts";
 
 export default function AIAssistantPanel({
   isOpen,
@@ -73,7 +74,7 @@ export default function AIAssistantPanel({
   const [flashEntity, setFlashEntity] = useState<string | null>(null);
   const [expandedReasoning, setExpandedReasoning] = useState<Set<number>>(new Set());
   const [prevMode, setPrevMode] = useState<PanelMode>("chat");
-  const [activeArtifact, setActiveArtifact] = useState<{ id: string; title?: string } | null>(null);
+  const [activeArtifact, setActiveArtifact] = useState<{ id: string; title?: string; registryName?: string; version?: number } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const store = useConversationStore();
@@ -171,7 +172,12 @@ export default function AIAssistantPanel({
       const resp = await fetch("/api/assistant/query/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, viewport, conversation }),
+        body: JSON.stringify({
+          query,
+          viewport,
+          conversation,
+          ...(activeArtifact?.registryName ? { active_artifact: { name: activeArtifact.registryName } } : {}),
+        }),
       });
 
       if (!resp.ok) {
@@ -248,7 +254,12 @@ export default function AIAssistantPanel({
             try {
               const art = JSON.parse(eventData);
               if (art.artifact_id) {
-                setActiveArtifact({ id: art.artifact_id, title: art.title });
+                setActiveArtifact({
+                  id: art.artifact_id,
+                  title: art.title,
+                  registryName: art.registry_name,
+                  version: art.version,
+                });
               }
             } catch { /* ignore parse errors */ }
           } else if (eventType === "result") {
@@ -443,7 +454,7 @@ export default function AIAssistantPanel({
   };
 
   // Direction for transitions: history < chat < actions
-  const modeOrder: Record<PanelMode, number> = { history: 0, chat: 1, actions: 2 };
+  const modeOrder: Record<PanelMode, number> = { history: 0, chat: 1, actions: 2, artifacts: 3 };
   const direction = modeOrder[mode] - modeOrder[prevMode];
 
   const switchMode = (next: PanelMode) => {
@@ -472,7 +483,7 @@ export default function AIAssistantPanel({
                 <ArrowLeft size={14} />
               </button>
             )}
-            {mode === "actions" && (
+            {(mode === "actions" || mode === "artifacts") && (
               <button
                 type="button"
                 onClick={() => switchMode("chat")}
@@ -483,10 +494,20 @@ export default function AIAssistantPanel({
             )}
             <Bot size={14} className="text-cyan-400" />
             <span className="text-[10px] text-cyan-400 font-mono tracking-[0.2em] font-bold">
-              {mode === "actions" ? "ACTIONS" : "AI ANALYST"}
+              {mode === "actions" ? "ACTIONS" : mode === "artifacts" ? "ARTIFACTS" : "AI ANALYST"}
             </span>
           </div>
           <div className="flex items-center gap-1.5">
+            {mode === "chat" && (
+              <button
+                type="button"
+                onClick={() => switchMode("artifacts")}
+                className="text-[9px] font-mono px-2 py-0.5 rounded border border-cyan-800/40 text-cyan-500/70 hover:text-cyan-400 hover:bg-cyan-950/30 transition-colors"
+                title="Browse artifacts"
+              >
+                <Layers size={10} />
+              </button>
+            )}
             {mode === "chat" && hasActions && (
               <button
                 type="button"
@@ -793,12 +814,39 @@ export default function AIAssistantPanel({
                       <ArtifactPanel
                         artifactId={activeArtifact.id}
                         artifactTitle={activeArtifact.title}
+                        artifactVersion={activeArtifact.version}
+                        registryName={activeArtifact.registryName}
                         onClose={() => setActiveArtifact(null)}
                       />
                     )}
                   </div>
                 ))
               )}
+            </motion.div>
+          )}
+
+          {mode === "artifacts" && (
+            <motion.div
+              key="artifacts"
+              custom={direction}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.15 }}
+              className="flex-1 overflow-y-auto styled-scrollbar min-h-[200px] max-h-[400px]"
+            >
+              <ArtifactBrowser
+                onSelect={(artifact) => {
+                  setActiveArtifact({
+                    id: `registry:${artifact.name}`,
+                    title: artifact.title,
+                    registryName: artifact.name,
+                    version: artifact.version,
+                  });
+                  switchMode("chat");
+                }}
+              />
             </motion.div>
           )}
         </AnimatePresence>
