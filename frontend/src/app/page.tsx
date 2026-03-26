@@ -567,26 +567,38 @@ export default function Dashboard() {
         data={data}
       />
 
-      {/* Floating AI button */}
-      <button
-        type="button"
-        onClick={() => setAiPanelOpen(o => !o)}
+      {/* Floating AI button — double-border ring for visual separation from HUD */}
+      <div
         className={`
-          fixed bottom-6 right-6 z-[601]
-          w-12 h-12 rounded-lg
-          bg-black/80 backdrop-blur-md
-          border font-mono font-bold text-sm tracking-[0.1em]
+          fixed bottom-5 right-5 z-[601]
+          w-[56px] h-[56px] rounded-xl
           flex items-center justify-center
-          transition-all duration-200
-          shadow-[0_0_20px_rgba(0,0,0,0.5)]
+          border transition-all duration-200
           ${aiPanelOpen
-            ? "border-cyan-400/60 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.15)]"
-            : "border-cyan-800/60 text-cyan-500/80 hover:border-cyan-600/60 hover:text-cyan-400"
+            ? "border-cyan-400/30"
+            : "border-cyan-800/30"
           }
         `}
       >
-        AI
-      </button>
+        <button
+          type="button"
+          onClick={() => setAiPanelOpen(o => !o)}
+          className={`
+            w-11 h-11 rounded-lg
+            bg-black/90 backdrop-blur-md
+            border font-mono font-bold text-sm tracking-[0.1em]
+            flex items-center justify-center
+            transition-all duration-200
+            shadow-[0_0_20px_rgba(0,0,0,0.6)]
+            ${aiPanelOpen
+              ? "border-cyan-400/60 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.2)]"
+              : "border-cyan-800/60 text-cyan-500/80 hover:border-cyan-600/60 hover:text-cyan-400"
+            }
+          `}
+        >
+          AI
+        </button>
+      </div>
 
       {/* INTELLIGENCE FEED PANEL */}
       <IntelFeedPanel
