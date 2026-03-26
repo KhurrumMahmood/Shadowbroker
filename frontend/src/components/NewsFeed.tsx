@@ -188,7 +188,6 @@ function NewsFeedInner({ data, selectedEntity, regionDossier, regionDossierLoadi
     const rawNews = data?.news || [];
     const outbreaks = (data?.disease_outbreaks || []).map((o: any) => ({
         ...o,
-        source: `WHO DON`,
         summary: o.summary || o.title,
         published: o.pub_date,
         coords: o.lat != null && o.lng != null ? [o.lat, o.lng] : null,

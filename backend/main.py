@@ -637,7 +637,6 @@ def _build_data_summary(data: dict) -> dict:
 
     outbreaks = data.get("disease_outbreaks", [])
     if outbreaks:
-        summary["disease_outbreaks_count"] = len(outbreaks)
         summary["recent_outbreaks"] = [
             {"disease": o.get("disease_name", ""), "country": o.get("country", ""), "date": o.get("pub_date", "")}
             for o in outbreaks[:5]

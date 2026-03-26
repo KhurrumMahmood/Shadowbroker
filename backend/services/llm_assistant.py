@@ -146,7 +146,7 @@ def _current_situation_section(data_summary: dict) -> str:
 
     outbreaks = data_summary.get("recent_outbreaks", [])
     if outbreaks:
-        lines = [f"DISEASE OUTBREAKS ({data_summary.get('disease_outbreaks_count', len(outbreaks))} total):"]
+        lines = [f"DISEASE OUTBREAKS ({data_summary.get('disease_outbreaks', len(outbreaks))} total):"]
         for o in outbreaks:
             lines.append(f"  - {o.get('disease', '?')} — {o.get('country', '?')} ({o.get('date', '?')})")
         sections.append("\n".join(lines))

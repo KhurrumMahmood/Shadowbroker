@@ -18,12 +18,10 @@ _SEVERITY = {
 
 def _parse_title(title: str) -> tuple[str, str]:
     """Extract (disease_name, country) from DON title like 'Ebola virus disease \u2013 Uganda'."""
-    if " \u2013 " in title:
-        parts = title.split(" \u2013 ", 1)
-        return parts[0].strip(), parts[1].strip()
-    if " - " in title:
-        parts = title.split(" - ", 1)
-        return parts[0].strip(), parts[1].strip()
+    for sep in (" \u2013 ", " - "):
+        if sep in title:
+            disease, country = title.split(sep, 1)
+            return disease.strip(), country.strip()
     return title, ""
 
 
@@ -50,23 +48,26 @@ def fetch_disease_outbreaks():
         logger.warning("WHO DON: unexpected response format")
         return
 
+    def _field(item: dict, pascal: str, camel: str, default=""):
+        return item.get(pascal) or item.get(camel, default)
+
     outbreaks = []
     for item in items[:30]:
-        title = item.get("Title") or item.get("title", "")
+        title = _field(item, "Title", "title")
         disease_name, country = _parse_title(title)
         coords = _resolve_coords(f"{country} {disease_name}")
 
         outbreaks.append({
-            "id": item.get("Id") or item.get("id", ""),
+            "id": _field(item, "Id", "id"),
             "title": title,
             "disease_name": disease_name,
             "country": country,
-            "summary": (item.get("Summary") or item.get("summary", ""))[:300],
-            "pub_date": item.get("DatePublished") or item.get("datePublished", ""),
+            "summary": _field(item, "Summary", "summary")[:300],
+            "pub_date": _field(item, "DatePublished", "datePublished"),
             "risk_score": _severity_score(disease_name),
             "lat": coords[0] if coords else None,
             "lng": coords[1] if coords else None,
-            "link": item.get("Url") or item.get("url", ""),
+            "link": _field(item, "Url", "url"),
             "source": "WHO DON",
         })
 

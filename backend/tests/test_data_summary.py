@@ -89,7 +89,7 @@ class TestBuildDataSummary:
             {"disease_name": "Cholera", "country": "Haiti", "pub_date": "2026-02-15"},
         ]
         s = _build_data_summary({"disease_outbreaks": outbreaks})
-        assert s["disease_outbreaks_count"] == 2
+        assert s["disease_outbreaks"] == 2
         assert "recent_outbreaks" in s
         assert s["recent_outbreaks"][0]["disease"] == "Ebola"
 

@@ -68,7 +68,7 @@ class TestCurrentSituationSection:
 
     def test_disease_outbreaks_rendered(self):
         summary = {
-            "disease_outbreaks_count": 3,
+            "disease_outbreaks": 3,
             "recent_outbreaks": [
                 {"disease": "Ebola", "country": "Uganda", "date": "2026-03-01"},
             ]
