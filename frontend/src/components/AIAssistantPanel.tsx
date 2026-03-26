@@ -12,6 +12,7 @@ import { useConversationStore } from "@/hooks/useConversationStore";
 import type { StoredMessage, StoredAction } from "@/types/aiConversation";
 import ArtifactPanel from "@/components/ArtifactPanel";
 import ArtifactBrowser from "@/components/ArtifactBrowser";
+import { getDummyData } from "@/artifacts/_shared/dummyData";
 
 function generateId(): string {
   return crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -34,6 +35,84 @@ function tryParseJSON<T>(json: string): T | null {
     return JSON.parse(json) as T;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Maps raw DashboardData into the shape each artifact expects.
+ * Falls back to the full data object for unknown artifacts.
+ */
+/**
+ * Maps raw DashboardData into the shape each artifact expects.
+ * Falls back to the full data object for unknown artifacts.
+ */
+function mapDataForArtifact(registryName: string | undefined, dashData: DashboardData): unknown {
+  const ships = dashData.ships || [];
+  const milFlights = dashData.military_flights || [];
+  const gdelt = dashData.gdelt || [];
+  const jamming = dashData.gps_jamming || [];
+  const fires = dashData.firms_fires || [];
+  const news = dashData.news || [];
+  const earthquakes = dashData.earthquakes || [];
+
+  // Tracked = yachts, military, carriers (enriched ships)
+  const trackedShips = ships.filter((s) =>
+    s.yacht_alert || s.plan_name || s.type === "military_vessel" || s.type === "carrier"
+  );
+
+  // Carriers specifically
+  const carriers = ships
+    .filter((s) => s.type === "carrier")
+    .map((s) => ({ name: s.name, lat: s.lat, lng: s.lng, status: s.desc || s.destination || undefined }));
+
+  switch (registryName) {
+    case "chokepoint-risk-monitor":
+      return {
+        ships,
+        tracked_ships: trackedShips,
+        military_flights: milFlights,
+        gdelt_events: gdelt,
+        gps_jamming: jamming,
+        fires,
+        oil_prices: dashData.oil ? {
+          wti: dashData.oil.WTI ? { price: dashData.oil.WTI.price, change_pct: dashData.oil.WTI.change_percent } : undefined,
+          brent: dashData.oil.BRENT ? { price: dashData.oil.BRENT.price, change_pct: dashData.oil.BRENT.change_percent } : undefined,
+        } : undefined,
+      };
+    case "threat-convergence-panel":
+      return {
+        military_flights: milFlights,
+        gdelt_events: gdelt,
+        gps_jamming: jamming,
+        fires,
+        ships,
+      };
+    case "sitrep-region-brief":
+      return {
+        ships,
+        military_flights: milFlights,
+        gdelt_events: gdelt,
+        fires,
+        gps_jamming: jamming,
+        news,
+      };
+    case "tracked-entity-dashboard":
+      return {
+        tracked_ships: trackedShips,
+        military_flights: milFlights,
+        carriers,
+      };
+    case "risk-pulse-ticker":
+      return {
+        gdelt_events: gdelt,
+        military_flights: milFlights,
+        gps_jamming: jamming,
+        fires,
+        earthquakes,
+        news,
+      };
+    default:
+      return dashData;
   }
 }
 
@@ -95,11 +174,22 @@ export default function AIAssistantPanel({
   const [flashEntity, setFlashEntity] = useState<string | null>(null);
   const [expandedReasoning, setExpandedReasoning] = useState<Set<number>>(new Set());
   const [prevMode, setPrevMode] = useState<PanelMode>("chat");
-  const [activeArtifact, setActiveArtifact] = useState<{ id: string; title?: string; registryName?: string; version?: number } | null>(null);
+  const [activeArtifact, setActiveArtifact] = useState<{ id: string; title?: string; registryName?: string; version?: number; type?: "html" | "react"; useDummyData?: boolean } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const store = useConversationStore();
+
+  /** Live dashboard data mapped to the shape the active artifact expects.
+   *  When useDummyData is set (by the LLM on explicit user request), returns fixture data instead. */
+  const artifactData = useMemo(() => {
+    if (!activeArtifact) return undefined;
+    if (activeArtifact.useDummyData && activeArtifact.registryName) {
+      const dummy = getDummyData(activeArtifact.registryName);
+      if (dummy) return dummy;
+    }
+    return mapDataForArtifact(activeArtifact.registryName, data);
+  }, [activeArtifact, data, activeArtifact?.registryName, activeArtifact?.useDummyData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (isOpen && mode === "chat") inputRef.current?.focus();
@@ -257,13 +347,15 @@ export default function AIAssistantPanel({
               setProgressText(sub.summary.slice(0, 80) + (sub.summary.length > 80 ? "..." : ""));
             }
           } else if (eventType === "artifact") {
-            const art = tryParseJSON<{ artifact_id?: string; title?: string; registry_name?: string; version?: number }>(eventData);
+            const art = tryParseJSON<{ artifact_id?: string; title?: string; registry_name?: string; version?: number; type?: string; use_dummy_data?: boolean }>(eventData);
             if (art?.artifact_id) {
               setActiveArtifact({
                 id: art.artifact_id,
                 title: art.title,
                 registryName: art.registry_name,
                 version: art.version,
+                type: art.type === "react" ? "react" : art.registry_name ? "react" : "html",
+                useDummyData: art.use_dummy_data === true,
               });
             }
           } else if (eventType === "result") {
@@ -469,8 +561,10 @@ export default function AIAssistantPanel({
                 artifactId={activeArtifact.id}
                 artifactTitle={activeArtifact.title}
                 artifactVersion={activeArtifact.version}
+                artifactType={activeArtifact.type}
                 registryName={activeArtifact.registryName}
                 onClose={() => setActiveArtifact(null)}
+                data={artifactData}
                 sidePaneMode
               />
             </motion.div>
@@ -815,6 +909,7 @@ export default function AIAssistantPanel({
                     title: artifact.title,
                     registryName: artifact.name,
                     version: artifact.version,
+                    type: artifact.type === "react" ? "react" : "html",
                   });
                   switchMode("chat");
                 }}

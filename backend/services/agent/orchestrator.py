@@ -52,6 +52,7 @@ class _ArtifactOutcome:
     title: str | None = None
     registry_name: str | None = None
     version: int | None = None
+    use_dummy_data: bool = False
 
     @property
     def created(self) -> bool:
@@ -170,6 +171,8 @@ class Orchestrator:
                         art_event["registry_name"] = artifact.registry_name
                     if artifact.version is not None:
                         art_event["version"] = artifact.version
+                    if artifact.use_dummy_data:
+                        art_event["use_dummy_data"] = True
                     yield _sse("artifact", art_event)
             except Exception as e:
                 logger.warning(f"Artifact generation failed: {e}")
@@ -342,6 +345,13 @@ class Orchestrator:
         synthesis_summary: str,
     ) -> _ArtifactOutcome:
         """Generate an HTML artifact from sub-agent findings."""
+        # Detect explicit "dummy data" / "test data" / "sample data" request
+        _q_lower = query.lower()
+        wants_dummy = any(phrase in _q_lower for phrase in [
+            "dummy data", "test data", "sample data", "demo data", "fake data",
+            "example data", "mock data",
+        ])
+
         findings = "\n".join(
             f"[{r.sub_task_intent}] {r.summary}" for r in successful
         )
@@ -386,6 +396,7 @@ class Orchestrator:
                     title=meta["title"],
                     registry_name=result.reuse_artifact,
                     version=meta.get("current_version"),
+                    use_dummy_data=wants_dummy,
                 )
 
         if not result.html:
@@ -413,6 +424,7 @@ class Orchestrator:
                     title=result.title,
                     registry_name=self.enhance_artifact_name,
                     version=version,
+                    use_dummy_data=wants_dummy,
                 )
             except Exception as e:
                 logger.warning(f"Version creation failed, falling back to new artifact: {e}")
@@ -443,4 +455,5 @@ class Orchestrator:
             title=result.title,
             registry_name=registry_name,
             version=version,
+            use_dummy_data=wants_dummy,
         )

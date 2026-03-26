@@ -11,6 +11,8 @@ const REACT_ARTIFACTS: Record<string, () => Promise<{ default: ComponentType<any
   "sitrep-region-brief": () => import("@/artifacts/sitrep-region-brief/SitrepRegionBrief"),
   "tracked-entity-dashboard": () => import("@/artifacts/tracked-entity-dashboard/TrackedEntityDashboard"),
   "risk-pulse-ticker": () => import("@/artifacts/risk-pulse-ticker/RiskPulseTicker"),
+  "chokepoint-risk-monitor": () => import("@/artifacts/chokepoint-risk-monitor/ChokepointRiskMonitor"),
+  "threat-convergence-panel": () => import("@/artifacts/threat-convergence-panel/ThreatConvergencePanel"),
 };
 
 interface ArtifactPanelProps {

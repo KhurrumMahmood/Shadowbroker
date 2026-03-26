@@ -38,6 +38,15 @@ TECHNICAL REQUIREMENTS:
 - All data must be embedded inline (no fetch calls)
 - The HTML will have ShadowBroker CSS tokens injected (--sb-* variables)
 
+DUMMY/TEST DATA:
+The React artifacts (chokepoint-risk-monitor, threat-convergence-panel, sitrep-region-brief, \
+tracked-entity-dashboard, risk-pulse-ticker) have built-in dummy data fixtures on the frontend. \
+The frontend will automatically use these fixtures when the artifact SSE event includes \
+use_dummy_data=true. You do NOT need to embed dummy data in generated HTML. \
+IMPORTANT: Dummy data should ONLY be used when the user explicitly asks for it \
+(e.g. "show me with test data", "use dummy data", "demo mode"). \
+NEVER use dummy data unless the user explicitly requests it.
+
 OUTPUT: Return ONLY the HTML inside a ```html code block. No explanation text outside the block.
 """
 

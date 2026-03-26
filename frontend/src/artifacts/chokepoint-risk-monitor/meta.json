@@ -1,7 +1,7 @@
 {
   "name": "chokepoint-risk-monitor",
   "title": "Chokepoint Risk Monitor",
-  "type": "html",
+  "type": "react",
   "tags": ["chokepoint", "maritime", "ship", "ships", "oil", "military", "shipping", "hormuz", "suez", "malacca", "strait", "panama", "risk", "dashboard", "convergence"],
   "data_signature": "dashboard",
   "accepts_data": {

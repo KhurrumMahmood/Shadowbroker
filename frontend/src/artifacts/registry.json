@@ -79,7 +79,7 @@
       "tags": ["chokepoint", "maritime", "ship", "ships", "oil", "military", "shipping", "hormuz", "suez", "malacca", "strait", "panama", "risk", "dashboard", "convergence"],
       "data_signature": "dashboard",
       "current_version": 1,
-      "type": "html",
+      "type": "react",
       "created_by_admin": true,
       "created_at": "2026-03-26T10:00:00.000000+00:00",
       "updated_at": "2026-03-26T10:00:00.000000+00:00"
@@ -91,7 +91,7 @@
       "tags": ["convergence", "threat", "military", "conflict", "intelligence", "correlation", "gdelt", "fire", "jamming", "outage", "anomaly", "dashboard"],
       "data_signature": "dashboard",
       "current_version": 1,
-      "type": "html",
+      "type": "react",
       "created_by_admin": true,
       "created_at": "2026-03-26T10:00:00.000000+00:00",
       "updated_at": "2026-03-26T10:00:00.000000+00:00"

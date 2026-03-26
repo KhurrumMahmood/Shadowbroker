@@ -15,6 +15,13 @@ import { useState, useEffect } from "react";
 export function useArtifactData<T = unknown>(initialData?: T): T | undefined {
   const [data, setData] = useState<T | undefined>(initialData);
 
+  // Sync when prop changes (e.g., dashboard polling delivers fresh data)
+  useEffect(() => {
+    if (initialData !== undefined) {
+      setData(initialData);
+    }
+  }, [initialData]);
+
   // Only listen for postMessage inside iframes (HTML artifact context).
   // Inline React artifacts receive data via props, not postMessage.
   const isInIframe = typeof window !== "undefined" && window.parent !== window;

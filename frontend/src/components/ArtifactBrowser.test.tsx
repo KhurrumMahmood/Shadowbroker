@@ -62,6 +62,7 @@ describe("ArtifactBrowser", () => {
       name: "ship-map",
       title: "Ship Map",
       version: 2,
+      type: "html",
     });
   });
 

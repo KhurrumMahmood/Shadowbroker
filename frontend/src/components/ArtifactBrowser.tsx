@@ -11,7 +11,7 @@ interface RegistryEntry {
 }
 
 interface ArtifactBrowserProps {
-  onSelect: (artifact: { name: string; title: string; version: number }) => void;
+  onSelect: (artifact: { name: string; title: string; version: number; type: string }) => void;
 }
 
 export default function ArtifactBrowser({ onSelect }: ArtifactBrowserProps) {
@@ -77,7 +77,7 @@ export default function ArtifactBrowser({ onSelect }: ArtifactBrowserProps) {
         <button
           key={entry.name}
           type="button"
-          onClick={() => onSelect({ name: entry.name, title: entry.title, version: entry.current_version })}
+          onClick={() => onSelect({ name: entry.name, title: entry.title, version: entry.current_version, type: entry.type || "html" })}
           className="text-left p-2 rounded-lg border border-cyan-800/30 hover:border-cyan-700/50 hover:bg-cyan-950/20 transition-colors"
         >
           <div className="flex items-center justify-between mb-1">

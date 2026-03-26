@@ -1,7 +1,7 @@
 {
   "name": "threat-convergence-panel",
   "title": "Threat Convergence Panel",
-  "type": "html",
+  "type": "react",
   "tags": ["convergence", "threat", "military", "conflict", "intelligence", "correlation", "gdelt", "fire", "jamming", "outage", "anomaly", "dashboard"],
   "data_signature": "dashboard",
   "accepts_data": {
