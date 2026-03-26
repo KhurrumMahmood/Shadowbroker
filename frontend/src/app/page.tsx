@@ -478,20 +478,6 @@ export default function Dashboard() {
               {/* Divider */}
               <div className="w-px h-8 bg-[var(--border-primary)]" />
 
-              {/* AI Assistant toggle */}
-              <div
-                className="flex flex-col items-center cursor-pointer"
-                onClick={() => setAiPanelOpen(o => !o)}
-              >
-                <div className="text-[8px] text-[var(--text-muted)] font-mono tracking-[0.2em]">ANALYST</div>
-                <div className={`text-[11px] font-mono font-bold ${aiPanelOpen ? "text-cyan-400" : "text-[var(--text-secondary)]"}`}>
-                  {aiPanelOpen ? "OPEN" : "AI"}
-                </div>
-              </div>
-
-              {/* Divider */}
-              <div className="w-px h-8 bg-[var(--border-primary)]" />
-
               {/* Intel Feed toggle */}
               <div
                 className="flex flex-col items-center cursor-pointer relative"
@@ -580,6 +566,27 @@ export default function Dashboard() {
         viewport={viewBoundsRef.current}
         data={data}
       />
+
+      {/* Floating AI button */}
+      <button
+        type="button"
+        onClick={() => setAiPanelOpen(o => !o)}
+        className={`
+          fixed bottom-6 right-6 z-[601]
+          w-12 h-12 rounded-lg
+          bg-black/80 backdrop-blur-md
+          border font-mono font-bold text-sm tracking-[0.1em]
+          flex items-center justify-center
+          transition-all duration-200
+          shadow-[0_0_20px_rgba(0,0,0,0.5)]
+          ${aiPanelOpen
+            ? "border-cyan-400/60 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.15)]"
+            : "border-cyan-800/60 text-cyan-500/80 hover:border-cyan-600/60 hover:text-cyan-400"
+          }
+        `}
+      >
+        AI
+      </button>
 
       {/* INTELLIGENCE FEED PANEL */}
       <IntelFeedPanel

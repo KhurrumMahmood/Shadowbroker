@@ -443,12 +443,42 @@ export default function AIAssistantPanel({
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 20 }}
-      className="absolute bottom-24 right-8 z-[400] w-96 pointer-events-auto"
+      initial={{ opacity: 0, y: 20, width: 400 }}
+      animate={{ opacity: 1, y: 0, width: activeArtifact ? 900 : 400 }}
+      exit={{ opacity: 0, y: 20 }}
+      transition={{
+        opacity: { duration: 0.2 },
+        y: { duration: 0.2 },
+        width: { type: "spring", stiffness: 300, damping: 30 },
+      }}
+      className="fixed bottom-20 right-6 z-[600] pointer-events-auto max-w-[calc(100vw-3rem)]"
     >
-      <div className="bg-black/90 backdrop-blur-md border border-cyan-800/60 rounded-xl shadow-[0_4px_30px_rgba(0,0,0,0.5)] flex flex-col max-h-[500px]">
+      <div className="bg-black/90 backdrop-blur-md border border-cyan-800/60 rounded-xl shadow-[0_4px_30px_rgba(0,0,0,0.5)] flex flex-row h-[600px] overflow-hidden">
+        {/* LEFT: Artifact pane (only when active) */}
+        <AnimatePresence>
+          {activeArtifact && mode !== "artifacts" && (
+            <motion.div
+              key="artifact-pane"
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 520, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="border-r border-cyan-800/40 flex flex-col overflow-hidden flex-shrink-0 h-full"
+            >
+              <ArtifactPanel
+                artifactId={activeArtifact.id}
+                artifactTitle={activeArtifact.title}
+                artifactVersion={activeArtifact.version}
+                registryName={activeArtifact.registryName}
+                onClose={() => setActiveArtifact(null)}
+                sidePaneMode
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* RIGHT: Chat pane */}
+        <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-cyan-800/40">
           <div className="flex items-center gap-2">
@@ -536,7 +566,7 @@ export default function AIAssistantPanel({
               className="flex flex-col flex-1 min-h-0"
             >
               {/* Messages */}
-              <div ref={scrollRef} className="flex-1 overflow-y-auto styled-scrollbar px-4 py-3 space-y-3 min-h-[200px] max-h-[350px]">
+              <div ref={scrollRef} className="flex-1 overflow-y-auto styled-scrollbar px-4 py-3 space-y-3 min-h-0">
                 {messages.length === 0 && (
                   <div className="text-[10px] text-[var(--text-muted)] font-mono text-center py-8">
                     Ask me about anything on the dashboard.
@@ -671,7 +701,7 @@ export default function AIAssistantPanel({
               animate="center"
               exit="exit"
               transition={{ duration: 0.15 }}
-              className="flex-1 overflow-y-auto styled-scrollbar min-h-[200px] max-h-[400px]"
+              className="flex-1 overflow-y-auto styled-scrollbar min-h-0"
             >
               {store.index.length === 0 ? (
                 <div className="text-[10px] text-[var(--text-muted)] font-mono text-center py-12">
@@ -733,7 +763,7 @@ export default function AIAssistantPanel({
               animate="center"
               exit="exit"
               transition={{ duration: 0.15 }}
-              className="flex-1 overflow-y-auto styled-scrollbar px-4 py-3 space-y-2 min-h-[200px] max-h-[400px]"
+              className="flex-1 overflow-y-auto styled-scrollbar px-4 py-3 space-y-2 min-h-0"
             >
               {actionMessages.length === 0 ? (
                 <div className="text-[10px] text-[var(--text-muted)] font-mono text-center py-12">
@@ -761,15 +791,6 @@ export default function AIAssistantPanel({
                         </button>
                       </div>
                     )}
-                    {msg.action?.artifact_id && activeArtifact?.id === msg.action.artifact_id && (
-                      <ArtifactPanel
-                        artifactId={activeArtifact.id}
-                        artifactTitle={activeArtifact.title}
-                        artifactVersion={activeArtifact.version}
-                        registryName={activeArtifact.registryName}
-                        onClose={() => setActiveArtifact(null)}
-                      />
-                    )}
                   </div>
                 ))
               )}
@@ -785,7 +806,7 @@ export default function AIAssistantPanel({
               animate="center"
               exit="exit"
               transition={{ duration: 0.15 }}
-              className="flex-1 overflow-y-auto styled-scrollbar min-h-[200px] max-h-[400px]"
+              className="flex-1 overflow-y-auto styled-scrollbar min-h-0"
             >
               <ArtifactBrowser
                 onSelect={(artifact) => {
@@ -801,7 +822,8 @@ export default function AIAssistantPanel({
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+        </div>{/* end chat pane */}
+      </div>{/* end flex-row */}
     </motion.div>
   );
 }

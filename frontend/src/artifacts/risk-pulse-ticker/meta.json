@@ -1,0 +1,16 @@
+{
+  "name": "risk-pulse-ticker",
+  "title": "Risk Pulse Ticker",
+  "type": "react",
+  "tags": ["risk", "pulse", "ticker", "alert", "warning", "status", "realtime", "feed", "headline", "breaking"],
+  "data_signature": "ticker",
+  "accepts_data": {
+    "gdelt_events": "Array of conflict events with lat, lng, event_type, goldstein_scale",
+    "military_flights": "Array of military aircraft",
+    "gps_jamming": "Array of GPS jamming zones",
+    "fires": "Array of FIRMS fire detections",
+    "earthquakes": "Array of seismic events with magnitude",
+    "news": "Array of news items with title, source"
+  },
+  "created_by_admin": true
+}

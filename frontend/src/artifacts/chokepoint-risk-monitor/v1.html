@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHOKEPOINT RISK MONITOR</title>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <style>
+        :root {
+            --sb-bg-primary: #000000;
+            --sb-bg-secondary: rgb(5,5,8);
+            --sb-bg-tertiary: rgb(12,12,16);
+            --sb-text-primary: rgb(243,244,246);
+            --sb-text-secondary: #22d3ee;
+            --sb-text-muted: rgba(34,211,238,0.5);
+            --sb-border-accent: rgba(34,211,238,0.4);
+            --sb-border-primary: rgba(255,255,255,0.08);
+            --sb-color-maritime: #60a5fa;
+            --sb-color-military: #facc15;
+            --sb-color-fire: #f87171;
+            --sb-color-intelligence: #4ade80;
+            --sb-font-mono: 'Courier New', Courier, monospace;
+            --sb-text-xs: 12px;
+            --sb-text-sm: 11px;
+            --sb-text-base: 10px;
+            --sb-text-meta: 9px;
+            --sb-text-micro: 8px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--sb-bg-primary);
+            color: var(--sb-text-primary);
+            font-family: var(--sb-font-mono);
+            font-size: var(--sb-text-sm);
+            letter-spacing: 0.05em;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Scanline overlay */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0,0,0,0.08) 2px,
+                rgba(0,0,0,0.08) 4px
+            );
+        }
+
+        .sb-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* ---- HEADER ---- */
+        .sb-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 1px solid var(--sb-border-accent);
+            padding-bottom: 10px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .sb-header-left {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .sb-heading {
+            font-size: 14px;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--sb-text-secondary);
+            font-weight: normal;
+            text-shadow: 0 0 8px rgba(34,211,238,0.3);
+        }
+
+        .sb-subheading {
+            font-size: var(--sb-text-base);
+            letter-spacing: 0.1em;
+            color: var(--sb-text-primary);
+            opacity: 0.5;
+        }
+
+        .sb-header-right {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .sb-oil-prices {
+            display: flex;
+            gap: 14px;
+        }
+
+        .sb-oil-item {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 1px;
+        }
+
+        .sb-oil-label {
+            font-size: var(--sb-text-micro);
+            letter-spacing: 0.15em;
+            color: var(--sb-text-primary);
+            opacity: 0.5;
+        }
+
+        .sb-oil-price {
+            font-size: var(--sb-text-xs);
+            color: var(--sb-text-primary);
+        }
+
+        .sb-oil-change {
+            font-size: var(--sb-text-meta);
+        }
+
+        .sb-oil-change.positive { color: var(--sb-color-intelligence); }
+        .sb-oil-change.negative { color: var(--sb-color-fire); }
+
+        .sb-timestamp {
+            font-size: var(--sb-text-micro);
+            letter-spacing: 0.1em;
+            color: var(--sb-text-muted);
+            text-align: right;
+        }
+
+        /* ---- MAIN LAYOUT ---- */
+        .sb-main {
+            display: flex;
+            flex: 1;
+            gap: 12px;
+            min-height: 0;
+        }
+
+        .sb-map-area {
+            flex: 1;
+            position: relative;
+            min-height: 420px;
+        }
+
+        .sb-map-area svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* ---- DETAIL PANEL ---- */
+        .sb-detail-panel {
+            width: 280px;
+            background: var(--sb-bg-secondary);
+            border: 1px solid var(--sb-border-accent);
+            padding: 12px;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+            max-height: 520px;
+        }
+
+        .sb-detail-panel.active {
+            display: flex;
+        }
+
+        .sb-detail-title {
+            font-size: var(--sb-text-xs);
+            color: var(--sb-text-secondary);
+            letter-spacing: 0.15em;
+            border-bottom: 1px solid var(--sb-border-accent);
+            padding-bottom: 6px;
+        }
+
+        .sb-detail-significance {
+            font-size: var(--sb-text-meta);
+            color: var(--sb-text-primary);
+            opacity: 0.6;
+            margin-top: -6px;
+        }
+
+        .sb-detail-section {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .sb-detail-section-title {
+            font-size: var(--sb-text-meta);
+            color: var(--sb-text-muted);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .sb-detail-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: var(--sb-text-base);
+            padding: 2px 0;
+            border-bottom: 1px dashed var(--sb-border-primary);
+        }
+
+        .sb-detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .sb-detail-row-label {
+            opacity: 0.6;
+        }
+
+        .sb-detail-list {
+            max-height: 120px;
+            overflow-y: auto;
+            font-size: var(--sb-text-meta);
+        }
+
+        .sb-detail-list-item {
+            padding: 2px 0;
+            border-bottom: 1px dashed var(--sb-border-primary);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .sb-detail-list-item:last-child {
+            border-bottom: none;
+        }
+
+        .sb-detail-close {
+            background: none;
+            border: 1px solid var(--sb-border-accent);
+            color: var(--sb-text-secondary);
+            font-family: var(--sb-font-mono);
+            font-size: var(--sb-text-meta);
+            letter-spacing: 0.1em;
+            padding: 4px 8px;
+            cursor: pointer;
+            align-self: flex-end;
+        }
+
+        .sb-detail-close:hover {
+            background: rgba(34,211,238,0.1);
+        }
+
+        /* ---- BADGES ---- */
+        .sb-badge-critical {
+            background: rgba(248,113,113,0.2);
+            color: var(--sb-color-fire);
+            border: 1px solid rgba(248,113,113,0.4);
+            padding: 1px 6px;
+            font-size: var(--sb-text-micro);
+            letter-spacing: 0.1em;
+        }
+
+        .sb-badge-elevated {
+            background: rgba(250,204,21,0.15);
+            color: var(--sb-color-military);
+            border: 1px solid rgba(250,204,21,0.3);
+            padding: 1px 6px;
+            font-size: var(--sb-text-micro);
+            letter-spacing: 0.1em;
+        }
+
+        .sb-badge-normal {
+            background: rgba(34,211,238,0.1);
+            color: var(--sb-text-secondary);
+            border: 1px solid rgba(34,211,238,0.3);
+            padding: 1px 6px;
+            font-size: var(--sb-text-micro);
+            letter-spacing: 0.1em;
+        }
+
+        .sb-badge-low {
+            background: rgba(74,222,128,0.1);
+            color: var(--sb-color-intelligence);
+            border: 1px solid rgba(74,222,128,0.3);
+            padding: 1px 6px;
+            font-size: var(--sb-text-micro);
+            letter-spacing: 0.1em;
+        }
+
+        /* ---- FOOTER ---- */
+        .sb-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid var(--sb-border-primary);
+            padding-top: 8px;
+            margin-top: 12px;
+        }
+
+        .sb-copy-btn {
+            background: none;
+            border: 1px solid var(--sb-border-accent);
+            color: var(--sb-text-secondary);
+            font-family: var(--sb-font-mono);
+            font-size: var(--sb-text-meta);
+            letter-spacing: 0.15em;
+            padding: 6px 14px;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: background 0.2s;
+        }
+
+        .sb-copy-btn:hover {
+            background: rgba(34,211,238,0.1);
+        }
+
+        .sb-copy-btn.copied {
+            border-color: var(--sb-color-intelligence);
+            color: var(--sb-color-intelligence);
+        }
+
+        .sb-legend {
+            display: flex;
+            gap: 12px;
+            font-size: var(--sb-text-micro);
+            opacity: 0.6;
+        }
+
+        .sb-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .sb-legend-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        /* ---- LOADING STATE ---- */
+        .sb-loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 10;
+        }
+
+        .sb-loading-text {
+            font-size: var(--sb-text-xs);
+            letter-spacing: 0.2em;
+            color: var(--sb-text-secondary);
+            animation: sb-pulse 1.8s ease-in-out infinite;
+        }
+
+        @keyframes sb-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 1; }
+        }
+
+        @keyframes sb-critical-pulse {
+            0%, 100% { filter: drop-shadow(0 0 4px rgba(248,113,113,0.3)); }
+            50% { filter: drop-shadow(0 0 12px rgba(248,113,113,0.8)); }
+        }
+
+        /* D3 element styles */
+        .chokepoint-node { cursor: pointer; }
+        .chokepoint-node:hover .node-ring { stroke-opacity: 1; }
+
+        .world-outline {
+            fill: rgba(255,255,255,0.015);
+            stroke: rgba(34,211,238,0.08);
+            stroke-width: 0.5;
+        }
+
+        .connection-line {
+            stroke: rgba(34,211,238,0.12);
+            stroke-width: 1;
+            stroke-dasharray: 4 4;
+            fill: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="sb-container">
+        <div class="sb-header">
+            <div class="sb-header-left">
+                <h1 class="sb-heading">CHOKEPOINT RISK MONITOR</h1>
+                <p class="sb-subheading">MARITIME STRATEGIC CHOKEPOINT STATUS</p>
+            </div>
+            <div class="sb-header-right">
+                <div class="sb-oil-prices" id="oil-prices">
+                    <div class="sb-oil-item">
+                        <span class="sb-oil-label">WTI</span>
+                        <span class="sb-oil-price" id="wti-price">--</span>
+                        <span class="sb-oil-change" id="wti-change">--</span>
+                    </div>
+                    <div class="sb-oil-item">
+                        <span class="sb-oil-label">BRENT</span>
+                        <span class="sb-oil-price" id="brent-price">--</span>
+                        <span class="sb-oil-change" id="brent-change">--</span>
+                    </div>
+                </div>
+                <div class="sb-timestamp" id="timestamp">DATA AS OF --:--:--</div>
+            </div>
+        </div>
+
+        <div class="sb-main">
+            <div class="sb-map-area" id="map-area">
+                <div class="sb-loading" id="loading">
+                    <div class="sb-loading-text">ACQUIRING FEED DATA...</div>
+                </div>
+            </div>
+            <div class="sb-detail-panel" id="detail-panel">
+                <button class="sb-detail-close" id="detail-close">[X] CLOSE</button>
+                <div class="sb-detail-title" id="detail-title"></div>
+                <div class="sb-detail-significance" id="detail-significance"></div>
+                <div class="sb-detail-section">
+                    <span class="sb-detail-section-title">RISK BREAKDOWN</span>
+                    <div id="detail-risk-rows"></div>
+                </div>
+                <div class="sb-detail-section">
+                    <span class="sb-detail-section-title">VESSELS IN AREA</span>
+                    <div class="sb-detail-list" id="detail-vessels"></div>
+                </div>
+                <div class="sb-detail-section">
+                    <span class="sb-detail-section-title">MILITARY ASSETS</span>
+                    <div class="sb-detail-list" id="detail-military"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sb-footer">
+            <div class="sb-legend">
+                <div class="sb-legend-item">
+                    <div class="sb-legend-dot" style="background: var(--sb-color-maritime);"></div>
+                    <span>VESSELS</span>
+                </div>
+                <div class="sb-legend-item">
+                    <div class="sb-legend-dot" style="background: var(--sb-color-military);"></div>
+                    <span>MILITARY</span>
+                </div>
+                <div class="sb-legend-item">
+                    <div class="sb-legend-dot" style="background: var(--sb-color-fire);"></div>
+                    <span>CONFLICT</span>
+                </div>
+                <div class="sb-legend-item">
+                    <div class="sb-legend-dot" style="background: #c084fc;"></div>
+                    <span>GPS JAM</span>
+                </div>
+                <div class="sb-legend-item">
+                    <div class="sb-legend-dot" style="background: #fb923c;"></div>
+                    <span>FIRES</span>
+                </div>
+            </div>
+            <button class="sb-copy-btn" id="copy-btn">COPY STATUS</button>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        "use strict";
+
+        // ---- CHOKEPOINT DEFINITIONS ----
+        var CHOKEPOINTS = [
+            { id: "hormuz", name: "Strait of Hormuz", lat: 26.57, lng: 56.25, significance: "21% global oil transit" },
+            { id: "malacca", name: "Strait of Malacca", lat: 2.5, lng: 101.0, significance: "25% global trade volume" },
+            { id: "suez", name: "Suez Canal", lat: 30.46, lng: 32.34, significance: "12% global trade" },
+            { id: "bab", name: "Bab el-Mandeb", lat: 12.6, lng: 43.3, significance: "Red Sea gateway" },
+            { id: "panama", name: "Panama Canal", lat: 9.08, lng: -79.68, significance: "5% global trade" },
+            { id: "turkish", name: "Turkish Straits", lat: 41.1, lng: 29.05, significance: "3.3M bbl/day oil" }
+        ];
+
+        // Connection lines between linked chokepoints
+        var CONNECTIONS = [
+            ["hormuz", "bab"],
+            ["bab", "suez"],
+            ["malacca", "hormuz"],
+            ["turkish", "suez"]
+        ];
+
+        var BBOX_RADIUS = 2; // degrees
+
+        // ---- STATE ----
+        var currentData = null;
+        var hasReceivedData = false;
+        var selectedChokepoint = null;
+        var chokepointStats = {};
+        var svg, projection, mapGroup;
+
+        // ---- INITIALIZATION ----
+        initMap();
+        initEventListeners();
+        startFallbackTimer();
+
+        // ---- D3 MAP SETUP ----
+        function initMap() {
+            var container = document.getElementById("map-area");
+            var rect = container.getBoundingClientRect();
+            var width = rect.width || 900;
+            var height = rect.height || 420;
+
+            svg = d3.select("#map-area")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height)
+                .attr("viewBox", "0 0 " + width + " " + height);
+
+            projection = d3.geoNaturalEarth1()
+                .scale(width / 5.8)
+                .translate([width / 2, height / 2]);
+
+            var path = d3.geoPath().projection(projection);
+
+            mapGroup = svg.append("g");
+
+            // Load world outline
+            d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json")
+                .then(function(world) {
+                    var land = topojson ? topojson.feature(world, world.objects.land) : world;
+                    // world-atlas uses TopoJSON — need topojson client
+                    // Since we loaded D3 v7 which doesn't include topojson, inline the conversion
+                    var geojsonLand = topoFeature(world, world.objects.land);
+
+                    mapGroup.append("path")
+                        .datum(geojsonLand)
+                        .attr("class", "world-outline")
+                        .attr("d", path);
+
+                    drawConnections();
+                    drawChokepoints();
+                })
+                .catch(function() {
+                    // Fallback: draw without world outline
+                    drawConnections();
+                    drawChokepoints();
+                });
+
+            // Handle resize
+            window.addEventListener("resize", function() {
+                var r = container.getBoundingClientRect();
+                var w = r.width || 900;
+                var h = r.height || 420;
+                svg.attr("width", w).attr("height", h).attr("viewBox", "0 0 " + w + " " + h);
+                projection.scale(w / 5.8).translate([w / 2, h / 2]);
+                var p = d3.geoPath().projection(projection);
+                svg.selectAll(".world-outline").attr("d", p);
+                updatePositions();
+            });
+        }
+
+        // Minimal TopoJSON feature extraction (avoids needing topojson-client)
+        function topoFeature(topology, obj) {
+            var arcs = topology.arcs;
+            function arcToCoords(arcIndex) {
+                var reverse = arcIndex < 0;
+                var idx = reverse ? ~arcIndex : arcIndex;
+                var arc = arcs[idx];
+                var coords = [];
+                var x = 0, y = 0;
+                for (var i = 0; i < arc.length; i++) {
+                    x += arc[i][0];
+                    y += arc[i][1];
+                    coords.push([x, y]);
+                }
+                if (topology.transform) {
+                    var tx = topology.transform.translate[0];
+                    var ty = topology.transform.translate[1];
+                    var sx = topology.transform.scale[0];
+                    var sy = topology.transform.scale[1];
+                    coords = coords.map(function(c) { return [c[0] * sx + tx, c[1] * sy + ty]; });
+                }
+                if (reverse) coords.reverse();
+                return coords;
+            }
+
+            function resolveArcs(arcsList) {
+                var ring = [];
+                arcsList.forEach(function(arcIndex) {
+                    var coords = arcToCoords(arcIndex);
+                    // Skip first point of subsequent arcs to avoid duplicates
+                    if (ring.length > 0) coords = coords.slice(1);
+                    ring = ring.concat(coords);
+                });
+                return ring;
+            }
+
+            if (obj.type === "GeometryCollection") {
+                var polygons = [];
+                obj.geometries.forEach(function(geom) {
+                    if (geom.type === "Polygon") {
+                        polygons.push(geom.arcs.map(resolveArcs));
+                    } else if (geom.type === "MultiPolygon") {
+                        geom.arcs.forEach(function(poly) {
+                            polygons.push(poly.map(resolveArcs));
+                        });
+                    }
+                });
+                return {
+                    type: "Feature",
+                    geometry: {
+                        type: "MultiPolygon",
+                        coordinates: polygons
+                    },
+                    properties: {}
+                };
+            }
+            return { type: "Feature", geometry: obj, properties: {} };
+        }
+
+        function drawConnections() {
+            var cpMap = {};
+            CHOKEPOINTS.forEach(function(cp) { cpMap[cp.id] = cp; });
+
+            CONNECTIONS.forEach(function(conn) {
+                var from = cpMap[conn[0]];
+                var to = cpMap[conn[1]];
+                if (!from || !to) return;
+
+                var p1 = projection([from.lng, from.lat]);
+                var p2 = projection([to.lng, to.lat]);
+                if (!p1 || !p2) return;
+
+                mapGroup.append("line")
+                    .attr("class", "connection-line")
+                    .attr("x1", p1[0]).attr("y1", p1[1])
+                    .attr("x2", p2[0]).attr("y2", p2[1])
+                    .attr("data-from", conn[0])
+                    .attr("data-to", conn[1]);
+            });
+        }
+
+        function drawChokepoints() {
+            var nodeGroups = mapGroup.selectAll(".chokepoint-node")
+                .data(CHOKEPOINTS, function(d) { return d.id; })
+                .enter()
+                .append("g")
+                .attr("class", "chokepoint-node")
+                .attr("data-id", function(d) { return d.id; })
+                .on("click", function(event, d) {
+                    event.stopPropagation();
+                    selectChokepoint(d.id);
+                });
+
+            // Outer ring
+            nodeGroups.append("circle")
+                .attr("class", "node-ring")
+                .attr("r", 28)
+                .attr("fill", "none")
+                .attr("stroke", "var(--sb-text-secondary)")
+                .attr("stroke-width", 1.5)
+                .attr("stroke-opacity", 0.5);
+
+            // Inner fill
+            nodeGroups.append("circle")
+                .attr("class", "node-fill")
+                .attr("r", 26)
+                .attr("fill", "rgba(5,5,8,0.85)")
+                .attr("stroke", "none");
+
+            // Hexagon accent (subtle inner shape)
+            nodeGroups.append("polygon")
+                .attr("class", "node-hex")
+                .attr("points", hexPoints(18))
+                .attr("fill", "none")
+                .attr("stroke", "var(--sb-text-secondary)")
+                .attr("stroke-width", 0.5)
+                .attr("stroke-opacity", 0.2);
+
+            // Center vessel count
+            nodeGroups.append("text")
+                .attr("class", "node-count")
+                .attr("text-anchor", "middle")
+                .attr("dy", "0.35em")
+                .attr("fill", "var(--sb-text-primary)")
+                .attr("font-family", "var(--sb-font-mono)")
+                .attr("font-size", "16px")
+                .text("--");
+
+            // Name label
+            nodeGroups.append("text")
+                .attr("class", "node-label")
+                .attr("text-anchor", "middle")
+                .attr("dy", 44)
+                .attr("fill", "var(--sb-text-secondary)")
+                .attr("font-family", "var(--sb-font-mono)")
+                .attr("font-size", "8px")
+                .attr("letter-spacing", "0.12em")
+                .text(function(d) { return d.name.toUpperCase(); });
+
+            // Risk badge (below label)
+            nodeGroups.append("rect")
+                .attr("class", "node-badge-bg")
+                .attr("x", -18)
+                .attr("y", 48)
+                .attr("width", 36)
+                .attr("height", 12)
+                .attr("rx", 1)
+                .attr("fill", "rgba(74,222,128,0.1)")
+                .attr("stroke", "rgba(74,222,128,0.3)")
+                .attr("stroke-width", 0.5);
+
+            nodeGroups.append("text")
+                .attr("class", "node-badge-text")
+                .attr("text-anchor", "middle")
+                .attr("dy", 57)
+                .attr("fill", "var(--sb-color-intelligence)")
+                .attr("font-family", "var(--sb-font-mono)")
+                .attr("font-size", "7px")
+                .attr("letter-spacing", "0.1em")
+                .text("LOW");
+
+            updatePositions();
+            // Hide loading once drawn
+            document.getElementById("loading").style.display = "none";
+        }
+
+        function hexPoints(r) {
+            var pts = [];
+            for (var i = 0; i < 6; i++) {
+                var angle = (Math.PI / 3) * i - Math.PI / 2;
+                pts.push(Math.cos(angle) * r + "," + Math.sin(angle) * r);
+            }
+            return pts.join(" ");
+        }
+
+        function updatePositions() {
+            var cpMap = {};
+            CHOKEPOINTS.forEach(function(cp) { cpMap[cp.id] = cp; });
+
+            svg.selectAll(".chokepoint-node")
+                .attr("transform", function(d) {
+                    var p = projection([d.lng, d.lat]);
+                    return p ? "translate(" + p[0] + "," + p[1] + ")" : "translate(0,0)";
+                });
+
+            svg.selectAll(".connection-line")
+                .each(function() {
+                    var el = d3.select(this);
+                    var from = cpMap[el.attr("data-from")];
+                    var to = cpMap[el.attr("data-to")];
+                    if (from && to) {
+                        var p1 = projection([from.lng, from.lat]);
+                        var p2 = projection([to.lng, to.lat]);
+                        if (p1 && p2) {
+                            el.attr("x1", p1[0]).attr("y1", p1[1])
+                              .attr("x2", p2[0]).attr("y2", p2[1]);
+                        }
+                    }
+                });
+        }
+
+        // ---- DATA PROCESSING ----
+        function processData(data) {
+            currentData = data;
+            hasReceivedData = true;
+            document.getElementById("loading").style.display = "none";
+
+            // Update oil prices
+            updateOilPrices(data.oil_prices);
+
+            // Update timestamp
+            var now = new Date();
+            document.getElementById("timestamp").textContent =
+                "DATA AS OF " + now.toUTCString().replace("GMT", "UTC");
+
+            // Calculate stats for each chokepoint
+            CHOKEPOINTS.forEach(function(cp) {
+                chokepointStats[cp.id] = calcStats(cp, data);
+            });
+
+            // Update visual nodes
+            updateNodes();
+
+            // Update detail panel if one is selected
+            if (selectedChokepoint) {
+                renderDetail(selectedChokepoint);
+            }
+        }
+
+        function calcStats(cp, data) {
+            var bbox = {
+                south: cp.lat - BBOX_RADIUS,
+                north: cp.lat + BBOX_RADIUS,
+                west: cp.lng - BBOX_RADIUS,
+                east: cp.lng + BBOX_RADIUS
+            };
+
+            var ships = filterByBbox(data.ships || [], bbox);
+            var tracked = filterByBbox(data.tracked_ships || [], bbox);
+            var military = filterByBbox(data.military_flights || [], bbox);
+            var gdelt = filterByBbox(data.gdelt_events || [], bbox);
+            var jamming = filterByBbox(data.gps_jamming || [], bbox);
+            var fires = filterByBbox(data.fires || [], bbox);
+
+            // Combine tracked military ships into military count
+            var trackedMilitary = tracked.filter(function(s) {
+                return s.type && (s.type.toLowerCase().indexOf("navy") >= 0 ||
+                       s.type.toLowerCase().indexOf("military") >= 0 ||
+                       s.type.toLowerCase().indexOf("coast guard") >= 0);
+            });
+
+            var allMilitary = military.concat(trackedMilitary);
+
+            // Risk score
+            var milPts = Math.min(allMilitary.length * 2, 10);
+            var conflictPts = Math.min(gdelt.length * 3, 15);
+            var jamPts = jamming.length * 5;
+            var firePts = Math.min(fires.length, 5);
+            var totalRisk = milPts + conflictPts + jamPts + firePts;
+
+            var riskLevel = "LOW";
+            if (totalRisk >= 20) riskLevel = "CRITICAL";
+            else if (totalRisk >= 10) riskLevel = "ELEVATED";
+            else if (totalRisk >= 5) riskLevel = "NORMAL";
+
+            return {
+                vessels: ships.concat(tracked),
+                vesselCount: ships.length + tracked.length,
+                military: allMilitary,
+                militaryCount: allMilitary.length,
+                conflicts: gdelt,
+                conflictCount: gdelt.length,
+                jamming: jamming,
+                jammingCount: jamming.length,
+                fires: fires,
+                fireCount: fires.length,
+                riskScore: totalRisk,
+                riskLevel: riskLevel
+            };
+        }
+
+        function filterByBbox(items, bbox) {
+            return items.filter(function(item) {
+                var lat = item.lat || item.latitude;
+                var lng = item.lng || item.lon || item.longitude;
+                if (lat == null || lng == null) return false;
+                return lat >= bbox.south && lat <= bbox.north &&
+                       lng >= bbox.west && lng <= bbox.east;
+            });
+        }
+
+        function updateOilPrices(prices) {
+            if (!prices) return;
+
+            if (prices.wti) {
+                document.getElementById("wti-price").textContent =
+                    "$" + (prices.wti.price || 0).toFixed(2);
+                var wtiChange = document.getElementById("wti-change");
+                var wtiPct = prices.wti.change_pct || 0;
+                wtiChange.textContent = (wtiPct >= 0 ? "+" : "") + wtiPct.toFixed(1) + "%";
+                wtiChange.className = "sb-oil-change " + (wtiPct >= 0 ? "positive" : "negative");
+            }
+
+            if (prices.brent) {
+                document.getElementById("brent-price").textContent =
+                    "$" + (prices.brent.price || 0).toFixed(2);
+                var brentChange = document.getElementById("brent-change");
+                var brentPct = prices.brent.change_pct || 0;
+                brentChange.textContent = (brentPct >= 0 ? "+" : "") + brentPct.toFixed(1) + "%";
+                brentChange.className = "sb-oil-change " + (brentPct >= 0 ? "positive" : "negative");
+            }
+        }
+
+        // ---- NODE RENDERING ----
+        function updateNodes() {
+            CHOKEPOINTS.forEach(function(cp) {
+                var stats = chokepointStats[cp.id] || { vesselCount: 0, militaryCount: 0, conflictCount: 0, jammingCount: 0, fireCount: 0, riskLevel: "LOW" };
+                var node = svg.select('.chokepoint-node[data-id="' + cp.id + '"]');
+                if (node.empty()) return;
+
+                // Update vessel count
+                node.select(".node-count")
+                    .transition().duration(400)
+                    .tween("text", function() {
+                        var el = this;
+                        var prev = parseInt(el.textContent) || 0;
+                        var next = stats.vesselCount;
+                        var interp = d3.interpolateRound(prev, next);
+                        return function(t) { el.textContent = interp(t); };
+                    });
+
+                // Update risk badge
+                var badgeColors = getBadgeColors(stats.riskLevel);
+                node.select(".node-badge-bg")
+                    .transition().duration(400)
+                    .attr("fill", badgeColors.bg)
+                    .attr("stroke", badgeColors.stroke);
+
+                node.select(".node-badge-text")
+                    .text(stats.riskLevel)
+                    .transition().duration(400)
+                    .attr("fill", badgeColors.text);
+
+                // Resize badge background to fit text
+                var textLen = stats.riskLevel.length;
+                var badgeW = Math.max(textLen * 6 + 8, 36);
+                node.select(".node-badge-bg")
+                    .attr("x", -badgeW / 2)
+                    .attr("width", badgeW);
+
+                // Update ring color based on risk
+                node.select(".node-ring")
+                    .transition().duration(400)
+                    .attr("stroke", badgeColors.text)
+                    .attr("stroke-opacity", stats.riskLevel === "CRITICAL" ? 0.9 : 0.5);
+
+                // Critical pulse animation
+                if (stats.riskLevel === "CRITICAL") {
+                    node.style("animation", "sb-critical-pulse 2s ease-in-out infinite");
+                } else {
+                    node.style("animation", "none");
+                }
+
+                // Remove old indicators
+                node.selectAll(".indicator-dot").remove();
+
+                // Military indicator dots (yellow, around the ring)
+                var milCount = Math.min(stats.militaryCount, 8);
+                for (var m = 0; m < milCount; m++) {
+                    var angle = (Math.PI * 2 / Math.max(milCount, 1)) * m - Math.PI / 2;
+                    node.append("circle")
+                        .attr("class", "indicator-dot")
+                        .attr("cx", Math.cos(angle) * 32)
+                        .attr("cy", Math.sin(angle) * 32)
+                        .attr("r", 2.5)
+                        .attr("fill", "var(--sb-color-military)")
+                        .attr("opacity", 0)
+                        .transition().duration(300).delay(m * 40)
+                        .attr("opacity", 0.9);
+                }
+
+                // Conflict pip (red, top-right)
+                if (stats.conflictCount > 0) {
+                    node.append("circle")
+                        .attr("class", "indicator-dot")
+                        .attr("cx", 22)
+                        .attr("cy", -22)
+                        .attr("r", 4)
+                        .attr("fill", "var(--sb-color-fire)")
+                        .attr("stroke", "rgba(248,113,113,0.4)")
+                        .attr("stroke-width", 2)
+                        .attr("opacity", 0)
+                        .transition().duration(300)
+                        .attr("opacity", 0.9);
+                }
+
+                // GPS jamming indicator (purple, top-left)
+                if (stats.jammingCount > 0) {
+                    node.append("circle")
+                        .attr("class", "indicator-dot")
+                        .attr("cx", -22)
+                        .attr("cy", -22)
+                        .attr("r", 4)
+                        .attr("fill", "#c084fc")
+                        .attr("stroke", "rgba(192,132,252,0.4)")
+                        .attr("stroke-width", 2)
+                        .attr("opacity", 0)
+                        .transition().duration(300)
+                        .attr("opacity", 0.9);
+
+                    // Warning triangle
+                    node.append("text")
+                        .attr("class", "indicator-dot")
+                        .attr("x", -22)
+                        .attr("y", -19)
+                        .attr("text-anchor", "middle")
+                        .attr("fill", "#c084fc")
+                        .attr("font-size", "6px")
+                        .text("\u26A0");
+                }
+
+                // Fire indicator (orange, bottom-right)
+                if (stats.fireCount > 0) {
+                    node.append("circle")
+                        .attr("class", "indicator-dot")
+                        .attr("cx", 22)
+                        .attr("cy", 18)
+                        .attr("r", 3.5)
+                        .attr("fill", "#fb923c")
+                        .attr("stroke", "rgba(251,146,60,0.4)")
+                        .attr("stroke-width", 1.5)
+                        .attr("opacity", 0)
+                        .transition().duration(300)
+                        .attr("opacity", 0.9);
+                }
+            });
+        }
+
+        function getBadgeColors(level) {
+            switch (level) {
+                case "CRITICAL":
+                    return { bg: "rgba(248,113,113,0.2)", stroke: "rgba(248,113,113,0.4)", text: "var(--sb-color-fire)" };
+                case "ELEVATED":
+                    return { bg: "rgba(250,204,21,0.15)", stroke: "rgba(250,204,21,0.3)", text: "var(--sb-color-military)" };
+                case "NORMAL":
+                    return { bg: "rgba(34,211,238,0.1)", stroke: "rgba(34,211,238,0.3)", text: "var(--sb-text-secondary)" };
+                default:
+                    return { bg: "rgba(74,222,128,0.1)", stroke: "rgba(74,222,128,0.3)", text: "var(--sb-color-intelligence)" };
+            }
+        }
+
+        // ---- DETAIL PANEL ----
+        function selectChokepoint(id) {
+            selectedChokepoint = id;
+
+            // Highlight selected node
+            svg.selectAll(".chokepoint-node").each(function(d) {
+                d3.select(this).select(".node-ring")
+                    .attr("stroke-width", d.id === id ? 2.5 : 1.5);
+            });
+
+            renderDetail(id);
+        }
+
+        function renderDetail(id) {
+            var cp = CHOKEPOINTS.find(function(c) { return c.id === id; });
+            var stats = chokepointStats[id] || { vesselCount: 0, vessels: [], militaryCount: 0, military: [], conflictCount: 0, jammingCount: 0, fireCount: 0, riskLevel: "LOW", riskScore: 0 };
+
+            var panel = document.getElementById("detail-panel");
+            panel.classList.add("active");
+
+            // Title and significance (safe text insertion)
+            document.getElementById("detail-title").textContent = cp.name.toUpperCase();
+            document.getElementById("detail-significance").textContent = cp.significance;
+
+            // Risk breakdown
+            var riskRows = document.getElementById("detail-risk-rows");
+            riskRows.textContent = "";
+
+            var riskData = [
+                { label: "Risk Score", value: stats.riskScore },
+                { label: "Risk Level", value: stats.riskLevel, badge: true },
+                { label: "Vessels", value: stats.vesselCount },
+                { label: "Military Assets", value: stats.militaryCount },
+                { label: "Conflict Events", value: stats.conflictCount },
+                { label: "GPS Jamming Zones", value: stats.jammingCount },
+                { label: "Fire Detections", value: stats.fireCount }
+            ];
+
+            riskData.forEach(function(row) {
+                var div = document.createElement("div");
+                div.className = "sb-detail-row";
+
+                var labelSpan = document.createElement("span");
+                labelSpan.className = "sb-detail-row-label";
+                labelSpan.textContent = row.label;
+                div.appendChild(labelSpan);
+
+                if (row.badge) {
+                    var badgeSpan = document.createElement("span");
+                    var badgeClass = "sb-badge-" + row.value.toLowerCase();
+                    badgeSpan.className = badgeClass;
+                    badgeSpan.textContent = row.value;
+                    div.appendChild(badgeSpan);
+                } else {
+                    var valSpan = document.createElement("span");
+                    valSpan.textContent = row.value;
+                    div.appendChild(valSpan);
+                }
+
+                riskRows.appendChild(div);
+            });
+
+            // Vessels list
+            var vesselList = document.getElementById("detail-vessels");
+            vesselList.textContent = "";
+
+            var vesselItems = stats.vessels.slice(0, 30);
+            if (vesselItems.length === 0) {
+                var noVessels = document.createElement("div");
+                noVessels.className = "sb-detail-list-item";
+                noVessels.style.opacity = "0.4";
+                noVessels.textContent = "No vessels detected";
+                vesselList.appendChild(noVessels);
+            } else {
+                vesselItems.forEach(function(v) {
+                    var item = document.createElement("div");
+                    item.className = "sb-detail-list-item";
+
+                    var nameSpan = document.createElement("span");
+                    nameSpan.textContent = v.name || v.callsign || "UNKNOWN";
+                    item.appendChild(nameSpan);
+
+                    var typeSpan = document.createElement("span");
+                    typeSpan.style.opacity = "0.5";
+                    typeSpan.textContent = v.type || v.ship_type || "--";
+                    item.appendChild(typeSpan);
+
+                    vesselList.appendChild(item);
+                });
+                if (stats.vessels.length > 30) {
+                    var more = document.createElement("div");
+                    more.className = "sb-detail-list-item";
+                    more.style.opacity = "0.4";
+                    more.textContent = "+" + (stats.vessels.length - 30) + " more";
+                    vesselList.appendChild(more);
+                }
+            }
+
+            // Military assets list
+            var milList = document.getElementById("detail-military");
+            milList.textContent = "";
+
+            var milItems = stats.military.slice(0, 20);
+            if (milItems.length === 0) {
+                var noMil = document.createElement("div");
+                noMil.className = "sb-detail-list-item";
+                noMil.style.opacity = "0.4";
+                noMil.textContent = "No military assets detected";
+                milList.appendChild(noMil);
+            } else {
+                milItems.forEach(function(m) {
+                    var item = document.createElement("div");
+                    item.className = "sb-detail-list-item";
+
+                    var nameSpan = document.createElement("span");
+                    nameSpan.textContent = m.callsign || m.name || "UNKNOWN";
+                    item.appendChild(nameSpan);
+
+                    var typeSpan = document.createElement("span");
+                    typeSpan.style.opacity = "0.5";
+                    typeSpan.textContent = m.type || m.aircraft_type || "--";
+                    item.appendChild(typeSpan);
+
+                    milList.appendChild(item);
+                });
+            }
+        }
+
+        function closeDetail() {
+            selectedChokepoint = null;
+            document.getElementById("detail-panel").classList.remove("active");
+            svg.selectAll(".chokepoint-node .node-ring")
+                .attr("stroke-width", 1.5);
+        }
+
+        // ---- EVENT LISTENERS ----
+        function initEventListeners() {
+            // Close detail panel
+            document.getElementById("detail-close").addEventListener("click", closeDetail);
+
+            // Click outside nodes to deselect
+            svg.on("click", function() {
+                closeDetail();
+            });
+
+            // Copy status button
+            document.getElementById("copy-btn").addEventListener("click", copyStatus);
+
+            // Listen for data messages
+            window.addEventListener("message", function(e) {
+                if (e.data && e.data.type === "shadowbroker:data") {
+                    processData(e.data.payload);
+                }
+            });
+        }
+
+        // ---- COPY STATUS ----
+        function copyStatus() {
+            var now = new Date();
+            var ts = now.toUTCString().replace("GMT", "UTC");
+            var lines = [];
+            lines.push("CHOKEPOINT STATUS \u2014 " + ts);
+            lines.push("\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501");
+
+            CHOKEPOINTS.forEach(function(cp) {
+                var stats = chokepointStats[cp.id] || { vesselCount: 0, militaryCount: 0, conflictCount: 0, riskLevel: "LOW" };
+                var shortName = cp.name.replace("Strait of ", "").replace("Canal", "").replace("Straits", "").trim().toUpperCase();
+                lines.push("\u25A0 " + shortName + " [" + stats.riskLevel + "] \u2014 " +
+                    stats.vesselCount + " vessels, " +
+                    stats.militaryCount + " military, " +
+                    stats.conflictCount + " conflicts");
+            });
+
+            // Oil prices
+            var wtiText = document.getElementById("wti-price").textContent;
+            var wtiChangeText = document.getElementById("wti-change").textContent;
+            var brentText = document.getElementById("brent-price").textContent;
+            var brentChangeText = document.getElementById("brent-change").textContent;
+            lines.push("OIL: WTI " + wtiText + " (" + wtiChangeText + ") | BRENT " + brentText + " (" + brentChangeText + ")");
+
+            var text = lines.join("\n");
+
+            navigator.clipboard.writeText(text).then(function() {
+                var btn = document.getElementById("copy-btn");
+                btn.textContent = "COPIED";
+                btn.classList.add("copied");
+                setTimeout(function() {
+                    btn.textContent = "COPY STATUS";
+                    btn.classList.remove("copied");
+                }, 2000);
+            }).catch(function() {
+                // Clipboard API may not work in sandboxed iframe — silent fail
+            });
+        }
+
+        // ---- FALLBACK TIMER ----
+        function startFallbackTimer() {
+            setTimeout(function() {
+                if (!hasReceivedData) {
+                    // Show zero-state
+                    document.getElementById("loading").style.display = "none";
+                    CHOKEPOINTS.forEach(function(cp) {
+                        chokepointStats[cp.id] = {
+                            vessels: [],
+                            vesselCount: 0,
+                            military: [],
+                            militaryCount: 0,
+                            conflicts: [],
+                            conflictCount: 0,
+                            jamming: [],
+                            jammingCount: 0,
+                            fires: [],
+                            fireCount: 0,
+                            riskScore: 0,
+                            riskLevel: "LOW"
+                        };
+                    });
+                    updateNodes();
+
+                    // Update vessel counts to 0
+                    svg.selectAll(".node-count").text("0");
+
+                    document.getElementById("timestamp").textContent =
+                        "DATA AS OF -- (NO FEED)";
+                }
+            }, 3000);
+        }
+
+    })();
+    </script>
+</body>
+</html>

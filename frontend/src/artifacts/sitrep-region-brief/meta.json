@@ -1,0 +1,20 @@
+{
+  "name": "sitrep-region-brief",
+  "title": "SITREP / Region Brief",
+  "type": "react",
+  "tags": ["sitrep", "brief", "briefing", "report", "intelligence", "summary", "region", "analysis", "assessment", "situation"],
+  "data_signature": "analysis",
+  "accepts_data": {
+    "region": "Region name string",
+    "bbox": "Bounding box {south, west, north, east}",
+    "timeframe": "Hours to cover (6, 12, 24)",
+    "ships": "Array of vessels in region",
+    "military_flights": "Array of military aircraft in region",
+    "gdelt_events": "Array of conflict events in region",
+    "fires": "Array of fire detections in region",
+    "gps_jamming": "Array of GPS jamming zones in region",
+    "news": "Array of news items relevant to region",
+    "assessment": "AI-generated assessment paragraph string"
+  },
+  "created_by_admin": true
+}

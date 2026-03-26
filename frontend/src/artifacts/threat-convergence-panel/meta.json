@@ -1,0 +1,16 @@
+{
+  "name": "threat-convergence-panel",
+  "title": "Threat Convergence Panel",
+  "type": "html",
+  "tags": ["convergence", "threat", "military", "conflict", "intelligence", "correlation", "gdelt", "fire", "jamming", "outage", "anomaly", "dashboard"],
+  "data_signature": "dashboard",
+  "accepts_data": {
+    "military_flights": "Array of military aircraft with lat, lng, callsign, type",
+    "gdelt_events": "Array of conflict events with lat, lng, event_type, goldstein_scale",
+    "gps_jamming": "Array of GPS jamming zones with lat, lng, radius",
+    "fires": "Array of FIRMS fire detections with lat, lng, brightness",
+    "ships": "Array of AIS vessel objects with lat, lng, type, name",
+    "internet_outages": "Array of internet outage events"
+  },
+  "created_by_admin": true
+}

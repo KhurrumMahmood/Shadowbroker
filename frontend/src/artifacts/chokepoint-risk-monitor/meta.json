@@ -1,0 +1,17 @@
+{
+  "name": "chokepoint-risk-monitor",
+  "title": "Chokepoint Risk Monitor",
+  "type": "html",
+  "tags": ["chokepoint", "maritime", "ship", "ships", "oil", "military", "shipping", "hormuz", "suez", "malacca", "strait", "panama", "risk", "dashboard", "convergence"],
+  "data_signature": "dashboard",
+  "accepts_data": {
+    "ships": "Array of AIS vessel objects with lat, lng, type, name",
+    "tracked_ships": "Array of tracked vessels (yachts, navy)",
+    "military_flights": "Array of military aircraft with lat, lng, callsign, type",
+    "gdelt_events": "Array of conflict events with lat, lng, event_type",
+    "gps_jamming": "Array of GPS jamming zones",
+    "oil_prices": "Object with WTI and Brent prices",
+    "fires": "Array of FIRMS fire detections"
+  },
+  "created_by_admin": true
+}

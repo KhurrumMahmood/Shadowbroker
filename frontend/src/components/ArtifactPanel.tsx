@@ -5,8 +5,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import artifactTokensCSS from "@/design/artifact-tokens.css?raw";
 
 /** Static map of React artifact components. Each new React artifact needs a one-line addition. */
-const REACT_ARTIFACTS: Record<string, () => Promise<{ default: ComponentType<{ initialData?: unknown }> }>> = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const REACT_ARTIFACTS: Record<string, () => Promise<{ default: ComponentType<any> }>> = {
   "entity-risk-dashboard": () => import("@/artifacts/entity-risk-dashboard/EntityRiskDashboard"),
+  "sitrep-region-brief": () => import("@/artifacts/sitrep-region-brief/SitrepRegionBrief"),
+  "tracked-entity-dashboard": () => import("@/artifacts/tracked-entity-dashboard/TrackedEntityDashboard"),
+  "risk-pulse-ticker": () => import("@/artifacts/risk-pulse-ticker/RiskPulseTicker"),
 };
 
 interface ArtifactPanelProps {
@@ -17,6 +21,8 @@ interface ArtifactPanelProps {
   registryName?: string;
   onClose: () => void;
   data?: unknown;
+  /** When true, renders as a side pane (h-full, no border/shadow) instead of a standalone card. */
+  sidePaneMode?: boolean;
 }
 
 /**
@@ -25,12 +31,14 @@ interface ArtifactPanelProps {
  */
 export default function ArtifactPanel({
   artifactId, artifactTitle, artifactVersion, artifactType, registryName, onClose, data,
+  sidePaneMode = false,
 }: ArtifactPanelProps) {
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [iframeReady, setIframeReady] = useState(false);
-  const [ReactComponent, setReactComponent] = useState<ComponentType<{ initialData?: unknown }> | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [ReactComponent, setReactComponent] = useState<ComponentType<any> | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const pendingDataRef = useRef<unknown>(undefined);
 
@@ -123,18 +131,24 @@ export default function ArtifactPanel({
 
   const panelClass = expanded
     ? "fixed inset-4 z-[9999]"
-    : "w-full mt-2";
+    : sidePaneMode
+      ? "h-full w-full"
+      : "w-full mt-2";
+
+  const containerClass = expanded || !sidePaneMode
+    ? "h-full flex flex-col bg-black/95 backdrop-blur-xl border border-cyan-800/60 rounded-xl shadow-[0_4px_30px_rgba(0,0,0,0.5)] overflow-hidden"
+    : "h-full flex flex-col bg-transparent overflow-hidden";
 
   return (
     <AnimatePresence>
       <motion.div
         className={panelClass}
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 10 }}
+        initial={sidePaneMode ? undefined : { opacity: 0, y: 10 }}
+        animate={sidePaneMode ? undefined : { opacity: 1, y: 0 }}
+        exit={sidePaneMode ? undefined : { opacity: 0, y: 10 }}
         transition={{ duration: 0.2 }}
       >
-        <div className="h-full flex flex-col bg-black/95 backdrop-blur-xl border border-cyan-800/60 rounded-xl shadow-[0_4px_30px_rgba(0,0,0,0.5)] overflow-hidden">
+        <div className={containerClass}>
           {/* Header */}
           <div className="flex items-center justify-between px-3 py-1.5 border-b border-cyan-800/40 bg-[var(--bg-secondary)]/60">
             <div className="flex items-center gap-2">
@@ -187,7 +201,7 @@ export default function ArtifactPanel({
               </div>
             )}
             {isReact && ReactComponent ? (
-              <div style={{ minHeight: expanded ? "100%" : "280px", padding: 12, background: "#000" }}>
+              <div style={{ minHeight: (expanded || sidePaneMode) ? "100%" : "280px", padding: 12, background: "#000" }}>
                 <Suspense fallback={null}>
                   <ReactComponent initialData={data} />
                 </Suspense>
@@ -198,7 +212,7 @@ export default function ArtifactPanel({
                 className="w-full h-full border-0"
                 sandbox="allow-scripts"
                 title={artifactTitle || "Agent artifact"}
-                style={{ minHeight: expanded ? "100%" : "280px", background: "#000" }}
+                style={{ minHeight: (expanded || sidePaneMode) ? "100%" : "280px", background: "#000" }}
               />
             )}
           </div>

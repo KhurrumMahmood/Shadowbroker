@@ -1,0 +1,13 @@
+{
+  "name": "tracked-entity-dashboard",
+  "title": "Tracked Entity Dashboard",
+  "type": "react",
+  "tags": ["tracked", "entity", "vessel", "yacht", "aircraft", "oligarch", "military", "navy", "carrier", "surveillance", "watchlist", "monitor"],
+  "data_signature": "dashboard",
+  "accepts_data": {
+    "tracked_ships": "Array of tracked vessels {name, type, lat, lng, flag, owner, mmsi}",
+    "military_flights": "Array of military aircraft {callsign, type, lat, lng, altitude, squawk}",
+    "carriers": "Array of US Navy carriers {name, location, status}"
+  },
+  "created_by_admin": true
+}
