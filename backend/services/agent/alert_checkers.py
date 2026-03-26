@@ -5,24 +5,63 @@ No LLM calls — pure Python pattern matching on entity data.
 """
 from __future__ import annotations
 
-import math
+import logging
+
 from services.agent.alerts import Alert, AlertSeverity
-from services.agent.datasource import DataSource
+from services.agent.datasource import DataSource, _haversine_km
 
-
-def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
-    R = 6371.0
-    dlat = math.radians(lat2 - lat1)
-    dlng = math.radians(lng2 - lng1)
-    a = (math.sin(dlat / 2) ** 2
-         + math.cos(math.radians(lat1))
-         * math.cos(math.radians(lat2))
-         * math.sin(dlng / 2) ** 2)
-    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Chokepoints and sanctioned zones (static reference data)
+# Shared geo helpers
+# ---------------------------------------------------------------------------
+
+def _has_position(entity: dict) -> bool:
+    """True when the entity has a usable lat/lng pair."""
+    return entity.get("lat") is not None and entity.get("lng") is not None
+
+
+def _count_nearby(
+    origin: dict,
+    items: list[dict],
+    radius_km: float,
+) -> int:
+    """Count items within *radius_km* of *origin* (both must have lat/lng)."""
+    lat, lng = origin["lat"], origin["lng"]
+    return sum(
+        1 for item in items
+        if _has_position(item)
+        and _haversine_km(lat, lng, item["lat"], item["lng"]) < radius_km
+    )
+
+
+def _find_nearby(
+    origin: dict,
+    items: list[dict],
+    radius_km: float,
+) -> list[dict]:
+    """Return items within *radius_km* of *origin*."""
+    lat, lng = origin["lat"], origin["lng"]
+    return [
+        item for item in items
+        if _has_position(item)
+        and _haversine_km(lat, lng, item["lat"], item["lng"]) < radius_km
+    ]
+
+
+def _centroid(items: list[dict]) -> tuple[float, float]:
+    """Average lat/lng of positioned items. Returns (0, 0) when none qualify."""
+    positioned = [item for item in items if _has_position(item)]
+    if not positioned:
+        return 0.0, 0.0
+    lat = sum(item["lat"] for item in positioned) / len(positioned)
+    lng = sum(item["lng"] for item in positioned) / len(positioned)
+    return lat, lng
+
+
+# ---------------------------------------------------------------------------
+# Static reference data
 # ---------------------------------------------------------------------------
 _CHOKEPOINTS = [
     {"name": "Strait of Hormuz", "lat": 26.5, "lng": 56.3, "radius_km": 150},
@@ -46,7 +85,11 @@ _AIRLIFT_MODELS = {"C-17", "C-17A", "C-5", "C-5M", "C-130J", "C-130",
 
 _AIRLIFT_CALLSIGN_PREFIXES = ("RCH", "REACH")
 
+_AIRLIFT_MODEL_PREFIXES = ("C-17", "C-5", "C-130")
+
 _AIRLIFT_SURGE_THRESHOLD = 5  # 5+ strategic airlift = anomalous
+
+_SUSPICIOUS_DESTINATIONS = {"", "FOR ORDERS", "FOR ORDER", "ORDERS", "TBN", "TBA"}
 
 
 # ---------------------------------------------------------------------------
@@ -58,19 +101,16 @@ def check_military_convergence(ds: DataSource) -> list[Alert]:
     if len(flights) < 2:
         return []
 
-    # Group flights by country
     by_country: dict[str, list[dict]] = {}
     for f in flights:
-        c = f.get("country", "Unknown")
-        by_country.setdefault(c, []).append(f)
+        by_country.setdefault(f.get("country", "Unknown"), []).append(f)
 
     countries = list(by_country.keys())
     if len(countries) < 2:
         return []
 
-    # Check pairwise proximity between countries' flights
     convergence_zones: list[dict] = []
-    seen_pairs = set()
+    seen_pairs: set[tuple[str, str]] = set()
 
     for i, c1 in enumerate(countries):
         for c2 in countries[i + 1:]:
@@ -78,10 +118,10 @@ def check_military_convergence(ds: DataSource) -> list[Alert]:
             if pair in seen_pairs:
                 continue
             for f1 in by_country[c1]:
-                if f1.get("lat") is None:
+                if not _has_position(f1):
                     continue
                 for f2 in by_country[c2]:
-                    if f2.get("lat") is None:
+                    if not _has_position(f2):
                         continue
                     dist = _haversine_km(f1["lat"], f1["lng"], f2["lat"], f2["lng"])
                     if dist < 200:
@@ -99,8 +139,7 @@ def check_military_convergence(ds: DataSource) -> list[Alert]:
     if not convergence_zones:
         return []
 
-    # Find the zone with the most countries
-    all_countries = set()
+    all_countries: set[str] = set()
     center_lat, center_lng = 0.0, 0.0
     for z in convergence_zones:
         all_countries.update(z["countries"])
@@ -135,16 +174,15 @@ def check_chokepoint_disruption(ds: DataSource) -> list[Alert]:
     if not jamming:
         return []
 
-    alerts = []
+    alerts: list[Alert] = []
     for cp in _CHOKEPOINTS:
         for j in jamming:
-            if j.get("lat") is None:
+            if not _has_position(j):
                 continue
             dist = _haversine_km(cp["lat"], cp["lng"], j["lat"], j["lng"])
             if dist < cp["radius_km"]:
                 sev_str = j.get("severity", "").lower()
-                severity = (AlertSeverity.CRITICAL if sev_str == "high"
-                            else AlertSeverity.ELEVATED)
+                severity = AlertSeverity.CRITICAL if sev_str == "high" else AlertSeverity.ELEVATED
                 alerts.append(Alert(
                     alert_type="chokepoint_disruption",
                     severity=severity,
@@ -172,60 +210,50 @@ def check_infrastructure_cascade(ds: DataSource) -> list[Alert]:
     fires = ds.query("firms_fires", limit=500)
     outages = ds.query("internet_outages", limit=200)
 
-    # Need at least earthquakes + one other signal
     if not earthquakes or (not fires and not outages):
         return []
 
-    alerts = []
+    alerts: list[Alert] = []
     radius = 200  # km
 
     for eq in earthquakes:
-        if eq.get("lat") is None:
+        if not _has_position(eq):
             continue
         mag = eq.get("mag", 0)
         if mag < 4.5:
             continue
 
-        co_located_fires = sum(
-            1 for f in fires
-            if f.get("lat") is not None
-            and _haversine_km(eq["lat"], eq["lng"], f["lat"], f["lng"]) < radius
-        )
-        co_located_outages = [
-            o for o in outages
-            if o.get("lat") is not None
-            and _haversine_km(eq["lat"], eq["lng"], o["lat"], o["lng"]) < radius
-        ]
+        nearby_fires = _count_nearby(eq, fires, radius)
+        nearby_outages = len(_find_nearby(eq, outages, radius))
+        place = eq.get("place", "Unknown")
 
-        if co_located_fires > 0 and co_located_outages:
-            # Full cascade: earthquake + fire + outage
+        if nearby_fires > 0 and nearby_outages > 0:
             alerts.append(Alert(
                 alert_type="infrastructure_cascade",
                 severity=AlertSeverity.CRITICAL,
-                title=f"Infrastructure Cascade — M{mag} {eq.get('place', 'Unknown')}",
+                title=f"Infrastructure Cascade — M{mag} {place}",
                 description=(
-                    f"M{mag} earthquake with {co_located_fires} fire hotspot(s) "
-                    f"and {len(co_located_outages)} internet outage(s) within {radius}km."
+                    f"M{mag} earthquake with {nearby_fires} fire hotspot(s) "
+                    f"and {nearby_outages} internet outage(s) within {radius}km."
                 ),
                 lat=eq["lat"],
                 lng=eq["lng"],
-                data={"magnitude": mag, "fires": co_located_fires,
-                      "outages": len(co_located_outages), "place": eq.get("place", "")},
+                data={"magnitude": mag, "fires": nearby_fires,
+                      "outages": nearby_outages, "place": eq.get("place", "")},
             ))
-        elif co_located_fires > 2 or len(co_located_outages) > 1:
-            # Partial cascade
+        elif nearby_fires > 2 or nearby_outages > 1:
             alerts.append(Alert(
                 alert_type="infrastructure_cascade",
                 severity=AlertSeverity.ELEVATED,
-                title=f"Possible Cascade — M{mag} {eq.get('place', 'Unknown')}",
+                title=f"Possible Cascade — M{mag} {place}",
                 description=(
-                    f"M{mag} earthquake co-located with {co_located_fires} fires "
-                    f"and {len(co_located_outages)} outages."
+                    f"M{mag} earthquake co-located with {nearby_fires} fires "
+                    f"and {nearby_outages} outages."
                 ),
                 lat=eq["lat"],
                 lng=eq["lng"],
-                data={"magnitude": mag, "fires": co_located_fires,
-                      "outages": len(co_located_outages)},
+                data={"magnitude": mag, "fires": nearby_fires,
+                      "outages": nearby_outages},
             ))
 
     return alerts
@@ -240,19 +268,17 @@ def check_sanctions_evasion(ds: DataSource) -> list[Alert]:
     if not ships:
         return []
 
-    _SUSPICIOUS_DESTS = {"", "FOR ORDERS", "FOR ORDER", "ORDERS", "TBN", "TBA"}
-
-    alerts = []
+    alerts: list[Alert] = []
     for zone in _SANCTIONED_ZONES:
-        suspicious_ships = []
+        suspicious_ships: list[dict] = []
         for s in ships:
-            if s.get("lat") is None:
+            if not _has_position(s):
                 continue
             dist = _haversine_km(zone["lat"], zone["lng"], s["lat"], s["lng"])
             if dist > zone["radius_km"]:
                 continue
             dest = (s.get("destination") or "").strip().upper()
-            if dest in _SUSPICIOUS_DESTS and s.get("type") in ("tanker", "cargo"):
+            if dest in _SUSPICIOUS_DESTINATIONS and s.get("type") in ("tanker", "cargo"):
                 suspicious_ships.append({
                     "name": s.get("name", "Unknown"),
                     "mmsi": s.get("mmsi", ""),
@@ -280,36 +306,31 @@ def check_sanctions_evasion(ds: DataSource) -> list[Alert]:
 # ---------------------------------------------------------------------------
 # 5. Airlift Surge
 # ---------------------------------------------------------------------------
+def _is_airlift(flight: dict) -> bool:
+    """True when the flight matches a strategic airlift profile."""
+    model = flight.get("model", "")
+    callsign = flight.get("callsign", "")
+    return (
+        model in _AIRLIFT_MODELS
+        or any(model.startswith(p) for p in _AIRLIFT_MODEL_PREFIXES)
+        or any(callsign.startswith(p) for p in _AIRLIFT_CALLSIGN_PREFIXES)
+        or flight.get("military_type", "") == "cargo"
+    )
+
+
 def check_airlift_surge(ds: DataSource) -> list[Alert]:
     """Alert when strategic airlift aircraft count exceeds threshold."""
     flights = ds.query("military_flights", limit=500)
     if not flights:
         return []
 
-    airlift = []
-    for f in flights:
-        model = f.get("model", "")
-        callsign = f.get("callsign", "")
-        mil_type = f.get("military_type", "")
-        is_airlift = (
-            model in _AIRLIFT_MODELS
-            or any(model.startswith(m) for m in ("C-17", "C-5", "C-130"))
-            or any(callsign.startswith(p) for p in _AIRLIFT_CALLSIGN_PREFIXES)
-            or mil_type == "cargo"
-        )
-        if is_airlift:
-            airlift.append(f)
+    airlift = [f for f in flights if _is_airlift(f)]
 
     if len(airlift) < _AIRLIFT_SURGE_THRESHOLD:
         return []
 
     severity = AlertSeverity.CRITICAL if len(airlift) >= 8 else AlertSeverity.ELEVATED
-
-    # Compute average position for the alert
-    lats = [f["lat"] for f in airlift if f.get("lat") is not None]
-    lngs = [f["lng"] for f in airlift if f.get("lng") is not None]
-    center_lat = sum(lats) / len(lats) if lats else 0
-    center_lng = sum(lngs) / len(lngs) if lngs else 0
+    center_lat, center_lng = _centroid(airlift)
 
     return [Alert(
         alert_type="airlift_surge",
@@ -340,7 +361,6 @@ def check_under_reported_crisis(ds: DataSource) -> list[Alert]:
     total_gdelt = sum(e.get("count", 1) for e in gdelt)
     news_count = len(news)
 
-    # Threshold: 10+ GDELT event clusters with 3 or fewer news articles
     if total_gdelt < 30 or news_count > max(3, total_gdelt // 10):
         return []
 
@@ -369,28 +389,20 @@ def check_ew_detection(ds: DataSource) -> list[Alert]:
     if not jamming:
         return []
 
-    radius = 300  # km — EW effects can be wide-area
+    radius = 300  # km -- EW effects can be wide-area
 
-    alerts = []
+    alerts: list[Alert] = []
     for j in jamming:
-        if j.get("lat") is None:
+        if not _has_position(j):
             continue
 
-        co_outages = [
-            o for o in outages
-            if o.get("lat") is not None
-            and _haversine_km(j["lat"], j["lng"], o["lat"], o["lng"]) < radius
-        ]
-        co_conflict = [
-            g for g in gdelt
-            if g.get("lat") is not None
-            and _haversine_km(j["lat"], j["lng"], g["lat"], g["lng"]) < radius
-        ]
+        nearby_outages = len(_find_nearby(j, outages, radius))
+        nearby_conflict = len(_find_nearby(j, gdelt, radius))
 
-        if co_outages and co_conflict:
+        if nearby_outages and nearby_conflict:
             severity = AlertSeverity.CRITICAL
             classification = "LIKELY EW"
-        elif co_outages or co_conflict:
+        elif nearby_outages or nearby_conflict:
             severity = AlertSeverity.ELEVATED
             classification = "POSSIBLE EW"
         else:
@@ -401,15 +413,15 @@ def check_ew_detection(ds: DataSource) -> list[Alert]:
             severity=severity,
             title=f"Electronic Warfare — {classification}",
             description=(
-                f"GPS jamming co-located with {len(co_outages)} internet outage(s) "
-                f"and {len(co_conflict)} conflict event(s) within {radius}km."
+                f"GPS jamming co-located with {nearby_outages} internet outage(s) "
+                f"and {nearby_conflict} conflict event(s) within {radius}km."
             ),
             lat=j["lat"],
             lng=j["lng"],
             data={"classification": classification,
                   "jamming_severity": j.get("severity", "unknown"),
-                  "outages": len(co_outages),
-                  "conflict_events": len(co_conflict)},
+                  "outages": nearby_outages,
+                  "conflict_events": nearby_conflict},
         ))
 
     return alerts
@@ -421,39 +433,41 @@ def check_ew_detection(ds: DataSource) -> list[Alert]:
 def check_vip_movement(ds: DataSource) -> list[Alert]:
     """Alert when notable/tracked aircraft are detected airborne."""
     flights = ds.query("military_flights", limit=500)
-    # Also check regular flights for tracked aircraft
     civil_flights = ds.query("flights", limit=500)
     all_flights = flights + civil_flights
 
     if not all_flights:
         return []
 
-    alerts = []
+    alerts: list[Alert] = []
     for f in all_flights:
         is_notable = f.get("is_notable", False)
-        notable_reason = f.get("notable_reason", "")
         mil_type = f.get("military_type", "")
 
-        if is_notable or mil_type == "vip":
-            callsign = f.get("callsign", "Unknown")
-            model = f.get("model", "")
-            alt = f.get("alt", 0)
+        if not (is_notable or mil_type == "vip"):
+            continue
 
-            # Only alert if airborne (alt > 1000ft)
-            if alt and alt > 1000:
-                alerts.append(Alert(
-                    alert_type="vip_movement",
-                    severity=AlertSeverity.ELEVATED,
-                    title=f"VIP Aircraft — {callsign}",
-                    description=(
-                        f"Notable aircraft {callsign} ({model}) detected airborne. "
-                        f"{notable_reason}".strip()
-                    ),
-                    lat=f.get("lat"),
-                    lng=f.get("lng"),
-                    data={"callsign": callsign, "model": model,
-                          "notable_reason": notable_reason},
-                ))
+        alt = f.get("alt", 0)
+        if not alt or alt <= 1000:
+            continue
+
+        callsign = f.get("callsign", "Unknown")
+        model = f.get("model", "")
+        notable_reason = f.get("notable_reason", "")
+
+        alerts.append(Alert(
+            alert_type="vip_movement",
+            severity=AlertSeverity.ELEVATED,
+            title=f"VIP Aircraft — {callsign}",
+            description=(
+                f"Notable aircraft {callsign} ({model}) detected airborne. "
+                f"{notable_reason}".strip()
+            ),
+            lat=f.get("lat"),
+            lng=f.get("lng"),
+            data={"callsign": callsign, "model": model,
+                  "notable_reason": notable_reason},
+        ))
 
     return alerts
 
@@ -475,10 +489,10 @@ ALL_CHECKERS = [
 
 def run_all_checkers(ds: DataSource) -> list[Alert]:
     """Run all alert checkers and return combined results."""
-    alerts = []
+    alerts: list[Alert] = []
     for checker in ALL_CHECKERS:
         try:
             alerts.extend(checker(ds))
         except Exception:
-            pass  # Individual checker failures shouldn't block others
+            logger.exception("Checker %s failed", checker.__name__)
     return alerts

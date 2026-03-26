@@ -3,16 +3,13 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Send, Bot, User, Loader2, ChevronLeft, ChevronRight, XCircle, Plus, Trash2, ArrowLeft, Zap, Layers } from "lucide-react";
-import { validateAssistantResponse, extractStoredAction, type AssistantResponse } from "@/lib/assistantTypes";
+import { validateAssistantResponse, extractStoredAction } from "@/lib/assistantTypes";
 import type { DashboardData } from "@/types/dashboard";
 import type { AIResultState } from "@/hooks/useAIResultCycler";
 import { findEntityInData } from "@/hooks/useAIResultCycler";
 import { toSelectedEntity } from "@/hooks/useCategoryCycler";
-import {
-  useConversationStore,
-  saveConversation as saveConv,
-} from "@/hooks/useConversationStore";
-import type { StoredMessage, StoredAction, StoredConversation } from "@/types/aiConversation";
+import { useConversationStore } from "@/hooks/useConversationStore";
+import type { StoredMessage, StoredAction } from "@/types/aiConversation";
 import ArtifactPanel from "@/components/ArtifactPanel";
 import ArtifactBrowser from "@/components/ArtifactBrowser";
 
@@ -32,6 +29,32 @@ function relativeTime(ts: number): string {
   return `${days}d ago`;
 }
 
+function tryParseJSON<T>(json: string): T | null {
+  try {
+    return JSON.parse(json) as T;
+  } catch {
+    return null;
+  }
+}
+
+type PanelMode = "chat" | "history" | "actions" | "artifacts";
+
+const STEP_TYPE_COLORS: Record<string, string> = {
+  thinking: "text-amber-400/70",
+  tool_call: "text-blue-400/70",
+  tool_result: "text-green-400/70",
+};
+
+const MODE_TITLES: Record<PanelMode, string> = {
+  history: "AI ANALYST",
+  chat: "AI ANALYST",
+  actions: "ACTIONS",
+  artifacts: "ARTIFACTS",
+};
+
+/** Error markers that identify failed exchanges to strip from conversation history */
+const ERROR_MARKERS = ["Cannot reach", "LLM service unavailable", "Query filtered", "Connection error", "Connection lost"];
+
 interface AIAssistantPanelProps {
   isOpen: boolean;
   onClose: () => void;
@@ -47,8 +70,6 @@ interface AIAssistantPanelProps {
   viewport?: { south: number; west: number; north: number; east: number } | null;
   data: DashboardData;
 }
-
-type PanelMode = "chat" | "history" | "actions" | "artifacts";
 
 export default function AIAssistantPanel({
   isOpen,
@@ -77,6 +98,7 @@ export default function AIAssistantPanel({
   const [activeArtifact, setActiveArtifact] = useState<{ id: string; title?: string; registryName?: string; version?: number } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const store = useConversationStore();
 
   useEffect(() => {
@@ -86,6 +108,11 @@ export default function AIAssistantPanel({
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
+
+  // Cancel in-flight SSE stream on unmount
+  useEffect(() => {
+    return () => { abortRef.current?.abort(); };
+  }, []);
 
   // Save conversation to localStorage whenever messages change
   const saveCurrentConversation = useCallback(
@@ -111,32 +138,13 @@ export default function AIAssistantPanel({
     (action: StoredAction) => {
       if (action.layers) onApplyLayers(action.layers);
       if (action.viewport) onFlyTo(action.viewport.lat, action.viewport.lng, action.viewport.zoom);
-      if (action.filters && onApplyFilters) onApplyFilters(action.filters);
+      if (action.filters) onApplyFilters?.(action.filters);
       if (action.result_entities && action.result_entities.length > 0 && onSetAIResults) {
         onSetAIResults(action.result_entities);
       } else {
-        // Clear stale AI results so the results bar and dimming don't persist
         onAIResultClear?.();
         if (action.highlight_entities && action.highlight_entities.length > 0) {
           onSelectEntity(action.highlight_entities[0]);
-        }
-      }
-    },
-    [onApplyLayers, onFlyTo, onSelectEntity, onApplyFilters, onSetAIResults, onAIResultClear],
-  );
-
-  const applyResponse = useCallback(
-    (resp: AssistantResponse) => {
-      if (resp.layers) onApplyLayers(resp.layers);
-      if (resp.viewport) onFlyTo(resp.viewport.lat, resp.viewport.lng, resp.viewport.zoom);
-      if (resp.filters && onApplyFilters) onApplyFilters(resp.filters);
-
-      if (resp.result_entities?.length > 0 && onSetAIResults) {
-        onSetAIResults(resp.result_entities);
-      } else {
-        onAIResultClear?.();
-        if (resp.highlight_entities?.length > 0) {
-          onSelectEntity(resp.highlight_entities[0]);
         }
       }
     },
@@ -153,10 +161,19 @@ export default function AIAssistantPanel({
     setLoading(true);
     setProgressText("Connecting...");
 
+    function appendAssistantMsg(msg: StoredMessage): void {
+      const updated = [...newMessages, msg];
+      setMessages(updated);
+      saveCurrentConversation(updated);
+    }
+
+    function appendError(content: string): void {
+      appendAssistantMsg({ role: "assistant", content, timestamp: Date.now() });
+    }
+
     try {
-      // Filter out error exchanges — sending them back to the LLM causes
+      // Filter out error exchanges -- sending them back to the LLM causes
       // self-reinforcing refusals. Drop both the error and the user msg that caused it.
-      const ERROR_MARKERS = ["Cannot reach", "LLM service unavailable", "Query filtered", "Connection error", "Connection lost"];
       const conversation: { role: string; content: string }[] = [];
       for (let i = 0; i < messages.length; i++) {
         const m = messages[i];
@@ -169,6 +186,10 @@ export default function AIAssistantPanel({
         conversation.push({ role: m.role, content: m.content });
       }
 
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
       const resp = await fetch("/api/assistant/query/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -178,28 +199,20 @@ export default function AIAssistantPanel({
           conversation,
           ...(activeArtifact?.registryName ? { active_artifact: { name: activeArtifact.registryName } } : {}),
         }),
+        signal: controller.signal,
       });
 
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ error: "Request failed" }));
-        let errorContent: string;
         if (resp.status === 502) {
-          errorContent = "Cannot reach the backend server.";
+          appendError("Cannot reach the backend server.");
         } else if (err.error_type === "content_filter") {
-          errorContent = `Query filtered: ${err.error || "The LLM provider declined this request."}`;
+          appendError(`Query filtered: ${err.error || "The LLM provider declined this request."}`);
         } else if (err.error_type === "connection" || resp.status === 503) {
-          errorContent = `LLM service unavailable: ${err.error || "Try again in a moment."}`;
+          appendError(`LLM service unavailable: ${err.error || "Try again in a moment."}`);
         } else {
-          errorContent = err.error || `Error: ${resp.status}`;
+          appendError(err.error || `Error: ${resp.status}`);
         }
-        const errMsg: StoredMessage = {
-          role: "assistant",
-          content: errorContent,
-          timestamp: Date.now(),
-        };
-        const updated = [...newMessages, errMsg];
-        setMessages(updated);
-        saveCurrentConversation(updated);
         return;
       }
 
@@ -233,41 +246,32 @@ export default function AIAssistantPanel({
           if (!eventType || !eventData) continue;
 
           if (eventType === "status") {
-            try {
-              const status = JSON.parse(eventData);
-              setProgressText(status.detail || "Working...");
-            } catch { /* ignore parse errors */ }
+            const status = tryParseJSON<{ detail?: string }>(eventData);
+            if (status) setProgressText(status.detail || "Working...");
           } else if (eventType === "plan") {
-            try {
-              const plan = JSON.parse(eventData);
-              const count = plan.sub_tasks?.length || 0;
-              setProgressText(`Analyzing across ${count} domains...`);
-            } catch { /* ignore parse errors */ }
+            const plan = tryParseJSON<{ sub_tasks?: unknown[] }>(eventData);
+            if (plan) setProgressText(`Analyzing across ${plan.sub_tasks?.length || 0} domains...`);
           } else if (eventType === "sub_result") {
-            try {
-              const sub = JSON.parse(eventData);
-              if (sub.summary) {
-                setProgressText(sub.summary.slice(0, 80) + (sub.summary.length > 80 ? "..." : ""));
-              }
-            } catch { /* ignore parse errors */ }
+            const sub = tryParseJSON<{ summary?: string }>(eventData);
+            if (sub?.summary) {
+              setProgressText(sub.summary.slice(0, 80) + (sub.summary.length > 80 ? "..." : ""));
+            }
           } else if (eventType === "artifact") {
-            try {
-              const art = JSON.parse(eventData);
-              if (art.artifact_id) {
-                setActiveArtifact({
-                  id: art.artifact_id,
-                  title: art.title,
-                  registryName: art.registry_name,
-                  version: art.version,
-                });
-              }
-            } catch { /* ignore parse errors */ }
+            const art = tryParseJSON<{ artifact_id?: string; title?: string; registry_name?: string; version?: number }>(eventData);
+            if (art?.artifact_id) {
+              setActiveArtifact({
+                id: art.artifact_id,
+                title: art.title,
+                registryName: art.registry_name,
+                version: art.version,
+              });
+            }
           } else if (eventType === "result") {
-            try {
-              const raw = JSON.parse(eventData);
+            const raw = tryParseJSON<unknown>(eventData);
+            if (raw) {
               const validated = validateAssistantResponse(raw);
               const action = extractStoredAction(validated);
-              const assistantMsg: StoredMessage = {
+              appendAssistantMsg({
                 role: "assistant",
                 content: validated.summary,
                 action,
@@ -275,62 +279,36 @@ export default function AIAssistantPanel({
                 duration_ms: validated.duration_ms,
                 provider: validated.provider,
                 timestamp: Date.now(),
-              };
-              const updated = [...newMessages, assistantMsg];
-              setMessages(updated);
-              saveCurrentConversation(updated);
-              applyResponse(validated);
+              });
+              if (action) applyAction(action);
               handled = true;
-            } catch { /* ignore parse errors */ }
+            }
           } else if (eventType === "error") {
-            try {
-              const err = JSON.parse(eventData);
-              let errorContent: string;
+            const err = tryParseJSON<{ error_type?: string; error?: string }>(eventData);
+            if (err) {
               if (err.error_type === "content_filter") {
-                errorContent = `Query filtered: ${err.error || "The LLM provider declined this request."}`;
+                appendError(`Query filtered: ${err.error || "The LLM provider declined this request."}`);
               } else {
-                errorContent = `LLM service unavailable: ${err.error || "Try again in a moment."}`;
+                appendError(`LLM service unavailable: ${err.error || "Try again in a moment."}`);
               }
-              const errMsg: StoredMessage = {
-                role: "assistant",
-                content: errorContent,
-                timestamp: Date.now(),
-              };
-              const updated = [...newMessages, errMsg];
-              setMessages(updated);
-              saveCurrentConversation(updated);
               handled = true;
-            } catch { /* ignore parse errors */ }
+            }
           }
         }
       }
 
       if (!handled) {
-        const errMsg: StoredMessage = {
-          role: "assistant",
-          content: "Connection lost before receiving a response.",
-          timestamp: Date.now(),
-        };
-        const updated = [...newMessages, errMsg];
-        setMessages(updated);
-        saveCurrentConversation(updated);
+        appendError("Connection lost before receiving a response.");
       }
     } catch {
-      const errMsg: StoredMessage = {
-        role: "assistant",
-        content: "Connection error — is the backend running?",
-        timestamp: Date.now(),
-      };
-      const updated = [...newMessages, errMsg];
-      setMessages(updated);
-      saveCurrentConversation(updated);
+      appendError("Connection error — is the backend running?");
     } finally {
       setLoading(false);
       setProgressText(null);
     }
   };
 
-  const handleClear = useCallback(() => {
+  const resetConversation = useCallback(() => {
     if (messages.length > 0) {
       saveCurrentConversation(messages);
     }
@@ -344,7 +322,6 @@ export default function AIAssistantPanel({
     (id: string) => {
       const conv = store.load(id);
       if (!conv) return;
-      // Save current conversation before switching
       if (messages.length > 0) {
         saveCurrentConversation(messages);
       }
@@ -357,15 +334,9 @@ export default function AIAssistantPanel({
   );
 
   const handleNewChat = useCallback(() => {
-    if (messages.length > 0) {
-      saveCurrentConversation(messages);
-    }
-    setConversationId(generateId());
-    setMessages([]);
-    setActiveArtifact(null);
+    resetConversation();
     setMode("chat");
-    onAIResultClear?.();
-  }, [messages, saveCurrentConversation, onAIResultClear]);
+  }, [resetConversation]);
 
   const handleTrackEntity = useCallback(
     (type: string, id: string | number) => {
@@ -407,8 +378,8 @@ export default function AIAssistantPanel({
     return `${on.length} LAYERS ON`;
   };
 
-  const renderActionChips = (action: StoredAction) => (
-    <div className="mt-1.5 pt-1.5 border-t border-cyan-800/30 flex flex-wrap gap-1">
+  const renderCoreChips = (action: StoredAction) => (
+    <>
       {action.viewport && (
         <button
           type="button"
@@ -433,6 +404,12 @@ export default function AIAssistantPanel({
           SHOW {action.result_entities.length} RESULTS
         </button>
       )}
+    </>
+  );
+
+  const renderChatActionChips = (action: StoredAction) => (
+    <div className="mt-1.5 pt-1.5 border-t border-cyan-800/30 flex flex-wrap gap-1">
+      {renderCoreChips(action)}
       {action.highlight_entities?.map((e, i) => {
         const key = `${e.type}:${e.id}`;
         return (
@@ -496,7 +473,7 @@ export default function AIAssistantPanel({
             )}
             <Bot size={14} className="text-cyan-400" />
             <span className="text-[10px] text-cyan-400 font-mono tracking-[0.2em] font-bold">
-              {mode === "actions" ? "ACTIONS" : mode === "artifacts" ? "ARTIFACTS" : "AI ANALYST"}
+              {MODE_TITLES[mode]}
             </span>
           </div>
           <div className="flex items-center gap-1.5">
@@ -523,7 +500,7 @@ export default function AIAssistantPanel({
             {mode === "chat" && messages.length > 0 && (
               <button
                 type="button"
-                onClick={handleClear}
+                onClick={resetConversation}
                 className="text-[9px] font-mono px-2 py-0.5 rounded border border-cyan-800/40 text-cyan-500/70 hover:text-cyan-400 hover:bg-cyan-950/30 transition-colors"
               >
                 CLEAR
@@ -611,12 +588,7 @@ export default function AIAssistantPanel({
                             <div className="mt-1 pl-2 border-l border-cyan-800/30 space-y-1">
                               {msg.reasoning_steps.map((step, si) => (
                                 <div key={si} className="text-[8px] font-mono leading-snug">
-                                  <span className={
-                                    step.type === "thinking" ? "text-amber-400/70" :
-                                    step.type === "tool_call" ? "text-blue-400/70" :
-                                    step.type === "tool_result" ? "text-green-400/70" :
-                                    "text-cyan-400/70"
-                                  }>
+                                  <span className={STEP_TYPE_COLORS[step.type] || "text-cyan-400/70"}>
                                     {step.type.toUpperCase()}
                                   </span>
                                   <span className="text-[var(--text-muted)] ml-1">
@@ -628,7 +600,7 @@ export default function AIAssistantPanel({
                           )}
                         </div>
                       )}
-                      {msg.action && renderActionChips(msg.action)}
+                      {msg.action && renderChatActionChips(msg.action)}
                     </div>
                     {msg.role === "user" && (
                       <User size={12} className="text-[var(--text-muted)] mt-1 flex-shrink-0" />
@@ -778,30 +750,7 @@ export default function AIAssistantPanel({
                     </div>
                     {msg.action && (
                       <div className="mt-1.5 flex flex-wrap gap-1">
-                        {msg.action.viewport && (
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); onFlyTo(msg.action!.viewport!.lat, msg.action!.viewport!.lng, msg.action!.viewport!.zoom); }}
-                            className={chipClass}
-                          >
-                            {msg.action.viewport_label ? `GO TO ${msg.action.viewport_label.toUpperCase()}` : `FLY TO ${msg.action.viewport.lat.toFixed(1)}, ${msg.action.viewport.lng.toFixed(1)}`}
-                          </button>
-                        )}
-                        {msg.action.layers && (
-                          <button type="button" onClick={(e) => { e.stopPropagation(); onApplyLayers(msg.action!.layers!); }} className={chipClass}>
-                            {formatLayerLabel(msg.action.layers)}
-                          </button>
-                        )}
-                        {msg.action.filters && (
-                          <button type="button" onClick={(e) => { e.stopPropagation(); onApplyFilters?.(msg.action!.filters!); }} className={chipClass}>
-                            {Object.keys(msg.action.filters).length === 0 ? "CLEAR FILTERS" : "APPLY FILTERS"}
-                          </button>
-                        )}
-                        {msg.action.result_entities && msg.action.result_entities.length > 0 && (
-                          <button type="button" onClick={(e) => { e.stopPropagation(); onSetAIResults?.(msg.action!.result_entities!); }} className={chipClass}>
-                            SHOW {msg.action.result_entities.length} RESULTS
-                          </button>
-                        )}
+                        {renderCoreChips(msg.action)}
                         {msg.action.artifact_id && (
                           <button type="button" onClick={(e) => { e.stopPropagation(); setActiveArtifact({ id: msg.action!.artifact_id!, title: msg.action!.artifact_title }); }} className={`${chipClass} border-purple-600/50 text-purple-300`}>
                             VIEW ARTIFACT

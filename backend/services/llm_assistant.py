@@ -725,18 +725,23 @@ def _exec_web_search(args: dict) -> str:
         return json.dumps({"error": f"Search failed: {str(e)}"})
 
 
+_default_registry = None
+
+
 def execute_tool_call(name: str, args: dict, data: dict) -> str:
     """Route a tool call to the right handler.
 
     Delegates to the ToolRegistry, wrapping the raw data dict in an
     InMemoryDataSource for the registry's (args, ds) handler signature.
     """
+    global _default_registry
     from services.agent.registry import create_default_registry
     from services.agent.datasource import InMemoryDataSource
 
     ds = InMemoryDataSource(data) if data else None
-    reg = create_default_registry()
-    return reg.execute(name, args, ds=ds)
+    if _default_registry is None:
+        _default_registry = create_default_registry()
+    return _default_registry.execute(name, args, ds=ds)
 
 
 def _parse_directional_hints(query: str) -> dict:

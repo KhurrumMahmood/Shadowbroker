@@ -42,23 +42,54 @@ for _var in _SECRET_VARS:
         except Exception as _e:
             logger.error(f"Failed to read secret file {_file_path} for {_var}: {_e}")
 
-from fastapi import FastAPI, Request, Response, Query, Depends, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-from services.data_fetcher import start_scheduler, stop_scheduler, get_latest_data, source_timestamps
-from services.ais_stream import start_ais_stream, stop_ais_stream
-from services.carrier_tracker import start_carrier_tracker, stop_carrier_tracker
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-from services.schemas import HealthResponse, RefreshResponse
-import uvicorn
 import hashlib
 import json as json_mod
 import socket
 import threading
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+import uvicorn
+from fastapi import FastAPI, Request, Response, Query, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from pydantic import BaseModel, field_validator
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+from starlette.responses import StreamingResponse, JSONResponse
+
+from services.api_settings import get_api_keys, update_api_key
+from services.ais_stream import start_ais_stream, stop_ais_stream
+from services.carrier_tracker import start_carrier_tracker, stop_carrier_tracker
+from services.data_fetcher import (
+    start_scheduler, stop_scheduler, get_latest_data,
+    source_timestamps, update_all_data,
+)
+from services.llm_assistant import (
+    call_llm, call_llm_streaming, search_entities,
+    build_briefing_context, build_briefing_prompt,
+    ContentFilterError, LLMConnectionError,
+)
+from services.network_utils import fetch_with_curl
+from services.news_feed_config import get_feeds, save_feeds, reset_feeds
+from services.radio_intercept import (
+    get_top_broadcastify_feeds, get_openmhz_systems,
+    get_recent_openmhz_calls, find_nearest_openmhz_system,
+    find_nearest_openmhz_systems_list,
+)
+from services.region_dossier import get_region_dossier
+from services.schemas import HealthResponse, RefreshResponse
+from services.sentinel_search import search_sentinel2_scene
+from services.updater import perform_update, schedule_restart
 
 limiter = Limiter(key_func=get_remote_address)
+
+_ARTIFACT_CSP = (
+    "default-src 'self' 'unsafe-inline' 'unsafe-eval' "
+    "https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; "
+    "img-src * data: blob:; connect-src *"
+)
 
 # ---------------------------------------------------------------------------
 # Admin authentication — protects settings & system endpoints
@@ -143,7 +174,6 @@ app = FastAPI(title="Live Risk Dashboard API", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-from fastapi.middleware.gzip import GZipMiddleware
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(
     CORSMiddleware,
@@ -152,8 +182,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-from services.data_fetcher import update_all_data
 
 _refresh_lock = threading.Lock()
 
@@ -188,7 +216,6 @@ async def ais_feed(request: Request):
     count = ingest_ais_catcher(msgs)
     return {"status": "ok", "ingested": count}
 
-from pydantic import BaseModel
 class ViewportUpdate(BaseModel):
     s: float
     w: float
@@ -347,7 +374,6 @@ async def debug_latest_data(request: Request):
 @app.get("/api/health", response_model=HealthResponse)
 @limiter.limit("30/minute")
 async def health_check(request: Request):
-    import time
     d = get_latest_data()
     last = d.get("last_updated")
     return {
@@ -371,8 +397,6 @@ async def health_check(request: Request):
     }
 
 
-
-from services.radio_intercept import get_top_broadcastify_feeds, get_openmhz_systems, get_recent_openmhz_calls, find_nearest_openmhz_system
 
 @app.get("/api/radio/top")
 @limiter.limit("30/minute")
@@ -398,8 +422,6 @@ async def api_get_nearest_radio(
 ):
     return find_nearest_openmhz_system(lat, lng)
 
-from services.radio_intercept import find_nearest_openmhz_systems_list
-
 @app.get("/api/radio/nearest-list")
 @limiter.limit("60/minute")
 async def api_get_nearest_radios_list(
@@ -409,8 +431,6 @@ async def api_get_nearest_radios_list(
     limit: int = Query(5, ge=1, le=20),
 ):
     return find_nearest_openmhz_systems_list(lat, lng, limit=limit)
-
-from services.network_utils import fetch_with_curl
 
 @app.get("/api/route/{callsign}")
 @limiter.limit("60/minute")
@@ -424,7 +444,7 @@ async def get_flight_route(request: Request, callsign: str, lat: float = 0.0, ln
         elif isinstance(data, list):
             route_list = data
         
-        if route_list and len(route_list) > 0:
+        if route_list:
             route = route_list[0]
             airports = route.get("_airports", [])
             if len(airports) >= 2:
@@ -438,8 +458,6 @@ async def get_flight_route(request: Request, callsign: str, lat: float = 0.0, ln
                 }
     return {}
 
-from services.region_dossier import get_region_dossier
-
 @app.get("/api/region-dossier")
 @limiter.limit("30/minute")
 def api_region_dossier(
@@ -449,8 +467,6 @@ def api_region_dossier(
 ):
     """Sync def so FastAPI runs it in a threadpool — prevents blocking the event loop."""
     return get_region_dossier(lat, lng)
-
-from services.sentinel_search import search_sentinel2_scene
 
 @app.get("/api/sentinel2/search")
 @limiter.limit("30/minute")
@@ -465,8 +481,6 @@ def api_sentinel2_search(
 # ---------------------------------------------------------------------------
 # API Settings — key registry & management
 # ---------------------------------------------------------------------------
-from services.api_settings import get_api_keys, update_api_key
-from pydantic import BaseModel
 
 class ApiKeyUpdate(BaseModel):
     env_key: str
@@ -496,7 +510,6 @@ async def api_update_key(request: Request, body: ApiKeyUpdate):
 # ---------------------------------------------------------------------------
 # News Feed Configuration
 # ---------------------------------------------------------------------------
-from services.news_feed_config import get_feeds, save_feeds, reset_feeds
 
 @app.get("/api/settings/news-feeds")
 @limiter.limit("30/minute")
@@ -527,8 +540,6 @@ async def api_reset_news_feeds(request: Request):
 # ---------------------------------------------------------------------------
 # System — self-update
 # ---------------------------------------------------------------------------
-from pathlib import Path
-from services.updater import perform_update, schedule_restart
 
 @app.post("/api/system/update", dependencies=[Depends(require_admin)])
 @limiter.limit("1/minute")
@@ -556,9 +567,6 @@ async def system_update(request: Request):
 # ---------------------------------------------------------------------------
 # AI Assistant
 # ---------------------------------------------------------------------------
-from pydantic import BaseModel, field_validator
-from starlette.responses import StreamingResponse, JSONResponse
-from services.llm_assistant import call_llm, call_llm_streaming, search_entities, build_briefing_context, build_briefing_prompt, ContentFilterError, LLMConnectionError
 
 class AssistantQuery(BaseModel):
     query: str
@@ -573,22 +581,27 @@ class AssistantQuery(BaseModel):
             raise ValueError("query must not be empty")
         return v.strip()
 
+_SUMMARY_KEYS = [
+    "commercial_flights", "private_flights", "private_jets",
+    "military_flights", "tracked_flights", "ships", "satellites",
+    "earthquakes", "firms_fires", "internet_outages", "gdelt",
+    "kiwisdr", "datacenters", "military_bases", "power_plants", "cctv",
+]
+
+def _build_data_summary(data: dict) -> dict[str, int]:
+    """Count list-type data sources for LLM context."""
+    return {
+        key: len(items)
+        for key in _SUMMARY_KEYS
+        if (items := data.get(key)) and isinstance(items, list)
+    }
+
 @app.post("/api/assistant/query")
 @limiter.limit("10/minute")
 async def assistant_query(request: Request, body: AssistantQuery):
     """Ask the AI assistant a question about the current dashboard state."""
-    # Build data summary from current store
     data = get_latest_data()
-    data_summary = {}
-    for key in ["commercial_flights", "private_flights", "private_jets",
-                "military_flights", "tracked_flights", "ships", "satellites",
-                "earthquakes", "firms_fires", "internet_outages", "gdelt",
-                "kiwisdr", "datacenters", "military_bases", "power_plants", "cctv"]:
-        items = data.get(key)
-        if items and isinstance(items, list):
-            data_summary[key] = len(items)
-
-    # Pre-search entities matching the query for LLM context
+    data_summary = _build_data_summary(data)
     search_results = search_entities(body.query, data, viewport=body.viewport)
 
     try:
@@ -607,13 +620,7 @@ async def assistant_query(request: Request, body: AssistantQuery):
             status_code=422,
             media_type="application/json",
         )
-    except LLMConnectionError as e:
-        return Response(
-            content=json_mod.dumps({"error": str(e), "error_type": "connection"}),
-            status_code=503,
-            media_type="application/json",
-        )
-    except RuntimeError as e:
+    except (LLMConnectionError, RuntimeError) as e:
         return Response(
             content=json_mod.dumps({"error": str(e), "error_type": "connection"}),
             status_code=503,
@@ -625,15 +632,7 @@ async def assistant_query(request: Request, body: AssistantQuery):
 async def assistant_query_stream(request: Request, body: AssistantQuery):
     """Streaming version — yields SSE events for real-time progress."""
     data = get_latest_data()
-    data_summary = {}
-    for key in ["commercial_flights", "private_flights", "private_jets",
-                "military_flights", "tracked_flights", "ships", "satellites",
-                "earthquakes", "firms_fires", "internet_outages", "gdelt",
-                "kiwisdr", "datacenters", "military_bases", "power_plants", "cctv"]:
-        items = data.get(key)
-        if items and isinstance(items, list):
-            data_summary[key] = len(items)
-
+    data_summary = _build_data_summary(data)
     search_results = search_entities(body.query, data, viewport=body.viewport)
 
     def generate():
@@ -706,7 +705,11 @@ async def get_artifact_version(name: str, version: int):
     html = get_artifact_registry().get_version(name, version)
     if html is None:
         return JSONResponse({"error": "Version not found"}, status_code=404)
-    return Response(content=html, media_type="text/html")
+    return Response(
+        content=html,
+        media_type="text/html",
+        headers={"Content-Security-Policy": _ARTIFACT_CSP},
+    )
 
 
 @app.get("/api/artifacts/{artifact_id}")
@@ -717,7 +720,11 @@ async def get_artifact(artifact_id: str):
     art = store.get(artifact_id)
     if art is None:
         return JSONResponse({"error": "Artifact not found"}, status_code=404)
-    return Response(content=art.html, media_type="text/html")
+    return Response(
+        content=art.html,
+        media_type="text/html",
+        headers={"Content-Security-Policy": _ARTIFACT_CSP},
+    )
 
 
 @app.get("/api/alerts")

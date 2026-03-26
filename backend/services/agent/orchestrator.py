@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 
@@ -18,11 +20,45 @@ logger = logging.getLogger(__name__)
 
 _MAX_WORKERS = 3
 _AGENT_TIME_BUDGET_RATIO = 0.7  # 70% of total time for agents, 30% reserved
+_SLUG_PATTERN = re.compile(r"[^a-z0-9-]")
 
 
 def _sse(event: str, data: dict) -> str:
     """Format a single SSE event string."""
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+def _make_error_result(task: SubTask, error: Exception) -> SubAgentResult:
+    """Build a failed SubAgentResult from a task and its exception."""
+    return SubAgentResult(
+        sub_task_intent=task.intent,
+        summary="",
+        success=False,
+        error=str(error),
+    )
+
+
+def _slugify(title: str) -> str:
+    """Convert a title to a lowercase alphanumeric-and-hyphen slug (max 40 chars)."""
+    raw = title.lower().replace(" ", "-")[:40] if title else "artifact"
+    slug = _SLUG_PATTERN.sub("", raw).strip("-")
+    return slug or "artifact"
+
+
+@dataclass
+class _ArtifactOutcome:
+    """Result of artifact generation, replacing a fragile 4-tuple."""
+    artifact_id: str | None = None
+    title: str | None = None
+    registry_name: str | None = None
+    version: int | None = None
+
+    @property
+    def created(self) -> bool:
+        return self.artifact_id is not None
+
+
+_EMPTY_ARTIFACT = _ArtifactOutcome()
 
 
 @dataclass
@@ -85,12 +121,12 @@ class Orchestrator:
         Event types:
           - plan: query decomposition (emitted immediately)
           - sub_result: each sub-agent completion
+          - artifact: artifact generation (if enabled)
           - result: final synthesized result
         """
         start = time.monotonic()
         agent_deadline = start + (self.total_budget * _AGENT_TIME_BUDGET_RATIO)
 
-        # Emit plan event
         yield _sse("plan", {
             "complexity": plan.complexity.value,
             "sub_tasks": [
@@ -99,67 +135,41 @@ class Orchestrator:
             ],
         })
 
-        # Dispatch sub-agents and yield results as they complete
+        # Collect SSE events from sub-agent completions to yield after dispatch
+        pending_events: list[str] = []
+
+        def _on_result(result: SubAgentResult) -> None:
+            pending_events.append(_sse("sub_result", {
+                "sub_task": result.sub_task_intent,
+                "summary": result.summary,
+                "success": result.success,
+                "duration_ms": result.duration_ms,
+            }))
+
         agent_tasks = [t for t in plan.sub_tasks if t.intent != "synthesis"]
-        sub_results = []
+        sub_results = self._dispatch_parallel(agent_tasks, agent_deadline, on_result=_on_result)
 
-        if agent_tasks:
-            with ThreadPoolExecutor(max_workers=min(_MAX_WORKERS, len(agent_tasks))) as executor:
-                futures = {}
-                for task in agent_tasks:
-                    agent = SubAgent(
-                        provider=self.provider,
-                        sub_task=task,
-                        ds=self.ds,
-                        deadline=agent_deadline,
-                    )
-                    future = executor.submit(agent.run)
-                    futures[future] = task
+        yield from pending_events
 
-                for future in as_completed(futures, timeout=max(0, agent_deadline - time.monotonic())):
-                    try:
-                        result = future.result()
-                    except Exception as e:
-                        task = futures[future]
-                        result = SubAgentResult(
-                            sub_task_intent=task.intent,
-                            summary="",
-                            success=False,
-                            error=str(e),
-                        )
-                    sub_results.append(result)
-
-                    yield _sse("sub_result", {
-                        "sub_task": result.sub_task_intent,
-                        "summary": result.summary,
-                        "success": result.success,
-                        "duration_ms": result.duration_ms,
-                    })
-
-        # Synthesize and emit final result
         final = self._synthesize(query, sub_results, plan)
         final.duration_ms = int((time.monotonic() - start) * 1000)
         final.provider = self.provider.get("model", "")
 
         # Generate artifact if enabled and we have successful sub-results
-        artifact_id = None
-        artifact_title = None
-        artifact_registry_name = None
-        artifact_version = None
         successful = [r for r in sub_results if r.success]
+        artifact = _EMPTY_ARTIFACT
         if self.generate_artifact and successful:
             try:
-                artifact_id, artifact_title, artifact_registry_name, artifact_version = \
-                    self._generate_artifact(query, successful, final.summary)
-                if artifact_id:
+                artifact = self._generate_artifact(query, successful, final.summary)
+                if artifact.created:
                     art_event: dict = {
-                        "artifact_id": artifact_id,
-                        "title": artifact_title,
+                        "artifact_id": artifact.artifact_id,
+                        "title": artifact.title,
                     }
-                    if artifact_registry_name:
-                        art_event["registry_name"] = artifact_registry_name
-                    if artifact_version is not None:
-                        art_event["version"] = artifact_version
+                    if artifact.registry_name:
+                        art_event["registry_name"] = artifact.registry_name
+                    if artifact.version is not None:
+                        art_event["version"] = artifact.version
                     yield _sse("artifact", art_event)
             except Exception as e:
                 logger.warning(f"Artifact generation failed: {e}")
@@ -178,20 +188,27 @@ class Orchestrator:
                 "successful_count": len(successful),
             },
         }
-        if artifact_id:
-            result_data["artifact_id"] = artifact_id
-            result_data["artifact_title"] = artifact_title
+        if artifact.created:
+            result_data["artifact_id"] = artifact.artifact_id
+            result_data["artifact_title"] = artifact.title
 
         yield _sse("result", result_data)
 
     def _dispatch_parallel(
-        self, sub_tasks: list[SubTask], deadline: float
+        self,
+        sub_tasks: list[SubTask],
+        deadline: float,
+        on_result: Callable[[SubAgentResult], None] | None = None,
     ) -> list[SubAgentResult]:
-        """Run sub-agents in parallel via ThreadPoolExecutor."""
+        """Run sub-agents in parallel via ThreadPoolExecutor.
+
+        If on_result is provided, it is called with each result as it completes
+        (used by run_streaming to build SSE events incrementally).
+        """
         if not sub_tasks:
             return []
 
-        results = []
+        results: list[SubAgentResult] = []
 
         with ThreadPoolExecutor(max_workers=min(_MAX_WORKERS, len(sub_tasks))) as executor:
             futures = {}
@@ -202,22 +219,23 @@ class Orchestrator:
                     ds=self.ds,
                     deadline=deadline,
                 )
-                future = executor.submit(agent.run)
-                futures[future] = task
+                futures[executor.submit(agent.run)] = task
 
-            for future in as_completed(futures, timeout=max(0, deadline - time.monotonic())):
-                try:
-                    result = future.result()
+            try:
+                for future in as_completed(futures, timeout=max(0, deadline - time.monotonic())):
+                    try:
+                        result = future.result()
+                    except Exception as e:
+                        task = futures[future]
+                        logger.warning(f"Sub-agent {task.intent} raised: {e}")
+                        result = _make_error_result(task, e)
                     results.append(result)
-                except Exception as e:
-                    task = futures[future]
-                    logger.warning(f"Sub-agent {task.intent} raised: {e}")
-                    results.append(SubAgentResult(
-                        sub_task_intent=task.intent,
-                        summary="",
-                        success=False,
-                        error=str(e),
-                    ))
+                    if on_result:
+                        on_result(result)
+            except TimeoutError:
+                logger.warning(
+                    f"Orchestrator deadline hit — {len(results)}/{len(sub_tasks)} agents completed"
+                )
 
         return results
 
@@ -230,34 +248,21 @@ class Orchestrator:
         Falls back to deterministic concatenation on failure or when disabled.
         """
         successful = [r for r in sub_results if r.success and r.summary]
-        all_findings = []
-        all_entities = []
+        all_entities = [ref for r in successful for ref in r.entity_references]
 
-        for r in successful:
-            all_findings.extend(r.key_findings)
-            all_entities.extend(r.entity_references)
-
-        # Try LLM synthesis
+        # Try LLM synthesis, fall back to deterministic concatenation
+        method = "concat"
+        summary = None
         if self.use_llm_synthesis and successful:
             summary = self._synthesize_with_llm(query, successful)
             if summary:
-                return OrchestratorResult(
-                    summary=summary,
-                    sub_results=sub_results,
-                    plan=plan,
-                    result_entities=all_entities,
-                    reasoning_steps=[
-                        {"step": "plan", "domains": plan.domains_detected},
-                        {"step": "dispatch", "agents": len(sub_results)},
-                        {"step": "synthesize", "method": "llm", "successful": len(successful)},
-                    ],
-                )
+                method = "llm"
 
-        # Deterministic fallback
-        if successful:
-            summary = " | ".join(r.summary for r in successful)
-        else:
-            summary = "Unable to complete analysis — all sub-agents failed."
+        if not summary:
+            if successful:
+                summary = " | ".join(r.summary for r in successful)
+            else:
+                summary = "Unable to complete analysis — all sub-agents failed."
 
         return OrchestratorResult(
             summary=summary,
@@ -267,7 +272,7 @@ class Orchestrator:
             reasoning_steps=[
                 {"step": "plan", "domains": plan.domains_detected},
                 {"step": "dispatch", "agents": len(sub_results)},
-                {"step": "synthesize", "method": "concat", "successful": len(successful)},
+                {"step": "synthesize", "method": method, "successful": len(successful)},
             ],
         )
 
@@ -335,11 +340,8 @@ class Orchestrator:
         query: str,
         successful: list[SubAgentResult],
         synthesis_summary: str,
-    ) -> tuple[str | None, str | None, str | None, int | None]:
-        """Generate an HTML artifact from sub-agent findings.
-
-        Returns (artifact_id, title, registry_name, version).
-        """
+    ) -> _ArtifactOutcome:
+        """Generate an HTML artifact from sub-agent findings."""
         findings = "\n".join(
             f"[{r.sub_task_intent}] {r.summary}" for r in successful
         )
@@ -349,10 +351,8 @@ class Orchestrator:
             ][:20],
         }
 
-        # Query the artifact registry for potential reuse
         registry = get_artifact_registry()
         query_tags = extract_tags_from_query(query)
-        matches = registry.search(query_tags, min_score=2) if query_tags else []
 
         agent = ArtifactAgent(
             provider=self.provider,
@@ -367,7 +367,7 @@ class Orchestrator:
 
         if not result.success:
             logger.warning(f"Artifact generation failed: {result.error}")
-            return None, None, None, None
+            return _EMPTY_ARTIFACT
 
         # Agent decided to reuse an existing artifact (skip reuse when enhancing)
         if result.reuse_artifact and not self.enhance_artifact_name:
@@ -381,10 +381,15 @@ class Orchestrator:
                 )
                 artifact_id = store.save(artifact)
                 logger.info(f"Artifact reused: {result.reuse_artifact} → {artifact_id}")
-                return artifact_id, meta["title"], result.reuse_artifact, meta.get("current_version")
+                return _ArtifactOutcome(
+                    artifact_id=artifact_id,
+                    title=meta["title"],
+                    registry_name=result.reuse_artifact,
+                    version=meta.get("current_version"),
+                )
 
         if not result.html:
-            return None, None, None, None
+            return _EMPTY_ARTIFACT
 
         # Save to ephemeral store for immediate serving
         store = get_artifact_store()
@@ -403,15 +408,17 @@ class Orchestrator:
                     note=f"Enhanced for: {query[:80]}",
                 )
                 logger.info(f"Artifact enhanced: {self.enhance_artifact_name} → v{version}")
-                return artifact_id, result.title, self.enhance_artifact_name, version
+                return _ArtifactOutcome(
+                    artifact_id=artifact_id,
+                    title=result.title,
+                    registry_name=self.enhance_artifact_name,
+                    version=version,
+                )
             except Exception as e:
                 logger.warning(f"Version creation failed, falling back to new artifact: {e}")
 
         # New artifact path: persist to the registry for future reuse
-        slug = result.title.lower().replace(" ", "-")[:40] if result.title else "artifact"
-        slug = "".join(c for c in slug if c.isalnum() or c == "-").strip("-")
-        if not slug:
-            slug = "artifact"
+        slug = _slugify(result.title)
         registry_name = None
         version = None
         try:
@@ -431,4 +438,9 @@ class Orchestrator:
             logger.debug(f"Registry save skipped: {e}")
 
         logger.info(f"Artifact generated: {artifact_id} ({result.artifact_type})")
-        return artifact_id, result.title, registry_name, version
+        return _ArtifactOutcome(
+            artifact_id=artifact_id,
+            title=result.title,
+            registry_name=registry_name,
+            version=version,
+        )

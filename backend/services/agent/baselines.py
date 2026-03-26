@@ -6,6 +6,7 @@ enabling z-score anomaly detection across data categories.
 from __future__ import annotations
 
 import math
+import threading
 from dataclasses import dataclass
 
 
@@ -34,39 +35,42 @@ class BaselineStore:
             raise ValueError("alpha must be in (0, 1]")
         self._alpha = alpha
         self._stats: dict[str, _EmaState] = {}
+        self._lock = threading.Lock()
 
     def update(self, metric: str, value: float) -> BaselineStat:
         """Update the EMA for a metric with a new observation.
 
         Returns the updated baseline stats.
         """
-        if metric not in self._stats:
-            self._stats[metric] = _EmaState(mean=value, var=0.0, n=1)
-            return BaselineStat(mean=value, std=0.0, n=1)
+        with self._lock:
+            if metric not in self._stats:
+                self._stats[metric] = _EmaState(mean=value, var=0.0, n=1)
+                return BaselineStat(mean=value, std=0.0, n=1)
 
-        state = self._stats[metric]
-        state.n += 1
-        diff = value - state.mean
-        state.mean += self._alpha * diff
-        # EMA variance: exponentially weighted variance
-        state.var = (1 - self._alpha) * (state.var + self._alpha * diff * diff)
+            state = self._stats[metric]
+            state.n += 1
+            diff = value - state.mean
+            state.mean += self._alpha * diff
+            # EMA variance: exponentially weighted variance
+            state.var = (1 - self._alpha) * (state.var + self._alpha * diff * diff)
 
-        return BaselineStat(
-            mean=state.mean,
-            std=math.sqrt(max(state.var, 0)),
-            n=state.n,
-        )
+            return BaselineStat(
+                mean=state.mean,
+                std=math.sqrt(max(state.var, 0)),
+                n=state.n,
+            )
 
     def get(self, metric: str) -> BaselineStat | None:
         """Get current baseline stats for a metric."""
-        state = self._stats.get(metric)
-        if state is None:
-            return None
-        return BaselineStat(
-            mean=state.mean,
-            std=math.sqrt(max(state.var, 0)),
-            n=state.n,
-        )
+        with self._lock:
+            state = self._stats.get(metric)
+            if state is None:
+                return None
+            return BaselineStat(
+                mean=state.mean,
+                std=math.sqrt(max(state.var, 0)),
+                n=state.n,
+            )
 
     def z_score(self, metric: str, value: float) -> float | None:
         """Calculate z-score of a value against the baseline.

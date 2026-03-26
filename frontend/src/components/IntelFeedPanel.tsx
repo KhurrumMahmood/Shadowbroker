@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Shield, AlertTriangle, Bell, MapPin } from "lucide-react";
 
@@ -78,6 +78,8 @@ export default function IntelFeedPanel({
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const dismissedRef = useRef(dismissed);
+  dismissedRef.current = dismissed;
 
   const fetchAlerts = useCallback(async () => {
     try {
@@ -86,14 +88,14 @@ export default function IntelFeedPanel({
       if (!res.ok) return;
       const data: AlertItem[] = await res.json();
       setAlerts(data);
-      const visibleCount = data.filter((a) => !dismissed.has(a.id)).length;
+      const visibleCount = data.filter((a) => !dismissedRef.current.has(a.id)).length;
       onAlertCountChange(visibleCount);
     } catch {
       // Silent fail — backend may not be running
     } finally {
       setLoading(false);
     }
-  }, [dismissed, onAlertCountChange]);
+  }, [onAlertCountChange]);
 
   // Poll every 30s when open, 60s when closed
   useEffect(() => {
@@ -103,10 +105,11 @@ export default function IntelFeedPanel({
   }, [isOpen, fetchAlerts]);
 
   const handleDismiss = (id: string) => {
-    setDismissed((prev) => new Set(prev).add(id));
-    onAlertCountChange(
-      alerts.filter((a) => !dismissed.has(a.id) && a.id !== id).length
-    );
+    setDismissed((prev) => {
+      const next = new Set(prev).add(id);
+      onAlertCountChange(alerts.filter((a) => !next.has(a.id)).length);
+      return next;
+    });
   };
 
   const visibleAlerts = alerts.filter((a) => !dismissed.has(a.id));

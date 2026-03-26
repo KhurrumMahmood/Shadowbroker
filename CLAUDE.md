@@ -204,6 +204,20 @@ GitHub Actions (`.github/workflows/ci.yml`): runs `vitest` for frontend and `pyt
 
 Docker images published to GHCR (`.github/workflows/docker-publish.yml`): multi-arch builds (amd64 + arm64) on push to main or version tags.
 
+## Code Review Workflow
+
+Before deploying, run these review agents in order:
+
+1. **`superpowers:code-reviewer`** — After completing a planned milestone. Checks implementation against the plan and coding standards. Has write access.
+
+2. **`feature-dev:code-reviewer`** — Before merge/deploy. Finds bugs, logic errors, security vulnerabilities, and convention violations. Uses confidence-based filtering to report only high-priority issues. Read-only.
+
+3. **`code-simplifier:code-simplifier`** — After code is functionally correct. Simplifies and refines for clarity, consistency, and maintainability. Focuses on recently modified code. Has write access.
+
+The `/simplify` skill can also be used for targeted simplification of specific files.
+
+Run tests after each stage.
+
 ## Related Docs
 
 - `frontend/README.md` — API URL configuration and theming

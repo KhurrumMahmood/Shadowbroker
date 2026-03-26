@@ -96,6 +96,11 @@ export default function ArtifactPanel({
     if (artifactId && !isReact) {
       loadArtifact(artifactId);
     }
+    return () => {
+      if (iframeRef.current) {
+        iframeRef.current.onload = null;
+      }
+    };
   }, [artifactId, isReact, loadArtifact]);
 
   /** Send data to the artifact iframe via postMessage */

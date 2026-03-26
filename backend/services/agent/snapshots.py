@@ -5,6 +5,7 @@ temporal comparison queries like "what changed in the last 4 hours?"
 """
 from __future__ import annotations
 
+import threading
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -29,6 +30,7 @@ class SnapshotStore:
 
     def __init__(self, max_snapshots: int = 288):
         self._ring: deque[Snapshot] = deque(maxlen=max_snapshots)
+        self._lock = threading.Lock()
 
     @property
     def size(self) -> int:
@@ -75,7 +77,8 @@ class SnapshotStore:
             counts=counts,
             entity_ids=entity_ids,
         )
-        self._ring.append(snap)
+        with self._lock:
+            self._ring.append(snap)
         return snap
 
     def get_snapshot(self, hours_ago: float) -> Snapshot | None:
@@ -83,28 +86,29 @@ class SnapshotStore:
 
         Returns None if no snapshots exist or all are newer than the target.
         """
-        if not self._ring:
-            return None
+        with self._lock:
+            if not self._ring:
+                return None
 
-        target_ts = time.time() - (hours_ago * 3600)
+            target_ts = time.time() - (hours_ago * 3600)
 
-        # If target is before our oldest snapshot, return the oldest
-        if target_ts <= self._ring[0].timestamp:
-            return self._ring[0]
+            # If target is before our oldest snapshot, return the oldest
+            if target_ts <= self._ring[0].timestamp:
+                return self._ring[0]
 
-        # If target is after our newest, nothing is old enough
-        if target_ts >= self._ring[-1].timestamp:
-            return None
+            # If target is after our newest, nothing is old enough
+            if target_ts >= self._ring[-1].timestamp:
+                return None
 
-        # Binary-ish search for closest
-        best = None
-        best_diff = float("inf")
-        for snap in self._ring:
-            diff = abs(snap.timestamp - target_ts)
-            if diff < best_diff:
-                best_diff = diff
-                best = snap
-        return best
+            # Binary-ish search for closest
+            best = None
+            best_diff = float("inf")
+            for snap in self._ring:
+                diff = abs(snap.timestamp - target_ts)
+                if diff < best_diff:
+                    best_diff = diff
+                    best = snap
+            return best
 
     def get_delta(
         self, current_data: dict, hours_ago: float, category: str,
