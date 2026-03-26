@@ -265,7 +265,23 @@ export interface NewsArticle {
   lng: number;
   region?: string;
   coords?: [number, number];
-  machine_assessment?: string;
+  machine_assessment?: string | { gdelt_nearby?: number; fires_nearby?: number; outages_nearby?: number };
+}
+
+// ─── DISEASE OUTBREAKS (WHO DON) ─────────────────────────────────────────────
+
+export interface DiseaseOutbreak {
+  id: string | number;
+  title: string;
+  disease_name: string;
+  country: string;
+  summary: string;
+  pub_date: string;
+  risk_score: number;
+  lat: number | null;
+  lng: number | null;
+  link: string;
+  source: string;
 }
 
 // ─── UKRAINE FRONTLINE ──────────────────────────────────────────────────────
@@ -434,6 +450,7 @@ export interface DashboardData {
   datacenters?: DataCenter[];
   military_bases?: MilitaryBase[];
   power_plants?: PowerPlant[];
+  disease_outbreaks?: DiseaseOutbreak[];
 }
 
 // ─── COMPONENT PROPS ────────────────────────────────────────────────────────

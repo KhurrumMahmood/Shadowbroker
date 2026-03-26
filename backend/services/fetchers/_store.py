@@ -32,7 +32,10 @@ latest_data = {
     "firms_fires": [],
     "datacenters": [],
     "military_bases": [],
-    "power_plants": []
+    "power_plants": [],
+    "coverage_gaps": [],
+    "correlations": [],
+    "disease_outbreaks": [],
 }
 
 # Per-source freshness timestamps

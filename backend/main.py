@@ -360,6 +360,9 @@ async def live_data_slow(request: Request,
         "datacenters": _f(d.get("datacenters", [])),
         "military_bases": _f(d.get("military_bases", [])),
         "power_plants": _f(d.get("power_plants", [])),
+        "coverage_gaps": d.get("coverage_gaps", []),
+        "correlations": d.get("correlations", []),
+        "disease_outbreaks": d.get("disease_outbreaks", []),
         "freshness": dict(source_timestamps),
     }
     bbox_tag = f"{s},{w},{n},{e}" if has_bbox else "full"
@@ -586,15 +589,61 @@ _SUMMARY_KEYS = [
     "military_flights", "tracked_flights", "ships", "satellites",
     "earthquakes", "firms_fires", "internet_outages", "gdelt",
     "kiwisdr", "datacenters", "military_bases", "power_plants", "cctv",
+    "disease_outbreaks",
 ]
 
-def _build_data_summary(data: dict) -> dict[str, int]:
-    """Count list-type data sources for LLM context."""
-    return {
+def _build_data_summary(data: dict) -> dict:
+    """Build data summary with counts and rich context for LLM situational awareness."""
+    summary: dict = {
         key: len(items)
         for key in _SUMMARY_KEYS
         if (items := data.get(key)) and isinstance(items, list)
     }
+    if (gaps := data.get("coverage_gaps")) and isinstance(gaps, list):
+        summary["coverage_gaps_count"] = len(gaps)
+    if (corrs := data.get("correlations")) and isinstance(corrs, list):
+        summary["correlations_count"] = len(corrs)
+
+    # Rich context for LLM situational awareness
+    news = data.get("news", [])
+    if news:
+        summary["top_headlines"] = [
+            {"title": n.get("title", ""), "source": n.get("source", ""), "risk_score": n.get("risk_score", 0)}
+            for n in sorted(news, key=lambda x: x.get("risk_score", 0), reverse=True)[:10]
+        ]
+
+    stocks = data.get("stocks", {})
+    oil = data.get("oil", {})
+    if stocks or oil:
+        summary["markets"] = {
+            "stocks": {k: {"price": v.get("price"), "change": v.get("change_percent")} for k, v in stocks.items()},
+            "oil": {k: {"price": v.get("price"), "change": v.get("change_percent")} for k, v in oil.items()},
+        }
+
+    if gaps:
+        summary["top_coverage_gaps"] = [
+            {"lat": g.get("lat"), "lon": g.get("lon"), "gdelt_count": g.get("gdelt_count", 0),
+             "top_event_codes": g.get("top_event_codes", [])}
+            for g in sorted(gaps, key=lambda x: x.get("gdelt_count", 0), reverse=True)[:5]
+        ]
+
+    if corrs:
+        summary["top_correlations"] = [
+            {"type": c.get("type"), "distance_km": c.get("distance_km"),
+             "entity": c.get("callsign") or c.get("region_name", ""),
+             "gdelt_count": c.get("gdelt_count", 0)}
+            for c in corrs[:3]
+        ]
+
+    outbreaks = data.get("disease_outbreaks", [])
+    if outbreaks:
+        summary["disease_outbreaks_count"] = len(outbreaks)
+        summary["recent_outbreaks"] = [
+            {"disease": o.get("disease_name", ""), "country": o.get("country", ""), "date": o.get("pub_date", "")}
+            for o in outbreaks[:5]
+        ]
+
+    return summary
 
 @app.post("/api/assistant/query")
 @limiter.limit("10/minute")

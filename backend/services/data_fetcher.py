@@ -48,6 +48,7 @@ from services.fetchers.geo import (  # noqa: F401
     fetch_ships, fetch_airports, find_nearest_airport, cached_airports,
     fetch_frontlines, fetch_gdelt, fetch_geopolitics, update_liveuamap,
 )
+from services.fetchers.health import fetch_disease_outbreaks  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +71,21 @@ def _update_agent_stores():
             baseline_store.update(f"{category}_count", float(len(items)))
     except Exception as e:
         logger.debug(f"Agent store update skipped: {e}")
+
+
+def _run_post_processing():
+    """Run cross-domain post-processing on slow-tier data.
+
+    Computes coverage gaps, cross-domain correlations, and machine
+    assessments. Writes results directly into latest_data under the lock.
+    """
+    try:
+        from services.post_processing import post_process_slow_data
+
+        with _data_lock:
+            post_process_slow_data(latest_data)
+    except Exception:
+        logger.exception("Post-processing pipeline failed")
 
 
 def _run_alert_engine():
@@ -158,6 +174,7 @@ def update_slow_data():
         fetch_kiwisdr,
         fetch_frontlines,
         fetch_gdelt,
+        fetch_disease_outbreaks,
         # datacenters, military_bases, power_plants are static files —
         # loaded once at startup via _load_static_infrastructure(), not every 5min
     ]
@@ -165,6 +182,7 @@ def update_slow_data():
         futures = [executor.submit(func) for func in slow_funcs]
         concurrent.futures.wait(futures)
     logger.info("Slow-tier update complete.")
+    _run_post_processing()
     _run_alert_engine()
 
 def _load_static_infrastructure():

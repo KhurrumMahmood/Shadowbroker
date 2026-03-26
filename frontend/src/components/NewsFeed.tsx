@@ -13,6 +13,15 @@ import {
     PowerPlantDetailPanel
 } from "@/components/EntityDetailPanels";
 
+function formatAssessment(ma: string | { gdelt_nearby?: number; fires_nearby?: number; outages_nearby?: number }): string {
+    if (typeof ma === 'string') return ma;
+    const parts: string[] = [];
+    if (ma.gdelt_nearby) parts.push(`${ma.gdelt_nearby} conflict events`);
+    if (ma.fires_nearby) parts.push(`${ma.fires_nearby} fires`);
+    if (ma.outages_nearby) parts.push(`${ma.outages_nearby} outages`);
+    return parts.length ? parts.join(' + ') + ' nearby' : '';
+}
+
 // HLS video player — uses hls.js on Chrome/Firefox, native on Safari
 function HlsVideo({ url, className }: { url: string; className?: string }) {
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -176,7 +185,17 @@ function NewsFeedInner({ data, selectedEntity, regionDossier, regionDossierLoadi
         }
     }
 
-    const news = data?.news || [];
+    const rawNews = data?.news || [];
+    const outbreaks = (data?.disease_outbreaks || []).map((o: any) => ({
+        ...o,
+        source: `WHO DON`,
+        summary: o.summary || o.title,
+        published: o.pub_date,
+        coords: o.lat != null && o.lng != null ? [o.lat, o.lng] : null,
+    }));
+    const news = [...rawNews, ...outbreaks].sort(
+        (a: any, b: any) => (b.risk_score || 0) - (a.risk_score || 0)
+    );
 
     // Determine the selected flight's model for Wikipedia thumbnail lookup
     // (must call hook unconditionally — React rules of hooks)
@@ -795,7 +814,7 @@ function NewsFeedInner({ data, selectedEntity, regionDossier, regionDossierLoadi
                             <div className="mt-2 p-2 bg-black/60 border border-cyan-800/50 rounded-sm text-[9px] text-cyan-400 font-mono leading-tight relative overflow-hidden shadow-[inset_0_0_10px_rgba(0,255,255,0.05)]">
                                 <div className="absolute top-0 left-0 w-[2px] h-full bg-cyan-500 animate-pulse"></div>
                                 <span className="font-bold text-white">&gt;_ SYS.ANALYSIS: </span>
-                                <span className="text-cyan-300 opacity-90">{item.machine_assessment}</span>
+                                <span className="text-cyan-300 opacity-90">{formatAssessment(item.machine_assessment)}</span>
                             </div>
                         )}
                         {item.link && (
@@ -1048,7 +1067,7 @@ function NewsFeedInner({ data, selectedEntity, regionDossier, regionDossierLoadi
                                         <div className="mt-1 p-1.5 bg-black/60 border border-cyan-800/50 rounded-sm text-[8.5px] text-cyan-400 font-mono leading-tight relative overflow-hidden shadow-[inset_0_0_10px_rgba(0,255,255,0.05)]">
                                             <div className="absolute top-0 left-0 w-[2px] h-full bg-cyan-500 animate-pulse"></div>
                                             <span className="font-bold text-white">&gt;_ SYS.ANALYSIS: </span>
-                                            <span className="text-cyan-300 opacity-90">{item.machine_assessment}</span>
+                                            <span className="text-cyan-300 opacity-90">{formatAssessment(item.machine_assessment)}</span>
                                         </div>
                                     )}
 

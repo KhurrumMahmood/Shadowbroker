@@ -94,6 +94,68 @@ _FILTER_KEYS = [
 ]
 
 
+def _derived_intelligence_section(data_summary: dict) -> str:
+    """Build a DERIVED INTELLIGENCE section for the system prompt when gaps/correlations exist."""
+    gaps = data_summary.get("coverage_gaps_count", 0)
+    corr = data_summary.get("correlations_count", 0)
+    if not gaps and not corr:
+        return ""
+    lines = ["\nDERIVED INTELLIGENCE:"]
+    if gaps:
+        lines.append(f"- {gaps} geographic regions with GDELT conflict events but zero news coverage detected")
+    if corr:
+        lines.append(f"- {corr} cross-domain correlations found (military near conflict, fires near conflict, outages near conflict)")
+    return "\n".join(lines)
+
+
+def _current_situation_section(data_summary: dict) -> str:
+    """Build a CURRENT SITUATION block with headlines, markets, gaps for the system prompt."""
+    sections = []
+
+    headlines = data_summary.get("top_headlines", [])
+    if headlines:
+        lines = ["TOP HEADLINES (by risk score):"]
+        for h in headlines:
+            lines.append(f"  - [{h.get('risk_score', 0)}] {h.get('title', '')} ({h.get('source', '')})")
+        sections.append("\n".join(lines))
+
+    markets = data_summary.get("markets", {})
+    stocks = markets.get("stocks", {})
+    oil = markets.get("oil", {})
+    if stocks or oil:
+        lines = ["MARKETS:"]
+        for k, v in {**stocks, **oil}.items():
+            chg = v.get("change", 0)
+            arrow = "+" if chg and chg > 0 else ""
+            lines.append(f"  - {k}: ${v.get('price', '?')} ({arrow}{chg}%)")
+        sections.append("\n".join(lines))
+
+    gaps = data_summary.get("top_coverage_gaps", [])
+    if gaps:
+        lines = [f"COVERAGE GAPS ({data_summary.get('coverage_gaps_count', len(gaps))} total — GDELT conflict events with zero news coverage):"]
+        for g in gaps:
+            lines.append(f"  - ({g.get('lat')}, {g.get('lon')}): {g.get('gdelt_count', 0)} events, codes: {g.get('top_event_codes', [])}")
+        sections.append("\n".join(lines))
+
+    corrs = data_summary.get("top_correlations", [])
+    if corrs:
+        lines = [f"CROSS-DOMAIN CORRELATIONS ({data_summary.get('correlations_count', len(corrs))} total):"]
+        for c in corrs:
+            lines.append(f"  - {c.get('type', '?')}: {c.get('entity', '?')} within {c.get('distance_km', '?')}km of {c.get('gdelt_count', 0)} conflict events")
+        sections.append("\n".join(lines))
+
+    outbreaks = data_summary.get("recent_outbreaks", [])
+    if outbreaks:
+        lines = [f"DISEASE OUTBREAKS ({data_summary.get('disease_outbreaks_count', len(outbreaks))} total):"]
+        for o in outbreaks:
+            lines.append(f"  - {o.get('disease', '?')} — {o.get('country', '?')} ({o.get('date', '?')})")
+        sections.append("\n".join(lines))
+
+    if not sections:
+        return ""
+    return "\n\nCURRENT SITUATION:\n" + "\n\n".join(sections)
+
+
 def _web_search_available() -> bool:
     """True when OpenRouter + API key are configured (web_search uses Perplexity via OpenRouter)."""
     return bool(
@@ -173,6 +235,8 @@ DATA SOURCES:
 
 CURRENT DATA COUNTS:
 {counts or '  (no data currently loaded)'}
+{_current_situation_section(data_summary)}
+{_derived_intelligence_section(data_summary)}
 {search_section}
 
 RESPONSE FORMAT — You MUST respond with a raw JSON object (no XML, no markdown, no wrapper tags):
@@ -376,6 +440,53 @@ _SEARCH_CONFIG = {
             "mag": e.get("mag", 0),
         },
     },
+    "news": {
+        "fields": ["title", "summary", "source", "region"],
+        "entity_type": "news",
+        "compact": lambda n: {
+            "id": n.get("id", ""),
+            "title": n.get("title", ""),
+            "source": n.get("source", ""),
+            "risk_score": n.get("risk_score", 0),
+            "lat": n.get("lat"), "lng": n.get("lng"),
+        },
+    },
+    "gdelt": {
+        "fields": ["name", "action_geo_cc"],
+        "entity_type": "gdelt_incident",
+        "compact": lambda g: {
+            "name": (g.get("properties") or {}).get("name", ""),
+            "count": (g.get("properties") or {}).get("count", 0),
+            "lat": ((g.get("geometry") or {}).get("coordinates") or [0, 0])[1],
+            "lng": ((g.get("geometry") or {}).get("coordinates") or [0, 0])[0],
+        },
+        "search_extract": lambda g: {
+            "name": (g.get("properties") or {}).get("name", ""),
+            "action_geo_cc": (g.get("properties") or {}).get("action_geo_cc", ""),
+        },
+    },
+    "firms_fires": {
+        "fields": ["acq_date", "daynight", "confidence"],
+        "entity_type": "fire",
+        "compact": lambda f: {
+            "lat": f.get("lat"), "lng": f.get("lng"),
+            "frp": f.get("frp", 0),
+            "confidence": f.get("confidence", ""),
+            "acq_date": f.get("acq_date", ""),
+        },
+    },
+    "disease_outbreaks": {
+        "fields": ["title", "disease_name", "country"],
+        "entity_type": "disease_outbreak",
+        "compact": lambda o: {
+            "id": o.get("id", ""),
+            "title": o.get("title", ""),
+            "disease_name": o.get("disease_name", ""),
+            "country": o.get("country", ""),
+            "risk_score": o.get("risk_score", 0),
+            "lat": o.get("lat"), "lng": o.get("lng"),
+        },
+    },
 }
 
 _MAX_PER_CATEGORY = 100
@@ -400,6 +511,10 @@ _QUERYABLE_FIELDS = {
     "datacenters": ["name", "company", "country"],
     "power_plants": ["name", "country", "fuel_type"],
     "earthquakes": ["place", "id", "mag"],
+    "news": ["title", "source", "region", "risk_score"],
+    "gdelt": ["name", "action_geo_cc", "count"],
+    "firms_fires": ["confidence", "acq_date", "daynight"],
+    "disease_outbreaks": ["disease_name", "country"],
 }
 
 # Pre-built for the system prompt (avoids f-string brace-escaping issues)
@@ -814,14 +929,17 @@ def search_entities(query: str, data: dict, viewport: dict | None = None) -> dic
             geo_set = set(id(e) for e in geo_filtered) if geo_filtered else set()
 
         # Score each entity by keyword + geo + directional match
+        extract_fn = config.get("search_extract")
         scored = []
         for entity in items:
             score = 0
+            # For nested data (e.g. GeoJSON), flatten fields for matching
+            search_dict = extract_fn(entity) if extract_fn else entity
 
             # Directional scoring — boost origin/dest field matches heavily
             if has_direction:
                 for field_name in config["fields"]:
-                    val = str(entity.get(field_name, "")).lower()
+                    val = str(search_dict.get(field_name, "")).lower()
                     if not val:
                         continue
                     is_origin_field = field_name in _ORIGIN_FIELDS
@@ -839,7 +957,7 @@ def search_entities(query: str, data: dict, viewport: dict | None = None) -> dic
 
             # General keyword scoring
             for field_name in config["fields"]:
-                val = str(entity.get(field_name, "")).lower()
+                val = str(search_dict.get(field_name, "")).lower()
                 if not val:
                     continue
                 for token in tokens:

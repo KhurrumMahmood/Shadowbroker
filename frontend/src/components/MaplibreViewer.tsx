@@ -13,6 +13,15 @@ import { showPulseAt, removePulse } from "@/components/map/PulseMarker";
 import { findEntityInData } from "@/hooks/useAIResultCycler";
 import { AlertTriangle, Radio, Globe, Activity, Play } from "lucide-react";
 import WikiImage from "@/components/WikiImage";
+
+function formatAssessment(ma: string | { gdelt_nearby?: number; fires_nearby?: number; outages_nearby?: number }): string {
+    if (typeof ma === 'string') return ma;
+    const parts: string[] = [];
+    if (ma.gdelt_nearby) parts.push(`${ma.gdelt_nearby} conflict events`);
+    if (ma.fires_nearby) parts.push(`${ma.fires_nearby} fires`);
+    if (ma.outages_nearby) parts.push(`${ma.outages_nearby} outages`);
+    return parts.length ? parts.join(' + ') + ' nearby' : '';
+}
 import { useTheme } from "@/lib/ThemeContext";
 
 import {
@@ -2355,7 +2364,7 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                                             <div className="mt-1 p-2 bg-black/60 border border-cyan-800/50 rounded-sm text-[8px] text-cyan-400 font-mono leading-tight relative overflow-hidden shadow-[inset_0_0_10px_rgba(0,255,255,0.05)]">
                                                 <div className="absolute top-0 left-0 w-[2px] h-full bg-cyan-500 animate-pulse"></div>
                                                 <span className="font-bold text-white">&gt;_ SYS.ANALYSIS: </span>
-                                                <span className="text-cyan-300 opacity-90">{item.machine_assessment}</span>
+                                                <span className="text-cyan-300 opacity-90">{formatAssessment(item.machine_assessment)}</span>
                                             </div>
                                         )}
                                         {item.link && (
