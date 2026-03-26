@@ -149,8 +149,7 @@ class TestOrchestratorEnhancement:
         # Verify ArtifactAgent was constructed with enhance_artifact
         MockArtifactAgent.assert_called_once()
         call_kwargs = MockArtifactAgent.call_args
-        assert call_kwargs.kwargs.get("enhance_artifact") == "ship-map" or \
-               (len(call_kwargs.args) > 0 and "enhance_artifact" in str(call_kwargs))
+        assert call_kwargs.kwargs.get("enhance_artifact") == "ship-map"
 
     @patch("services.agent.orchestrator.ArtifactAgent")
     @patch("services.agent.orchestrator.get_artifact_store")
@@ -226,6 +225,47 @@ class TestOrchestratorEnhancement:
         _, art_data = art_events[0]
         assert art_data["registry_name"] == "ship-map"
         assert art_data["version"] == 2
+
+    @patch("services.agent.orchestrator.ArtifactAgent")
+    @patch("services.agent.orchestrator.get_artifact_store")
+    @patch("services.agent.orchestrator.SubAgent")
+    def test_create_version_failure_falls_back_to_save_artifact(
+        self, MockSubAgent, mock_get_store, MockArtifactAgent,
+        hormuz_ds, router, provider, mock_registry,
+    ):
+        """When create_version raises, orchestrator falls back to save_artifact."""
+        mock_instance = MagicMock()
+        mock_instance.run.return_value = _mock_sub_result("maritime", "Ships found")
+        MockSubAgent.return_value = mock_instance
+
+        mock_art = MagicMock()
+        mock_art.run.return_value = ArtifactAgentResult(
+            html="<div>v2</div>", title="Ship Map v2",
+            success=True, artifact_type="dashboard",
+        )
+        MockArtifactAgent.return_value = mock_art
+
+        mock_store = MagicMock()
+        mock_store.save.return_value = "art-fallback"
+        mock_get_store.return_value = mock_store
+
+        # Simulate create_version failure (e.g. artifact deleted between load and enhance)
+        mock_registry.create_version.side_effect = ValueError("Artifact not found")
+
+        plan = router.classify("What ships and flights are near Hormuz?")
+        orch = Orchestrator(
+            provider=provider, ds=hormuz_ds,
+            generate_artifact=True, enhance_artifact_name="ship-map",
+        )
+        events = list(orch.run_streaming(plan.original_query, plan))
+
+        # Should have fallen back to save_artifact
+        mock_registry.create_version.assert_called_once()
+        mock_registry.save_artifact.assert_called_once()
+
+        # SSE artifact event should still be emitted (from fallback path)
+        art_events = [(t, d) for t, d in (_parse_sse(e) for e in events) if t == "artifact"]
+        assert len(art_events) == 1
 
     @patch("services.agent.orchestrator.ArtifactAgent")
     @patch("services.agent.orchestrator.get_artifact_store")

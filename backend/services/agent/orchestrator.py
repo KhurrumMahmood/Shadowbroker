@@ -369,8 +369,8 @@ class Orchestrator:
             logger.warning(f"Artifact generation failed: {result.error}")
             return None, None, None, None
 
-        # Agent decided to reuse an existing artifact
-        if result.reuse_artifact:
+        # Agent decided to reuse an existing artifact (skip reuse when enhancing)
+        if result.reuse_artifact and not self.enhance_artifact_name:
             existing = registry.get_latest_version(result.reuse_artifact)
             if existing:
                 html, meta = existing
@@ -410,6 +410,8 @@ class Orchestrator:
         # New artifact path: persist to the registry for future reuse
         slug = result.title.lower().replace(" ", "-")[:40] if result.title else "artifact"
         slug = "".join(c for c in slug if c.isalnum() or c == "-").strip("-")
+        if not slug:
+            slug = "artifact"
         registry_name = None
         version = None
         try:

@@ -16,6 +16,7 @@ import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+import re
 from threading import Lock
 
 logger = logging.getLogger(__name__)
@@ -24,10 +25,21 @@ logger = logging.getLogger(__name__)
 class ArtifactRegistry:
     """Filesystem-backed artifact registry with tag search and versioning."""
 
+    _NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,79}$")
+
     def __init__(self, registry_root: Path):
         self._root = Path(registry_root)
         self._registry_path = self._root / "registry.json"
         self._lock = Lock()
+
+    @classmethod
+    def _validate_name(cls, name: str) -> None:
+        """Validate artifact name to prevent path traversal and filesystem issues."""
+        if not name or not cls._NAME_PATTERN.match(name):
+            raise ValueError(
+                f"Invalid artifact name '{name}': must be 1-80 lowercase alphanumeric chars or hyphens, "
+                "starting with alphanumeric"
+            )
 
     def _read_registry(self) -> dict:
         if not self._registry_path.exists():
@@ -38,12 +50,14 @@ class ArtifactRegistry:
         self._registry_path.write_text(json.dumps(data, indent=2))
 
     def _read_meta(self, name: str) -> dict | None:
+        self._validate_name(name)
         meta_path = self._root / name / "meta.json"
         if not meta_path.exists():
             return None
         return json.loads(meta_path.read_text())
 
     def _write_meta(self, name: str, meta: dict) -> None:
+        self._validate_name(name)
         meta_path = self._root / name / "meta.json"
         meta_path.write_text(json.dumps(meta, indent=2))
 
@@ -60,6 +74,7 @@ class ArtifactRegistry:
         accepts_data: dict | None = None,
     ) -> None:
         """Save a new artifact (creates directory, meta.json, v1.html, registry entry)."""
+        self._validate_name(name)
         now = datetime.now(timezone.utc).isoformat()
 
         with self._lock:
@@ -105,6 +120,7 @@ class ArtifactRegistry:
 
     def create_version(self, name: str, html: str, note: str) -> int:
         """Append a new version to an existing artifact. Returns the new version number."""
+        self._validate_name(name)
         now = datetime.now(timezone.utc).isoformat()
 
         with self._lock:
@@ -148,6 +164,7 @@ class ArtifactRegistry:
 
     def get_version(self, name: str, version: int) -> str | None:
         """Get a specific version's HTML. Returns None if not found."""
+        self._validate_name(name)
         html_path = self._root / name / f"v{version}.html"
         if not html_path.exists():
             return None

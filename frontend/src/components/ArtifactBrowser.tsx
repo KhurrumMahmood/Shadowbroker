@@ -17,15 +17,22 @@ interface ArtifactBrowserProps {
 export default function ArtifactBrowser({ onSelect }: ArtifactBrowserProps) {
   const [entries, setEntries] = useState<RegistryEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/artifacts/registry")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`Registry returned ${r.status}`);
+        return r.json();
+      })
       .then((data) => {
         setEntries(Array.isArray(data) ? data : []);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((e) => {
+        setError(e.message || "Failed to load registry");
+        setLoading(false);
+      });
   }, []);
 
   if (loading) {
@@ -34,6 +41,19 @@ export default function ArtifactBrowser({ onSelect }: ArtifactBrowserProps) {
         <span className="text-[9px] font-mono tracking-[0.2em] text-cyan-600 animate-pulse">
           LOADING REGISTRY...
         </span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-[9px] font-mono tracking-[0.15em] text-red-400">
+          REGISTRY UNAVAILABLE
+        </p>
+        <p className="text-[8px] font-mono text-red-700 mt-2">
+          {error}
+        </p>
       </div>
     );
   }
@@ -78,7 +98,7 @@ export default function ArtifactBrowser({ onSelect }: ArtifactBrowserProps) {
               </span>
             ))}
             <span className="text-[7px] font-mono text-cyan-700 ml-auto">
-              {entry.type.toUpperCase()}
+              {(entry.type || "html").toUpperCase()}
             </span>
           </div>
         </button>

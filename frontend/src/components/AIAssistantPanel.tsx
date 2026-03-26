@@ -336,6 +336,7 @@ export default function AIAssistantPanel({
     }
     setConversationId(generateId());
     setMessages([]);
+    setActiveArtifact(null);
     onAIResultClear?.();
   }, [messages, saveCurrentConversation, onAIResultClear]);
 
@@ -361,6 +362,7 @@ export default function AIAssistantPanel({
     }
     setConversationId(generateId());
     setMessages([]);
+    setActiveArtifact(null);
     setMode("chat");
     onAIResultClear?.();
   }, [messages, saveCurrentConversation, onAIResultClear]);
