@@ -575,8 +575,8 @@ export default function Dashboard() {
           flex items-center justify-center
           border transition-all duration-200
           ${aiPanelOpen
-            ? "border-cyan-400/30"
-            : "border-cyan-800/30"
+            ? "border-cyan-400/50 shadow-[0_0_12px_rgba(34,211,238,0.12)]"
+            : "border-cyan-400/40"
           }
         `}
       >
