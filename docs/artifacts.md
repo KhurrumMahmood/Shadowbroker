@@ -4,7 +4,7 @@ Artifacts are reusable data visualizations that the AI agent can display alongsi
 
 ## Showcase Page
 
-Browse all artifacts at `/artifacts-list`. The page auto-discovers artifacts from `registry.json` and loads fixture data from each artifact's `fixtures.ts` — no manual wiring needed.
+Browse all artifacts at `/artifacts`. The page auto-discovers artifacts from `registry.json` and loads fixture data from each artifact's `fixtures.ts` — no manual wiring needed.
 
 ## Directory Structure
 
@@ -97,7 +97,7 @@ src/artifacts/
 
 ### What Happens Automatically
 
-- **Showcase page** (`/artifacts-list`): The sidebar discovers the artifact from `registry.json` and loads fixtures via `dummyData.ts`'s dynamic import auto-discovery. No changes needed.
+- **Showcase page** (`/artifacts`): The sidebar discovers the artifact from `registry.json` and loads fixtures via `dummyData.ts`'s dynamic import auto-discovery. No changes needed.
 - **Dataset selector**: Reads the `DATASETS` export from your `fixtures.ts`. Multiple datasets show up as dropdown options.
 - **Fake chat**: Falls back to the default conversation for artifacts without a custom one in `fakeChatData.ts`.
 

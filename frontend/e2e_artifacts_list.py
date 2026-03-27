@@ -1,4 +1,4 @@
-"""Playwright E2E tests for the /artifacts-list showcase page.
+"""Playwright E2E tests for the /artifacts showcase page.
 
 Tests:
 1. Page loads with header and sidebar
@@ -48,8 +48,8 @@ def run_tests():
         ctx = browser.new_context(viewport={"width": 1920, "height": 1080})
         page = ctx.new_page()
 
-        print("\n=== Loading /artifacts-list ===")
-        page.goto("http://localhost:3000/artifacts-list", wait_until="networkidle", timeout=30000)
+        print("\n=== Loading /artifacts ===")
+        page.goto("http://localhost:3000/artifacts", wait_until="networkidle", timeout=30000)
 
         # ── Test 1: Page loads with header ──
         try:

@@ -245,6 +245,6 @@ Run tests after each stage.
   - `cross-domain-patterns.md` — Patterns transferred from marketing/sales/legal/finance/creative domains: significance scoring, Benford's Law spoofing detection, variance decomposition for anomaly explanation, provenance taxonomy, compliance tracking, visualization philosophy, audience adaptation (AIDA per persona), red-team simulation
   - `user-model.md` — User profiling and adaptive intelligence: 5-question onboarding questionnaire, behavioral signal tracking, derived preferences, per-domain complexity adaptation, Quick Access panel with persona-specific artifact templates, pre-generation strategy
 - `frontend/README.md` — API URL configuration and theming
-- `docs/artifacts.md` — Artifact system: conventions, categories, fixture format, and checklist for adding new artifacts. Showcase at `/artifacts-list`.
+- `docs/artifacts.md` — Artifact system: conventions, categories, fixture format, and checklist for adding new artifacts. Showcase at `/artifacts`.
 - `helm/chart/README.md` — Kubernetes Helm chart deployment
 - `test-silo/` — Phase 0 product research (archetypes, market analysis, roadmap). Snapshot from March 2026, not actively maintained.
