@@ -36,6 +36,12 @@ latest_data = {
     "coverage_gaps": [],
     "correlations": [],
     "disease_outbreaks": [],
+    "prediction_markets": [],
+    "trending_markets": [],
+    "ukraine_alerts": [],
+    "fimi": [],
+    "trains": [],
+    "meshtastic": [],
 }
 
 # Per-source freshness timestamps

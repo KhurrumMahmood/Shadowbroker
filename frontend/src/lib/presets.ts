@@ -28,6 +28,11 @@ const OFF: ActiveLayers = {
   datacenters: false,
   military_bases: false,
   power_plants: false,
+  prediction_markets: false,
+  ukraine_alerts: false,
+  fimi: false,
+  trains: false,
+  meshtastic: false,
 };
 
 export const PRESETS: Record<PresetKey, { label: string; layers: ActiveLayers }> = {
@@ -48,6 +53,8 @@ export const PRESETS: Record<PresetKey, { label: string; layers: ActiveLayers }>
       day_night: true,
       gps_jamming: true,
       highres_satellite: true,
+      prediction_markets: true,
+      ukraine_alerts: true,
     },
   },
   MARITIME: {
@@ -91,6 +98,9 @@ export const PRESETS: Record<PresetKey, { label: string; layers: ActiveLayers }>
       firms: true,
       day_night: true,
       highres_satellite: true,
+      prediction_markets: true,
+      ukraine_alerts: true,
+      fimi: true,
     },
   },
   INFRA: {
@@ -102,6 +112,7 @@ export const PRESETS: Record<PresetKey, { label: string; layers: ActiveLayers }>
       internet_outages: true,
       kiwisdr: true,
       firms: true,
+      trains: true,
       day_night: true,
       highres_satellite: true,
     },
@@ -134,6 +145,11 @@ export const PRESETS: Record<PresetKey, { label: string; layers: ActiveLayers }>
       datacenters: true,
       military_bases: true,
       power_plants: true,
+      prediction_markets: true,
+      ukraine_alerts: true,
+      fimi: true,
+      trains: true,
+      meshtastic: true,
     },
   },
 };

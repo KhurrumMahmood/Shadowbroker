@@ -35,6 +35,13 @@ python -m pytest tests/test_api_smoke.py -v  # single test file
 python -m pytest tests/test_api_smoke.py::TestHealthEndpoint::test_health_returns_200 -v  # single test
 ```
 
+### Starter Script
+```bash
+./start.sh           # discovers Node.js, validates env, starts both servers
+./start.sh --check   # setup-only mode (no server launch, just validates env + node)
+```
+Searches nvm > fnm > volta > brew > system PATH for Node >= 18. Caches the working path to `.node-path` for subsequent runs.
+
 ### Docker
 ```bash
 ./compose.sh up -d            # auto-detects docker/podman
@@ -65,7 +72,7 @@ All fetcher modules live in `backend/services/fetchers/` and write to a shared d
 
 **Network resilience:** `services/network_utils.py::fetch_with_curl()` tries Python requests first, falls back to system curl, with per-domain circuit breakers.
 
-### API Endpoints (26 total)
+### API Endpoints (28 total)
 
 **Live data:**
 - `GET /api/live-data/fast` — Fast-changing data (flights, ships, satellites, UAVs, GPS jamming) with ETag + bbox filtering (`s,w,n,e` params)
@@ -95,6 +102,8 @@ All fetcher modules live in `backend/services/fetchers/` and write to a shared d
 - `POST /api/assistant/query` — Question with dashboard context, returns JSON
 - `POST /api/assistant/query/stream` — Streaming version (SSE)
 - `POST /api/assistant/brief` — LLM-generated viewport briefing for a bounding box
+- `POST /api/assistant/transcribe` — Speech-to-text via OpenAI `gpt-4o-mini-transcribe` (multipart audio upload, max 25 MB)
+- `POST /api/assistant/tts` — Text-to-speech via OpenAI `tts-1` (streams `audio/mpeg`)
 
 **Settings** (protected by `X-Admin-Key` except news-feeds GET):
 - `GET /api/settings/api-keys` — List configured API keys (masked)
@@ -122,6 +131,8 @@ Single-page app in `frontend/src/app/page.tsx` (`Dashboard` component).
 
 **State:** React context (`DashboardDataContext`) + hooks. No external state library.
 
+**Voice:** Military radio-style voice interface — wake word ("Jarvis") + VAD recording + cloud STT/TTS. See `docs/voice.md` for architecture, hooks, design decisions, and costs.
+
 ## Key Patterns
 
 - **`@/*` path alias** maps to `src/*` in both TypeScript and Vitest configs
@@ -141,8 +152,12 @@ Backend (`backend/.env`):
 - `ADMIN_KEY` — Protects settings/update endpoints (required for production)
 - `CORS_ORIGINS` — Comma-separated allowed origins (auto-detects LAN if unset)
 
+Voice (backend):
+- `TTS_OPENAI_API_KEY` — OpenAI key for STT + TTS (falls back to `OPENAI_API_KEY`)
+
 Frontend (runtime):
 - `BACKEND_URL` — Backend URL for API proxy (default: `http://localhost:8000`, Docker: `http://backend:8000`)
+- `NEXT_PUBLIC_PICOVOICE_ACCESS_KEY` — Picovoice key for wake word (see `docs/voice.md`)
 
 ## Deployment (Railway)
 
@@ -220,6 +235,7 @@ Run tests after each stage.
 
 ## Related Docs
 
+- `docs/voice.md` — Voice communication architecture, hooks, design decisions, costs
 - `frontend/README.md` — API URL configuration and theming
 - `helm/chart/README.md` — Kubernetes Helm chart deployment
 - `test-silo/` — Phase 0 product research (archetypes, market analysis, roadmap). Snapshot from March 2026, not actively maintained.

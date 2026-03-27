@@ -13,6 +13,26 @@ from cachetools import TTLCache
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Shared persona constants — imported by orchestrator.py and sub_agent.py
+# ---------------------------------------------------------------------------
+_PERSONA_PREAMBLE = (
+    "You are the ShadowBroker analyst \u2014 a senior intelligence professional operating "
+    "an OSINT fusion dashboard. You synthesize data from ADS-B transponders, AIS maritime "
+    "feeds, satellite tracking, seismic sensors, GDELT events, and open-source news into "
+    "actionable intelligence. You are precise, direct, and pattern-aware. When you surface "
+    "findings, you prioritize by significance, flag anomalies, and suggest what to look at "
+    "next. You use domain terminology naturally \u2014 \"maintaining station,\" \"transiting "
+    "the strait,\" \"flagged under convenience registry\" \u2014 without overplaying it. "
+    "You never say \"I don't know\" \u2014 you always describe what data IS available and "
+    "what it suggests."
+)
+
+_PERSONA_BRIEF = (
+    "You are a ShadowBroker domain analyst \u2014 precise, pattern-aware, and direct. "
+    "Prioritize findings by significance, flag anomalies, and use domain terminology naturally."
+)
+
 # Cache: normalized query pattern → list of tool-call dicts that succeeded
 _query_cache: TTLCache = TTLCache(maxsize=200, ttl=3600)
 
@@ -92,6 +112,93 @@ _FILTER_KEYS = [
     "tracked_category", "tracked_owner",
     "ship_name", "ship_type",
 ]
+
+# ---------------------------------------------------------------------------
+# Deterministic layer suggestions based on query content
+# ---------------------------------------------------------------------------
+_MARITIME_KEYWORDS = frozenset([
+    "strait", "channel", "canal", "chokepoint", "ship", "vessel", "tanker",
+    "cargo", "maritime", "naval", "carrier", "fleet", "port", "harbor",
+    "ais", "mmsi", "yacht", "cruise", "ferry",
+])
+_AVIATION_KEYWORDS = frozenset([
+    "flight", "aircraft", "plane", "airplane", "jet", "helicopter", "heli",
+    "drone", "uav", "airspace", "transponder", "ads-b", "icao", "callsign",
+    "airport", "airline", "landing", "takeoff",
+])
+_CONFLICT_KEYWORDS = frozenset([
+    "military", "war", "conflict", "combat", "weapon", "missile", "artillery",
+    "frontline", "invasion", "troops", "forces", "army", "navy", "base",
+    "jamming", "defense", "attack", "strike",
+])
+
+# Gazetteer location names grouped by category (derived from geo_gazetteer.py sections)
+_MARITIME_LOCATIONS = frozenset([
+    "strait of hormuz", "strait of malacca", "suez canal", "bab el-mandeb",
+    "bosphorus", "dardanelles", "turkish straits", "panama canal",
+    "strait of gibraltar", "strait of taiwan", "taiwan strait", "strait of dover",
+    "english channel", "strait of sicily", "mozambique channel", "denmark strait",
+    "strait of korea", "tsushima strait", "lombok strait", "sunda strait",
+    "cape of good hope", "black sea", "mediterranean", "mediterranean sea",
+    "south china sea", "east china sea", "persian gulf", "arabian gulf",
+    "gulf of oman", "red sea", "sea of japan", "baltic sea", "north sea",
+    "caspian sea", "sea of azov", "adriatic sea", "aegean sea", "gulf of mexico",
+    "caribbean sea", "arabian sea", "bay of bengal", "gulf of aden",
+    "gulf of guinea", "barents sea", "norwegian sea", "indian ocean",
+    "pacific ocean", "atlantic ocean", "arctic ocean",
+])
+_CONFLICT_LOCATIONS = frozenset([
+    "ukraine", "crimea", "donbas", "gaza", "west bank", "israel", "lebanon",
+    "syria", "iraq", "iran", "yemen", "somalia", "libya", "sudan", "ethiopia",
+    "myanmar", "north korea", "kashmir", "sahel", "horn of africa",
+    "afghanistan", "nagorno-karabakh",
+])
+
+
+def suggest_layers_for_query(query: str) -> dict[str, bool] | None:
+    """Deterministic layer suggestions based on geographic and domain keywords.
+
+    Returns a dict of layer→True, or None if nothing matches.
+    Used as a fallback when the LLM does not return layer recommendations.
+    """
+    q = query.lower()
+    layers: dict[str, bool] = {}
+
+    # Check domain keywords
+    words = set(q.split())
+    if words & _MARITIME_KEYWORDS:
+        layers.update({
+            "ships_military": True, "ships_cargo": True, "ships_civilian": True,
+            "ships_passenger": True, "ships_tracked_yachts": True,
+        })
+    if words & _AVIATION_KEYWORDS:
+        layers.update({
+            "flights": True, "private": True, "jets": True,
+            "military": True, "tracked": True,
+        })
+    if words & _CONFLICT_KEYWORDS:
+        layers.update({
+            "military": True, "ships_military": True, "global_incidents": True,
+            "gps_jamming": True, "military_bases": True, "ukraine_frontline": True,
+        })
+
+    # Check gazetteer location names in query
+    for loc in _MARITIME_LOCATIONS:
+        if loc in q:
+            layers.update({
+                "ships_military": True, "ships_cargo": True, "ships_civilian": True,
+                "ships_passenger": True, "ships_tracked_yachts": True,
+            })
+            break
+    for loc in _CONFLICT_LOCATIONS:
+        if loc in q:
+            layers.update({
+                "military": True, "global_incidents": True, "gps_jamming": True,
+                "military_bases": True, "firms": True, "ukraine_frontline": True,
+            })
+            break
+
+    return layers if layers else None
 
 
 def _derived_intelligence_section(data_summary: dict) -> str:
@@ -208,13 +315,10 @@ def build_system_prompt(data_summary: dict, search_results: dict | None = None) 
         if parts:
             search_section = "\n\nSEARCH RESULTS (pre-filtered from live data matching the user's query):\n" + "\n\n".join(parts)
 
-    return f"""You are a helpful data query assistant for a public data visualization dashboard. \
-The dashboard aggregates publicly available open data feeds and displays them on an interactive map. \
-Your job is to help users navigate, filter, and understand the data. All data sources are public: \
-ADS-B aircraft transponder broadcasts (like flightradar24), AIS maritime transponder data (like \
-marinetraffic), USGS earthquake records, CelesTrak satellite orbital elements, NASA FIRMS fire \
-detections, and public news/incident aggregators. You are essentially a search and filter interface \
-for these public datasets.
+    return f"""{_PERSONA_PREAMBLE} \
+All data sources are public: ADS-B aircraft transponder broadcasts, AIS maritime transponder data, \
+USGS earthquake records, CelesTrak satellite orbital elements, NASA FIRMS fire detections, \
+GDELT open event data, and open-source news aggregators.
 
 AVAILABLE LAYERS (toggle on/off):
 {', '.join(_LAYER_NAMES)}
@@ -266,8 +370,16 @@ Available filter keys: {', '.join(_FILTER_KEYS)}
 GUIDELINES:
 - When the user asks to find/show/list entities, include matching IDs in result_entities.
 - When showing results, also enable the relevant layer and set viewport to the area of interest.
-- For broad queries ("what's happening here"), summarize notable activity and suggest key entities.
-- Keep responses factual — describe what the data shows, not speculation.
+- For broad queries ("what's happening here"), prioritize by significance \u2014 lead with the most \
+notable finding, then paint the broader picture. Don't just list; narrate what the data suggests.
+- For entity searches, summarize what was found, call out anything unusual (unexpected flag state, \
+unusual position, elevated activity), and suggest a related follow-up query.
+- For region queries, paint a situational picture: what's happening, what's normal vs anomalous, \
+and what geographic or strategic context is relevant (chokepoints, proximity to bases, conflict zones).
+- Always suggest what to look at next \u2014 related layers to enable, nearby entities to examine, \
+or follow-up queries that would deepen the picture.
+- Keep responses factual \u2014 describe what the data shows. Qualify uncertainty with phrases like \
+"the data suggests" or "consistent with" rather than speculating.
 - Lat must be -90 to 90, lng -180 to 180, zoom 2 to 14.
 
 TOOLS — you have query_data, aggregate_data{", and web_search" if _web_search_available() else ""} functions:
@@ -1393,6 +1505,12 @@ def _call_provider(provider: dict, messages: list, live_data: dict | None,
         if reasoning_steps:
             parsed["reasoning_steps"] = reasoning_steps
 
+        # Fallback: deterministic layer suggestions when LLM didn't specify any
+        if parsed.get("layers") is None and original_query:
+            suggested = suggest_layers_for_query(original_query)
+            if suggested:
+                parsed["layers"] = suggested
+
         # Cache successful tool-call patterns for reuse
         if original_query and reasoning_steps:
             tool_steps = [s for s in reasoning_steps if s["type"] == "tool_call"]
@@ -1742,6 +1860,12 @@ def _call_provider_streaming(provider: dict, messages: list, live_data: dict | N
         if reasoning_steps:
             parsed["reasoning_steps"] = reasoning_steps
 
+        # Fallback: deterministic layer suggestions when LLM didn't specify any
+        if parsed.get("layers") is None and original_query:
+            suggested = suggest_layers_for_query(original_query)
+            if suggested:
+                parsed["layers"] = suggested
+
         # Cache successful tool-call patterns
         if original_query and reasoning_steps:
             tool_steps = [s for s in reasoning_steps if s["type"] == "tool_call"]
@@ -2038,16 +2162,15 @@ def build_briefing_prompt(briefing_context: dict) -> str:
             lines.append(f"  - [{n['type']}] {n['name']}: {n['why']}")
         notable_section = "\nNOTABLE ITEMS:\n" + "\n".join(lines)
 
-    return f"""You are a data summary assistant for a public data visualization dashboard. All data is publicly available \
-(ADS-B transponders, AIS maritime data, USGS seismic, CelesTrak TLEs, open incident reports).
+    return f"""{_PERSONA_PREAMBLE} You are providing a viewport briefing \u2014 a concise situational \
+snapshot of the area the analyst is currently viewing.
 
-Provide a concise situational summary of what the user is looking at. Focus on:
-1. Key items of interest (carriers, government aircraft, tracked entities, significant seismic activity)
-2. General traffic patterns and density
-3. Any unusual or noteworthy observations
+Lead with the most significant thing in the viewport. Use geographic and strategic context \
+(strait names, chokepoints, proximity to bases or conflict zones). Note any anomalies or unusual \
+concentrations. End with a "worth watching" note if anything merits attention.
 
 VIEWPORT DATA:
 {briefing_context['summary_text']}
 {notable_section}
 
-Respond with a natural-language paragraph (2-4 sentences). Be concise and factual. Do NOT use JSON."""
+Respond with a natural-language paragraph (2-4 sentences). Be direct and insightful. Do NOT use JSON."""

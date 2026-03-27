@@ -67,7 +67,7 @@ import { spreadAlertItems } from "@/utils/alertSpread";
 import {
     buildEarthquakesGeoJSON, buildJammingGeoJSON, buildCctvGeoJSON, buildKiwisdrGeoJSON,
     buildFirmsGeoJSON, buildInternetOutagesGeoJSON, buildDataCentersGeoJSON, buildPowerPlantsGeoJSON, buildMilitaryBasesGeoJSON,
-    buildGdeltGeoJSON, buildLiveuaGeoJSON, buildFrontlineGeoJSON,
+    buildGdeltGeoJSON, buildLiveuaGeoJSON, buildFrontlineGeoJSON, buildUkraineAlertsGeoJSON, buildFIMIGeoJSON, buildTrainsGeoJSON, buildMeshtasticGeoJSON,
     buildFlightLayerGeoJSON, buildUavGeoJSON,
     buildSatellitesGeoJSON, buildShipsGeoJSONByGroup, buildFeaturesByGroup, buildCarriersGeoJSON,
     type FlightLayerConfig,
@@ -394,6 +394,22 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
     const militaryBasesGeoJSON = useMemo(() =>
         activeLayers.military_bases ? buildMilitaryBasesGeoJSON(data?.military_bases) : null,
         [activeLayers.military_bases, data?.military_bases]);
+
+    const ukraineAlertsGeoJSON = useMemo(() =>
+        activeLayers.ukraine_alerts ? buildUkraineAlertsGeoJSON(data?.ukraine_alerts) : null,
+        [activeLayers.ukraine_alerts, data?.ukraine_alerts]);
+
+    const fimiGeoJSON = useMemo(() =>
+        activeLayers.fimi ? buildFIMIGeoJSON(data?.fimi) : null,
+        [activeLayers.fimi, data?.fimi]);
+
+    const trainsGeoJSON = useMemo(() =>
+        activeLayers.trains ? buildTrainsGeoJSON(data?.trains) : null,
+        [activeLayers.trains, data?.trains]);
+
+    const meshtasticGeoJSON = useMemo(() =>
+        activeLayers.meshtastic ? buildMeshtasticGeoJSON(data?.meshtastic) : null,
+        [activeLayers.meshtastic, data?.meshtastic]);
 
     // Load Images into the Map Style once loaded
     const onMapLoad = useCallback((e: any) => {
@@ -810,6 +826,10 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
         powerPlantsGeoJSON && 'power-plants-cluster-count',
         powerPlantsGeoJSON && 'power-plants-layer',
         militaryBasesGeoJSON && 'military-bases-layer',
+        ukraineAlertsGeoJSON && 'ukraine-alerts-layer',
+        fimiGeoJSON && 'fimi-layer',
+        trainsGeoJSON && 'trains-layer',
+        meshtasticGeoJSON && 'meshtastic-layer',
         firmsGeoJSON && 'firms-clusters',
         firmsGeoJSON && 'firms-viirs-layer'
     ].filter(Boolean) as string[];
@@ -886,6 +906,8 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                         gdelt: 'CONFLICT', liveuamap: 'EVENT', cctv: 'CCTV', kiwisdr: 'SDR',
                         firms_fire: 'FIRE', internet_outage: 'OUTAGE', datacenter: 'DATACENTER',
                         military_base: 'MIL BASE', power_plant: 'POWER PLANT',
+                        ukraine_alert: 'UA ALERT', fimi: 'DISINFO',
+                        train: 'TRAIN', meshtastic: 'MESH NODE',
                     };
                     setHoverInfo({
                         x: e.point.x,
@@ -1879,6 +1901,192 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                                 'text-color': '#aaaaaa',
                                 'text-halo-color': 'rgba(0,0,0,0.9)',
                                 'text-halo-width': 1.5,
+                            }}
+                        />
+                    </Source>
+                )}
+
+                {/* Ukraine Air Raid Alerts — color-coded circles by alert type */}
+                {ukraineAlertsGeoJSON && (
+                    <Source id="ukraine-alerts" type="geojson" data={ukraineAlertsGeoJSON as any}>
+                        {/* Outer pulsing ring */}
+                        <Layer
+                            id="ukraine-alerts-pulse"
+                            type="circle"
+                            paint={{
+                                'circle-radius': 16,
+                                'circle-color': 'rgba(0, 0, 0, 0)',
+                                'circle-stroke-width': 2,
+                                'circle-stroke-color': ['get', 'color'],
+                                'circle-stroke-opacity': 0.4,
+                            }}
+                        />
+                        {/* Inner solid circle — color by alert type */}
+                        <Layer
+                            id="ukraine-alerts-layer"
+                            type="circle"
+                            paint={{
+                                'circle-radius': 8,
+                                'circle-color': ['get', 'color'],
+                                'circle-stroke-width': 2,
+                                'circle-stroke-color': 'rgba(0, 0, 0, 0.6)',
+                                'circle-opacity': 0.85,
+                            }}
+                        />
+                        {/* Alert type icon inside */}
+                        <Layer
+                            id="ukraine-alerts-icon"
+                            type="symbol"
+                            layout={{
+                                'text-field': '⚠',
+                                'text-size': 10,
+                                'text-font': ['Noto Sans Bold'],
+                                'text-allow-overlap': true,
+                                'text-ignore-placement': true,
+                            }}
+                            paint={{
+                                'text-color': '#ffffff',
+                            }}
+                        />
+                        {/* Oblast name label */}
+                        <Layer
+                            id="ukraine-alerts-label"
+                            type="symbol"
+                            layout={{
+                                'text-field': ['get', 'name'],
+                                'text-size': 10,
+                                'text-font': ['Noto Sans Bold'],
+                                'text-offset': [0, 1.8],
+                                'text-anchor': 'top',
+                                'text-allow-overlap': false,
+                            }}
+                            paint={{
+                                'text-color': ['get', 'color'],
+                                'text-halo-color': 'rgba(0,0,0,0.9)',
+                                'text-halo-width': 1.5,
+                            }}
+                        />
+                    </Source>
+                )}
+
+                {/* FIMI Disinformation narratives — color-coded by threat actor at target country */}
+                {fimiGeoJSON && (
+                    <Source id="fimi" type="geojson" data={fimiGeoJSON as any}>
+                        {/* Outer ring — larger for major waves */}
+                        <Layer
+                            id="fimi-pulse"
+                            type="circle"
+                            paint={{
+                                'circle-radius': ['case', ['==', ['get', 'is_major_wave'], 1], 18, 14],
+                                'circle-color': 'rgba(0, 0, 0, 0)',
+                                'circle-stroke-width': ['case', ['==', ['get', 'is_major_wave'], 1], 2.5, 1.5],
+                                'circle-stroke-color': ['get', 'color'],
+                                'circle-stroke-opacity': 0.4,
+                            }}
+                        />
+                        {/* Inner solid circle — color by threat actor */}
+                        <Layer
+                            id="fimi-layer"
+                            type="circle"
+                            paint={{
+                                'circle-radius': ['case', ['==', ['get', 'is_major_wave'], 1], 9, 6],
+                                'circle-color': ['get', 'color'],
+                                'circle-stroke-width': 2,
+                                'circle-stroke-color': 'rgba(0, 0, 0, 0.6)',
+                                'circle-opacity': 0.8,
+                            }}
+                        />
+                        {/* Actor label */}
+                        <Layer
+                            id="fimi-label"
+                            type="symbol"
+                            layout={{
+                                'text-field': ['get', 'primary_actor'],
+                                'text-size': 9,
+                                'text-font': ['Noto Sans Bold'],
+                                'text-offset': [0, 1.6],
+                                'text-anchor': 'top',
+                                'text-allow-overlap': false,
+                            }}
+                            paint={{
+                                'text-color': ['get', 'color'],
+                                'text-halo-color': 'rgba(0,0,0,0.9)',
+                                'text-halo-width': 1.5,
+                            }}
+                        />
+                    </Source>
+                )}
+
+                {/* Train positions — green circles with route labels */}
+                {trainsGeoJSON && (
+                    <Source id="trains" type="geojson" data={trainsGeoJSON as any}>
+                        <Layer
+                            id="trains-layer"
+                            type="circle"
+                            paint={{
+                                'circle-radius': 5,
+                                'circle-color': '#22c55e',
+                                'circle-stroke-width': 2,
+                                'circle-stroke-color': 'rgba(0, 0, 0, 0.6)',
+                                'circle-opacity': 0.9,
+                            }}
+                        />
+                        <Layer
+                            id="trains-label"
+                            type="symbol"
+                            layout={{
+                                'text-field': ['get', 'name'],
+                                'text-size': 9,
+                                'text-font': ['Noto Sans Bold'],
+                                'text-offset': [0, 1.4],
+                                'text-anchor': 'top',
+                                'text-allow-overlap': false,
+                            }}
+                            paint={{
+                                'text-color': '#86efac',
+                                'text-halo-color': 'rgba(0,0,0,0.9)',
+                                'text-halo-width': 1.5,
+                            }}
+                        />
+                    </Source>
+                )}
+
+                {/* Meshtastic LoRa nodes — clustered teal circles */}
+                {meshtasticGeoJSON && (
+                    <Source id="meshtastic" type="geojson" data={meshtasticGeoJSON as any} cluster={true} clusterRadius={40} clusterMaxZoom={10}>
+                        <Layer
+                            id="meshtastic-clusters"
+                            type="circle"
+                            filter={['has', 'point_count']}
+                            paint={{
+                                'circle-color': '#14b8a6',
+                                'circle-radius': ['step', ['get', 'point_count'], 10, 10, 14, 50, 18],
+                                'circle-opacity': 0.7,
+                                'circle-stroke-width': 1,
+                                'circle-stroke-color': 'rgba(0,0,0,0.4)',
+                            }}
+                        />
+                        <Layer
+                            id="meshtastic-cluster-count"
+                            type="symbol"
+                            filter={['has', 'point_count']}
+                            layout={{
+                                'text-field': '{point_count_abbreviated}',
+                                'text-size': 10,
+                                'text-font': ['Noto Sans Bold'],
+                            }}
+                            paint={{ 'text-color': '#ffffff' }}
+                        />
+                        <Layer
+                            id="meshtastic-layer"
+                            type="circle"
+                            filter={['!', ['has', 'point_count']]}
+                            paint={{
+                                'circle-radius': 4,
+                                'circle-color': '#14b8a6',
+                                'circle-stroke-width': 1.5,
+                                'circle-stroke-color': 'rgba(0, 0, 0, 0.5)',
+                                'circle-opacity': 0.85,
                             }}
                         />
                     </Source>

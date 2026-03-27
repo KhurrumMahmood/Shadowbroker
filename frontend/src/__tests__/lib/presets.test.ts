@@ -8,6 +8,11 @@ const ALL_LAYER_KEYS: (keyof ActiveLayers)[] = [
   'earthquakes', 'cctv', 'ukraine_frontline', 'global_incidents', 'day_night',
   'gps_jamming', 'gibs_imagery', 'highres_satellite', 'kiwisdr', 'firms',
   'internet_outages', 'datacenters', 'military_bases', 'power_plants',
+  'prediction_markets',
+  'ukraine_alerts',
+  'fimi',
+  'trains',
+  'meshtastic',
 ];
 
 describe('presets', () => {

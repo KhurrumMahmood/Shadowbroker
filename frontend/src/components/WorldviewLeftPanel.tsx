@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plane, AlertTriangle, Activity, Satellite, Cctv, ChevronDown, ChevronUp, Ship, Eye, Anchor, Settings, Sun, Moon, BookOpen, Radio, Play, Pause, Globe, Flame, Wifi, Server, Shield, Zap, ToggleLeft, ToggleRight, Palette, ChevronLeftIcon, ChevronRightIcon, Crosshair } from "lucide-react";
+import { Plane, AlertTriangle, Activity, Satellite, Cctv, ChevronDown, ChevronUp, Ship, Eye, Anchor, Settings, Sun, Moon, BookOpen, Radio, Play, Pause, Globe, Flame, Wifi, Server, Shield, Zap, ToggleLeft, ToggleRight, Palette, ChevronLeftIcon, ChevronRightIcon, Crosshair, TrainFront } from "lucide-react";
 import packageJson from "../../package.json";
 import { useTheme } from "@/lib/ThemeContext";
 
@@ -21,6 +21,11 @@ function relativeTime(iso: string | undefined): string {
 
 // Map layer IDs to freshness keys from the backend source_timestamps dict
 const FRESHNESS_MAP: Record<string, string> = {
+    prediction_markets: "prediction_markets",
+    ukraine_alerts: "ukraine_alerts",
+    fimi: "fimi",
+    trains: "trains",
+    meshtastic: "meshtastic",
     flights: "commercial_flights",
     private: "private_flights",
     jets: "private_jets",
@@ -251,6 +256,9 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
             { id: "ukraine_frontline", name: "Ukraine Frontline", source: "DeepStateMap", count: data?.frontlines ? 1 : 0, icon: AlertTriangle },
             { id: "gps_jamming", name: "GPS Jamming", source: "ADS-B NACp", count: data?.gps_jamming?.length || 0, icon: Radio },
             { id: "firms", name: "Fire Hotspots (24h)", source: "NASA FIRMS VIIRS", count: data?.firms_fires?.length || 0, icon: Flame },
+            { id: "prediction_markets", name: "Prediction Markets", source: "Polymarket + Kalshi", count: data?.prediction_markets?.length || 0, icon: Activity },
+            { id: "ukraine_alerts", name: "Ukraine Air Raid", source: "alerts.in.ua", count: data?.ukraine_alerts?.length || 0, icon: AlertTriangle },
+            { id: "fimi", name: "Disinformation", source: "EUvsDisinfo", count: data?.fimi?.length || 0, icon: Shield },
         ]},
         { name: "AVIATION", layers: [
             { id: "flights", name: "Commercial Flights", source: "adsb.lol", count: data?.commercial_flights?.length || 0, icon: Plane },
@@ -271,11 +279,13 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
             { id: "earthquakes", name: "Earthquakes (24h)", source: "USGS", count: data?.earthquakes?.length || 0, icon: Activity },
             { id: "kiwisdr", name: "KiwiSDR Receivers", source: "KiwiSDR.com", count: data?.kiwisdr?.length || 0, icon: Radio },
             { id: "cctv", name: "CCTV Mesh", source: "CCTV Mesh + Street View", count: data?.cctv?.length || 0, icon: Cctv },
+            { id: "meshtastic", name: "Meshtastic Nodes", source: "LoRa Mesh Network", count: data?.meshtastic?.length || 0, icon: Radio },
         ]},
         { name: "INFRASTRUCTURE", layers: [
             { id: "datacenters", name: "Data Centers", source: "DC Map (GitHub)", count: data?.datacenters?.length || 0, icon: Server },
             { id: "military_bases", name: "Military Bases", source: "OSINT (Static)", count: data?.military_bases?.length || 0, icon: Shield },
             { id: "internet_outages", name: "Internet Outages", source: "IODA / Georgia Tech", count: data?.internet_outages?.length || 0, icon: Wifi },
+            { id: "trains", name: "Train Tracking", source: "Amtrak + DigiTraffic", count: data?.trains?.length || 0, icon: TrainFront },
         ]},
         { name: "EXTRAS", layers: [
             { id: "power_plants", name: "Power Plants", source: "WRI (Static)", count: data?.power_plants?.length || 0, icon: Zap },

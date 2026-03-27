@@ -23,6 +23,7 @@ _SECRET_VARS = [
     "LTA_ACCOUNT_KEY",
     "CORS_ORIGINS",
     "ADMIN_KEY",
+    "TTS_OPENAI_API_KEY",
 ]
 
 for _var in _SECRET_VARS:
@@ -50,7 +51,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI, Request, Response, Query, Depends, HTTPException
+from fastapi import FastAPI, Request, Response, Query, Depends, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel, field_validator
@@ -71,6 +72,7 @@ from services.llm_assistant import (
     build_briefing_context, build_briefing_prompt,
     ContentFilterError, LLMConnectionError,
 )
+from services.voice import transcribe, tts_stream, AVAILABLE_VOICES, ALLOWED_AUDIO_TYPES, _get_api_key
 from services.network_utils import fetch_with_curl
 from services.news_feed_config import get_feeds, save_feeds, reset_feeds
 from services.radio_intercept import (
@@ -81,6 +83,8 @@ from services.radio_intercept import (
 from services.region_dossier import get_region_dossier
 from services.schemas import HealthResponse, RefreshResponse
 from services.sentinel_search import search_sentinel2_scene
+from services.thermal_sentinel import analyze_thermal
+from services.shodan_connector import search_shodan
 from services.updater import perform_update, schedule_restart
 
 limiter = Limiter(key_func=get_remote_address)
@@ -324,6 +328,8 @@ async def live_data_fast(request: Request,
         "uavs": _f(d.get("uavs", [])),
         "liveuamap": _f(d.get("liveuamap", [])),
         "gps_jamming": _f(d.get("gps_jamming", [])),
+        "ukraine_alerts": _f(d.get("ukraine_alerts", [])),
+        "trains": _f(d.get("trains", [])),
         "satellites": _f(d.get("satellites", [])),
         "satellite_source": d.get("satellite_source", "none"),
         "freshness": dict(source_timestamps),
@@ -363,6 +369,10 @@ async def live_data_slow(request: Request,
         "coverage_gaps": d.get("coverage_gaps", []),
         "correlations": d.get("correlations", []),
         "disease_outbreaks": d.get("disease_outbreaks", []),
+        "prediction_markets": d.get("prediction_markets", []),
+        "trending_markets": d.get("trending_markets", []),
+        "fimi": _f(d.get("fimi", [])),
+        "meshtastic": _f(d.get("meshtastic", [])),
         "freshness": dict(source_timestamps),
     }
     bbox_tag = f"{s},{w},{n},{e}" if has_bbox else "full"
@@ -480,6 +490,34 @@ def api_sentinel2_search(
 ):
     """Search for latest Sentinel-2 imagery at a point. Sync for threadpool execution."""
     return search_sentinel2_scene(lat, lng)
+
+# ---------------------------------------------------------------------------
+# Thermal Sentinel — on-demand SWIR anomaly analysis
+# ---------------------------------------------------------------------------
+
+class ThermalRequest(BaseModel):
+    lat: float
+    lng: float
+
+@app.post("/api/thermal/analyze")
+@limiter.limit("20/minute")
+def api_thermal_analyze(request: Request, body: ThermalRequest):
+    """Thermal anomaly analysis at a point. Sync for threadpool execution."""
+    return analyze_thermal(body.lat, body.lng)
+
+# ---------------------------------------------------------------------------
+# Shodan — on-demand exposed-device search (admin-only)
+# ---------------------------------------------------------------------------
+
+class ShodanSearchRequest(BaseModel):
+    query: str
+    limit: int = 20
+
+@app.post("/api/shodan/search", dependencies=[Depends(require_admin)])
+@limiter.limit("10/minute")
+def api_shodan_search(request: Request, body: ShodanSearchRequest):
+    """Search Shodan for exposed devices. Admin-only. Sync for threadpool."""
+    return search_shodan(body.query, body.limit)
 
 # ---------------------------------------------------------------------------
 # API Settings — key registry & management
@@ -699,6 +737,77 @@ async def assistant_query_stream(request: Request, body: AssistantQuery):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+# ---------------------------------------------------------------------------
+# Voice: Transcription (STT) and Text-to-Speech (TTS)
+# ---------------------------------------------------------------------------
+
+class TTSRequest(BaseModel):
+    text: str
+    voice: str = "onyx"
+
+
+@app.post("/api/assistant/transcribe")
+@limiter.limit("15/minute")
+async def assistant_transcribe(request: Request, file: UploadFile = File(...)):
+    """Transcribe uploaded audio to text via OpenAI STT."""
+    audio_bytes = await file.read()
+    if not audio_bytes:
+        raise HTTPException(status_code=400, detail="Empty audio file")
+    if len(audio_bytes) > 25 * 1024 * 1024:  # 25 MB limit (OpenAI max)
+        raise HTTPException(status_code=400, detail="Audio file too large (max 25 MB)")
+
+    content_type = file.content_type or "audio/webm"
+    if content_type not in ALLOWED_AUDIO_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported audio format: {content_type}",
+        )
+
+    try:
+        result = await transcribe(audio_bytes, content_type)
+        return result
+    except RuntimeError as e:
+        status = 503 if "not set" in str(e) else 500
+        return Response(
+            content=json_mod.dumps({"error": str(e)}),
+            status_code=status,
+            media_type="application/json",
+        )
+
+
+@app.post("/api/assistant/tts")
+@limiter.limit("15/minute")
+async def assistant_tts(request: Request, body: TTSRequest):
+    """Generate speech audio from text via OpenAI TTS. Returns streaming MP3."""
+    if not body.text.strip():
+        raise HTTPException(status_code=400, detail="Empty text")
+    if len(body.text) > 4096:
+        raise HTTPException(status_code=400, detail="Text too long (max 4096 chars)")
+
+    # Validate API key eagerly — tts_stream is an async generator so errors
+    # during iteration would produce a truncated 200 response, not a clean error.
+    try:
+        _get_api_key()
+    except RuntimeError as e:
+        return Response(
+            content=json_mod.dumps({"error": str(e)}),
+            status_code=503,
+            media_type="application/json",
+        )
+
+    return StreamingResponse(
+        tts_stream(body.text, body.voice),
+        media_type="audio/mpeg",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
+@app.get("/api/assistant/voices")
+async def assistant_voices():
+    """List available TTS voices."""
+    return {"voices": AVAILABLE_VOICES, "default": "onyx"}
+
 
 @app.get("/api/artifacts")
 async def list_artifacts():

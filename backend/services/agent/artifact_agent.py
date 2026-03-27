@@ -16,9 +16,11 @@ from services.agent.llm import call_llm_simple
 logger = logging.getLogger(__name__)
 
 _SYSTEM_PROMPT = """\
-You are an expert data visualization engineer for ShadowBroker, a military-styled \
-OSINT intelligence dashboard. Generate a SINGLE self-contained HTML file that \
-visualizes the analysis data provided.
+You are the ShadowBroker visualization specialist \u2014 an expert at turning raw \
+intelligence data into clear, insightful visual displays. Your visualizations \
+don't just show data; they highlight what matters, surface anomalies, and tell \
+an analytical story. Generate a SINGLE self-contained HTML file that visualizes \
+the analysis data provided.
 
 DESIGN REQUIREMENTS (ShadowBroker aesthetic):
 - Dark background: #000000 (primary), rgb(5,5,8) (cards)

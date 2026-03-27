@@ -49,6 +49,12 @@ from services.fetchers.geo import (  # noqa: F401
     fetch_frontlines, fetch_gdelt, fetch_geopolitics, update_liveuamap,
 )
 from services.fetchers.health import fetch_disease_outbreaks  # noqa: F401
+from services.fetchers.prediction_markets import fetch_prediction_markets  # noqa: F401
+from services.fetchers.ukraine_alerts import fetch_ukraine_alerts  # noqa: F401
+from services.fetchers.fimi import fetch_fimi  # noqa: F401
+from services.fetchers.emissions import enrich_emissions  # noqa: F401
+from services.fetchers.trains import fetch_trains  # noqa: F401
+from services.fetchers.meshtastic import fetch_meshtastic  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -149,10 +155,14 @@ def update_fast_data():
         fetch_military_flights,
         fetch_ships,
         fetch_satellites,
+        fetch_ukraine_alerts,
+        fetch_trains,
     ]
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(fast_funcs)) as executor:
         futures = [executor.submit(func) for func in fast_funcs]
         concurrent.futures.wait(futures)
+    # Post-processing enrichments
+    enrich_emissions()
     with _data_lock:
         latest_data['last_updated'] = datetime.utcnow().isoformat()
     _update_agent_stores()
@@ -175,6 +185,9 @@ def update_slow_data():
         fetch_frontlines,
         fetch_gdelt,
         fetch_disease_outbreaks,
+        fetch_prediction_markets,
+        fetch_fimi,
+        fetch_meshtastic,
         # datacenters, military_bases, power_plants are static files —
         # loaded once at startup via _load_static_infrastructure(), not every 5min
     ]
@@ -218,6 +231,12 @@ def start_scheduler():
     # Very slow — every 15 minutes
     _scheduler.add_job(fetch_gdelt, 'interval', minutes=15, id='gdelt', max_instances=1, misfire_grace_time=120)
     _scheduler.add_job(update_liveuamap, 'interval', minutes=15, id='liveuamap', max_instances=1, misfire_grace_time=120)
+
+    # Ultra slow — every 12 hours (narratives don't change fast)
+    _scheduler.add_job(fetch_fimi, 'interval', hours=12, id='fimi', max_instances=1, misfire_grace_time=600)
+
+    # Very slow — every 4 hours (large response, respectful interval)
+    _scheduler.add_job(fetch_meshtastic, 'interval', hours=4, id='meshtastic', max_instances=1, misfire_grace_time=600)
 
     # CCTV pipeline refresh — hydrate DB-backed cameras immediately, then every 10 minutes.
     _scheduler.add_job(

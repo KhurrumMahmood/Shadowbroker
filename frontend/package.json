@@ -17,6 +17,8 @@
   },
   "dependencies": {
     "@mapbox/point-geometry": "^1.1.0",
+    "@picovoice/porcupine-web": "^4.0.0",
+    "@ricky0123/vad-react": "^0.0.36",
     "@types/topojson-client": "^3.1.5",
     "d3": "^7.9.0",
     "framer-motion": "^12.34.3",

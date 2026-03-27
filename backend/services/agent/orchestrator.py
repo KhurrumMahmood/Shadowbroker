@@ -13,6 +13,29 @@ from services.agent.llm import call_llm_simple
 from services.agent.router import QueryPlan, SubTask
 from services.agent.sub_agent import SubAgent, SubAgentResult
 from services.agent.artifact_agent import ArtifactAgent
+from services.llm_assistant import _PERSONA_PREAMBLE
+
+# Deterministic domain → layer mapping for compound queries
+_DOMAIN_LAYER_MAP: dict[str, dict[str, bool]] = {
+    "maritime": {
+        "ships_military": True, "ships_cargo": True, "ships_civilian": True,
+        "ships_passenger": True, "ships_tracked_yachts": True,
+    },
+    "aviation": {
+        "flights": True, "private": True, "jets": True,
+        "military": True, "tracked": True,
+    },
+    "seismic": {"earthquakes": True},
+    "conflict": {
+        "military": True, "ships_military": True, "ukraine_frontline": True,
+        "global_incidents": True, "gps_jamming": True, "military_bases": True, "firms": True,
+        "ukraine_alerts": True,
+    },
+    "intelligence": {"gps_jamming": True, "satellites": True, "military": True, "meshtastic": True},
+    "economic": {"global_incidents": True, "prediction_markets": True},
+    "infrastructure": {"datacenters": True, "power_plants": True, "internet_outages": True, "trains": True},
+    "disinformation": {"fimi": True, "global_incidents": True},
+}
 from services.agent.artifacts import get_artifact_store, Artifact
 from services.agent.artifact_registry import get_artifact_registry, extract_tags_from_query
 
@@ -267,10 +290,16 @@ class Orchestrator:
             else:
                 summary = "Unable to complete analysis — all sub-agents failed."
 
+        # Derive layers from detected domains
+        layers: dict[str, bool] = {}
+        for domain in plan.domains_detected:
+            layers.update(_DOMAIN_LAYER_MAP.get(domain, {}))
+
         return OrchestratorResult(
             summary=summary,
             sub_results=sub_results,
             plan=plan,
+            layers=layers if layers else None,
             result_entities=all_entities,
             reasoning_steps=[
                 {"step": "plan", "domains": plan.domains_detected},
@@ -296,9 +325,14 @@ class Orchestrator:
             {
                 "role": "system",
                 "content": (
-                    "You are an intelligence analyst synthesizing findings from "
-                    "multiple domain specialists. Produce a coherent, concise summary "
-                    "that answers the user's question. Respond with JSON:\n"
+                    f"{_PERSONA_PREAMBLE} You are synthesizing findings from multiple "
+                    "domain specialists into a single coherent intelligence picture. "
+                    "Weave findings into a narrative \u2014 don't just concatenate. "
+                    "Lead with the most significant finding. Note cross-domain "
+                    "correlations (the whole point of multi-agent analysis). "
+                    "Cite data sources inline using [SOURCE: layer_name] format "
+                    "(e.g. [SOURCE: prediction_markets], [SOURCE: fimi]). "
+                    "Suggest what the analyst should examine next. Respond with JSON:\n"
                     '{"summary": "...", "risk_level": 1-10, "key_findings": ["..."]}'
                 ),
             },

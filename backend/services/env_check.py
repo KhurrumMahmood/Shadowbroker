@@ -23,6 +23,7 @@ _OPTIONAL = {
     "OPENSKY_CLIENT_ID": "OpenSky OAuth2 — gap-fill flights in Africa/Asia/LatAm",
     "OPENSKY_CLIENT_SECRET": "OpenSky OAuth2 — gap-fill flights in Africa/Asia/LatAm",
     "LTA_ACCOUNT_KEY": "Singapore LTA traffic cameras (CCTV layer)",
+    "TTS_OPENAI_API_KEY": "Voice mode — STT transcription and TTS speech synthesis",
 }
 
 

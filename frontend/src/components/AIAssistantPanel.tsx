@@ -2,17 +2,21 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Send, Bot, User, Loader2, ChevronLeft, ChevronRight, XCircle, Plus, Trash2, ArrowLeft, Zap, Layers } from "lucide-react";
+import { X, Send, Bot, User, Loader2, ChevronLeft, ChevronRight, XCircle, Plus, Trash2, ArrowLeft, Zap, Layers, Radio, Settings2 } from "lucide-react";
 import { validateAssistantResponse, extractStoredAction } from "@/lib/assistantTypes";
 import type { DashboardData } from "@/types/dashboard";
 import type { AIResultState } from "@/hooks/useAIResultCycler";
 import { findEntityInData } from "@/hooks/useAIResultCycler";
 import { toSelectedEntity } from "@/hooks/useCategoryCycler";
 import { useConversationStore } from "@/hooks/useConversationStore";
+import { useVoiceMode, type VoiceModeSettings } from "@/hooks/useVoiceMode";
 import type { StoredMessage, StoredAction } from "@/types/aiConversation";
 import ArtifactPanel from "@/components/ArtifactPanel";
 import ArtifactBrowser from "@/components/ArtifactBrowser";
+import { VoiceIndicator } from "@/components/VoiceIndicator";
+import { VoiceSettings } from "@/components/VoiceSettings";
 import { getDummyData } from "@/artifacts/_shared/dummyData";
+import { LAYER_LABELS } from "@/lib/layerMeta";
 
 function generateId(): string {
   return crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -183,10 +187,29 @@ export default function AIAssistantPanel({
   const [expandedReasoning, setExpandedReasoning] = useState<Set<number>>(new Set());
   const [prevMode, setPrevMode] = useState<PanelMode>("chat");
   const [activeArtifact, setActiveArtifact] = useState<{ id: string; title?: string; registryName?: string; version?: number; type?: "html" | "react"; useDummyData?: boolean } | null>(null);
+  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const handleSendInternalRef = useRef<((query: string) => Promise<void>) | null>(null);
   const store = useConversationStore();
+
+  // --- Voice Mode ---
+  const voiceMode = useVoiceMode({
+    settings: {
+      mode: "tactical",
+      voice: "onyx",
+      followUpWindowMs: 6000,
+      audioCues: true,
+      picovoiceAccessKey: process.env.NEXT_PUBLIC_PICOVOICE_ACCESS_KEY ?? "",
+    },
+    onSubmitQuery: (text) => {
+      handleSendVoice(text);
+    },
+    onError: (msg) => {
+      console.warn("[Voice]", msg);
+    },
+  });
 
   /** Live dashboard data mapped to the shape the active artifact expects.
    *  When useDummyData is set (by the LLM on explicit user request), loads fixture data instead. */
@@ -255,10 +278,21 @@ export default function AIAssistantPanel({
     [onApplyLayers, onFlyTo, onSelectEntity, onApplyFilters, onSetAIResults, onAIResultClear],
   );
 
+  /** Submit a voice-transcribed query. */
+  const handleSendVoice = useCallback((text: string) => {
+    if (!text.trim() || loading) return;
+    voiceMode.notifyAnalyzing();
+    handleSendInternalRef.current?.(text.trim());
+  }, [loading, voiceMode]);
+
   const handleSend = async () => {
     const query = input.trim();
     if (!query || loading) return;
     setInput("");
+    handleSendInternalRef.current?.(query);
+  };
+
+  const handleSendInternal = async (query: string) => {
     const userMsg: StoredMessage = { role: "user", content: query, timestamp: Date.now() };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
@@ -351,14 +385,27 @@ export default function AIAssistantPanel({
 
           if (eventType === "status") {
             const status = tryParseJSON<{ detail?: string }>(eventData);
-            if (status) setProgressText(status.detail || "Working...");
+            if (status) {
+              setProgressText(status.detail || "Working...");
+              if (voiceMode.isActive) voiceMode.narrateProgress("Let me look into that.");
+            }
           } else if (eventType === "plan") {
-            const plan = tryParseJSON<{ sub_tasks?: unknown[] }>(eventData);
-            if (plan) setProgressText(`Analyzing across ${plan.sub_tasks?.length || 0} domains...`);
+            const plan = tryParseJSON<{ sub_tasks?: { intent?: string }[] }>(eventData);
+            if (plan) {
+              const n = plan.sub_tasks?.length || 0;
+              const label = `Analyzing across ${n} domains...`;
+              setProgressText(label);
+              if (voiceMode.isActive && n > 1) {
+                voiceMode.narrateProgress(`I'm going to analyze across ${n} domains.`);
+              }
+            }
           } else if (eventType === "sub_result") {
             const sub = tryParseJSON<{ summary?: string }>(eventData);
             if (sub?.summary) {
               setProgressText(sub.summary.slice(0, 80) + (sub.summary.length > 80 ? "..." : ""));
+              if (voiceMode.isActive) {
+                voiceMode.narrateProgress(sub.summary.slice(0, 120));
+              }
             }
           } else if (eventType === "artifact") {
             const art = tryParseJSON<{ artifact_id?: string; title?: string; registry_name?: string; version?: number; type?: string; use_dummy_data?: boolean }>(eventData);
@@ -387,6 +434,10 @@ export default function AIAssistantPanel({
                 timestamp: Date.now(),
               });
               if (action) applyAction(action);
+              // Trigger TTS for voice mode
+              if (voiceMode.isActive && validated.summary) {
+                voiceMode.notifyResponse(validated.summary);
+              }
               handled = true;
             }
           } else if (eventType === "error") {
@@ -417,6 +468,7 @@ export default function AIAssistantPanel({
       setProgressText(null);
     }
   };
+  handleSendInternalRef.current = handleSendInternal;
 
   const resetConversation = useCallback(() => {
     if (messages.length > 0) {
@@ -499,11 +551,26 @@ export default function AIAssistantPanel({
           {action.viewport_label ? `GO TO ${action.viewport_label.toUpperCase()}` : `FLY TO ${action.viewport.lat.toFixed(1)}, ${action.viewport.lng.toFixed(1)}`}
         </button>
       )}
-      {action.layers && (
-        <button type="button" onClick={(e) => { e.stopPropagation(); onApplyLayers(action.layers!); }} className={chipClass}>
-          {formatLayerLabel(action.layers)}
-        </button>
-      )}
+      {action.layers && (() => {
+        const entries = Object.entries(action.layers!);
+        return <>
+          {entries.length > 3 && (
+            <button type="button" onClick={(e) => { e.stopPropagation(); onApplyLayers(action.layers!); }} className={chipClass}>
+              {formatLayerLabel(action.layers!)}
+            </button>
+          )}
+          {entries.map(([key, enabled]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onApplyLayers({ [key]: enabled }); }}
+              className={`${chipClass} ${enabled ? "border-green-700/50 text-green-400" : "border-red-800/50 text-red-400"}`}
+            >
+              {LAYER_LABELS[key] || key.replace(/_/g, " ").toUpperCase()} {enabled ? "ON" : "OFF"}
+            </button>
+          ))}
+        </>;
+      })()}
       {action.filters && (
         <button type="button" onClick={(e) => { e.stopPropagation(); onApplyFilters?.(action.filters!); }} className={chipClass}>
           {Object.keys(action.filters).length === 0 ? "CLEAR FILTERS" : "APPLY FILTERS"}
@@ -658,6 +725,25 @@ export default function AIAssistantPanel({
                 <Plus size={14} />
               </button>
             )}
+            {/* COMMS voice mode toggle */}
+            <button
+              type="button"
+              onClick={() => {
+                if (voiceMode.isActive) {
+                  voiceMode.deactivate();
+                } else {
+                  voiceMode.activate();
+                }
+              }}
+              className={`transition-colors ${
+                voiceMode.isActive
+                  ? "text-cyan-400 hover:text-cyan-300"
+                  : "text-[var(--text-muted)] hover:text-cyan-400"
+              }`}
+              title={voiceMode.isActive ? "Deactivate COMMS" : "Activate COMMS"}
+            >
+              <Radio size={14} />
+            </button>
             <button type="button" onClick={onClose} className="text-[var(--text-muted)] hover:text-cyan-400 transition-colors">
               <X size={14} />
             </button>
@@ -779,27 +865,49 @@ export default function AIAssistantPanel({
                 </div>
               )}
 
-              {/* Input */}
-              <div className="px-3 py-2.5 border-t border-cyan-800/40">
-                <div className="flex items-center gap-2">
-                  <input
-                    ref={inputRef}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }}
-                    placeholder="Ask the analyst..."
-                    disabled={loading}
-                    className="flex-1 bg-transparent text-[10px] text-[var(--text-primary)] font-mono tracking-wider outline-none placeholder:text-[var(--text-muted)] disabled:opacity-50"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSend}
-                    disabled={loading || !input.trim()}
-                    className="p-1.5 rounded border border-cyan-800/40 text-cyan-400 hover:bg-cyan-950/30 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    <Send size={12} />
-                  </button>
-                </div>
+              {/* Input / Voice Indicator */}
+              <div className="px-3 py-2.5 border-t border-cyan-800/40 relative">
+                {voiceMode.isActive && voiceMode.state !== "off" ? (
+                  <>
+                    <VoiceIndicator state={voiceMode.state} progressText={progressText} />
+                    {/* Voice settings toggle */}
+                    <button
+                      type="button"
+                      onClick={() => setShowVoiceSettings((v) => !v)}
+                      className="absolute top-2 right-3 text-[var(--text-muted)] hover:text-cyan-400 transition-colors"
+                      title="Voice settings"
+                    >
+                      <Settings2 size={11} />
+                    </button>
+                    {showVoiceSettings && (
+                      <VoiceSettings
+                        settings={voiceMode.settings}
+                        onUpdate={voiceMode.updateSettings}
+                        onClose={() => setShowVoiceSettings(false)}
+                      />
+                    )}
+                  </>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={inputRef}
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }}
+                      placeholder="Ask the analyst..."
+                      disabled={loading}
+                      className="flex-1 bg-transparent text-[10px] text-[var(--text-primary)] font-mono tracking-wider outline-none placeholder:text-[var(--text-muted)] disabled:opacity-50"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSend}
+                      disabled={loading || !input.trim()}
+                      className="p-1.5 rounded border border-cyan-800/40 text-cyan-400 hover:bg-cyan-950/30 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <Send size={12} />
+                    </button>
+                  </div>
+                )}
               </div>
             </motion.div>
           )}

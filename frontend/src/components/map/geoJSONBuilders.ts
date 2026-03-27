@@ -2,7 +2,7 @@
 // Extracted from MaplibreViewer to reduce component size and enable unit testing.
 // Each function takes data arrays + optional helpers and returns a GeoJSON FeatureCollection or null.
 
-import type { Earthquake, GPSJammingZone, FireHotspot, InternetOutage, DataCenter, MilitaryBase, PowerPlant, GDELTIncident, LiveUAmapIncident, CCTVCamera, KiwiSDR, FrontlineGeoJSON, UAV, Satellite, Ship, ActiveLayers } from "@/types/dashboard";
+import type { Earthquake, GPSJammingZone, FireHotspot, InternetOutage, DataCenter, MilitaryBase, PowerPlant, GDELTIncident, LiveUAmapIncident, CCTVCamera, KiwiSDR, FrontlineGeoJSON, UAV, Satellite, Ship, ActiveLayers, UkraineAlert, FIMINarrative, Train, MeshtasticNode } from "@/types/dashboard";
 import { classifyAircraft } from "@/utils/aircraftClassification";
 import { MISSION_COLORS, MISSION_ICON_MAP } from "@/components/map/icons/SatelliteIcons";
 import { getCountryGroup } from "@/components/map/icons/countryGroups";
@@ -528,5 +528,98 @@ export function buildCarriersGeoJSON(ships: Ship[] | undefined): FC {
                 geometry: { type: 'Point', coordinates: [s.lng, s.lat] }
             };
         }).filter(Boolean) as GeoJSON.Feature[]
+    };
+}
+
+// ─── Ukraine Alerts ─────────────────────────────────────────────────────────
+
+export function buildUkraineAlertsGeoJSON(alerts?: UkraineAlert[]): FC {
+    if (!alerts?.length) return null;
+    return {
+        type: 'FeatureCollection',
+        features: alerts.map((a) => ({
+            type: 'Feature' as const,
+            properties: {
+                id: `ua-alert-${a.id}`,
+                type: 'ukraine_alert',
+                name: a.name_en,
+                alert_type: a.alert_type,
+                location_title: a.location_title,
+                started_at: a.started_at,
+                color: a.color,
+            },
+            geometry: { type: 'Point' as const, coordinates: [a.lng, a.lat] },
+        })),
+    };
+}
+
+// ─── FIMI (Disinformation) ──────────────────────────────────────────────────
+
+export function buildFIMIGeoJSON(narratives?: FIMINarrative[]): FC {
+    if (!narratives?.length) return null;
+    // Only include geolocated narratives (those with target country coordinates)
+    const geolocated = narratives.filter(n => n.lat != null && n.lng != null);
+    if (!geolocated.length) return null;
+    return {
+        type: 'FeatureCollection',
+        features: geolocated.map((n) => ({
+            type: 'Feature' as const,
+            properties: {
+                id: n.id,
+                type: 'fimi',
+                name: n.title.slice(0, 80),
+                title: n.title,
+                primary_actor: n.primary_actor || 'Unknown',
+                target_country: n.target_country || '',
+                is_major_wave: n.is_major_wave ? 1 : 0,
+                color: n.color,
+            },
+            geometry: { type: 'Point' as const, coordinates: [n.lng!, n.lat!] },
+        })),
+    };
+}
+
+// ─── Trains ─────────────────────────────────────────────────────────────────
+
+export function buildTrainsGeoJSON(trains?: Train[]): FC {
+    if (!trains?.length) return null;
+    return {
+        type: 'FeatureCollection',
+        features: trains.map((t) => ({
+            type: 'Feature' as const,
+            properties: {
+                id: t.id,
+                type: 'train',
+                name: t.name,
+                operator: t.operator,
+                country: t.country,
+                speed: t.speed,
+                heading: t.heading ?? 0,
+                status: t.status,
+                origin: t.origin,
+                destination: t.destination,
+            },
+            geometry: { type: 'Point' as const, coordinates: [t.lng, t.lat] },
+        })),
+    };
+}
+
+// ─── Meshtastic Nodes ───────────────────────────────────────────────────────
+
+export function buildMeshtasticGeoJSON(nodes?: MeshtasticNode[]): FC {
+    if (!nodes?.length) return null;
+    return {
+        type: 'FeatureCollection',
+        features: nodes.map((n) => ({
+            type: 'Feature' as const,
+            properties: {
+                id: n.id,
+                type: 'meshtastic',
+                name: n.long_name || n.short_name || n.node_id,
+                hardware: n.hardware,
+                last_seen: n.last_seen,
+            },
+            geometry: { type: 'Point' as const, coordinates: [n.lng, n.lat] },
+        })),
     };
 }

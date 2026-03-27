@@ -27,6 +27,11 @@ export const LAYER_LABELS: Record<string, string> = {
   datacenters: "DATACENTERS",
   military_bases: "BASES",
   power_plants: "POWER",
+  prediction_markets: "MARKETS",
+  ukraine_alerts: "UA ALERTS",
+  fimi: "DISINFO",
+  trains: "TRAINS",
+  meshtastic: "MESH",
 };
 
 export const LAYER_GROUPS: Record<string, { label: string; members: string[] }> = {
@@ -40,6 +45,6 @@ export const LAYER_GROUPS: Record<string, { label: string; members: string[] }> 
   },
   intel: {
     label: "INTEL",
-    members: ["gps_jamming", "satellites", "global_incidents", "military_bases"],
+    members: ["gps_jamming", "satellites", "global_incidents", "military_bases", "prediction_markets", "fimi"],
   },
 };

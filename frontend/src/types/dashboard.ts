@@ -397,6 +397,104 @@ export interface FlightRoute {
   dest_name: string;
 }
 
+// ─── UKRAINE ALERTS ─────────────────────────────────────────────────────────
+
+export interface UkraineAlert {
+  id: number;
+  alert_type: string;
+  location_title: string;
+  location_uid: string;
+  name_en: string;
+  lat: number;
+  lng: number;
+  started_at: string;
+  color: string;
+  _source: string;
+}
+
+// ─── PREDICTION MARKETS ─────────────────────────────────────────────────────
+
+export interface PredictionMarketSource {
+  name: string;   // "POLY" | "KALSHI"
+  pct: number;
+}
+
+export interface PredictionMarketOutcome {
+  name: string;
+  pct: number;
+}
+
+export interface PredictionMarket {
+  title: string;
+  polymarket_pct: number | null;
+  kalshi_pct: number | null;
+  consensus_pct: number | null;
+  delta_pct: number | null;
+  description: string;
+  end_date: string | null;
+  volume: number;
+  volume_24h: number;
+  kalshi_volume: number;
+  category: "POLITICS" | "CONFLICT" | "NEWS" | "FINANCE" | "CRYPTO";
+  sources: PredictionMarketSource[];
+  slug: string;
+  kalshi_ticker: string;
+  outcomes: PredictionMarketOutcome[];
+  _source: string;
+}
+
+// ─── MESHTASTIC ─────────────────────────────────────────────────────────────
+
+export interface MeshtasticNode {
+  id: string;
+  node_id: string;
+  long_name: string;
+  short_name: string;
+  lat: number;
+  lng: number;
+  last_seen: string;
+  hardware: string;
+  _source: string;
+}
+
+// ─── TRAINS ─────────────────────────────────────────────────────────────────
+
+export interface Train {
+  id: string;
+  name: string;
+  train_num: string;
+  operator: string;
+  country: string;
+  lat: number;
+  lng: number;
+  speed: number | null;
+  heading: number | null;
+  status: string;
+  origin: string;
+  destination: string;
+  stations_left: number | null;
+  _source: string;
+}
+
+// ─── FIMI (DISINFORMATION) ──────────────────────────────────────────────────
+
+export interface FIMINarrative {
+  id: string;
+  title: string;
+  description: string;
+  link: string;
+  pub_date: string;
+  threat_actors: string[];
+  target_countries: string[];
+  primary_actor: string | null;
+  target_country: string | null;
+  color: string;
+  is_major_wave: boolean;
+  lat: number | null;
+  lng: number | null;
+  _source: string;
+}
+
 // ─── REGION DOSSIER ─────────────────────────────────────────────────────────
 
 export interface RegionDossier {
@@ -432,6 +530,7 @@ export interface DashboardData {
   cctv?: CCTVCamera[];
   liveuamap?: LiveUAmapIncident[];
   gps_jamming?: GPSJammingZone[];
+  ukraine_alerts?: UkraineAlert[];
   satellites?: Satellite[];
 
   // Slow tier
@@ -451,6 +550,11 @@ export interface DashboardData {
   military_bases?: MilitaryBase[];
   power_plants?: PowerPlant[];
   disease_outbreaks?: DiseaseOutbreak[];
+  prediction_markets?: PredictionMarket[];
+  trending_markets?: PredictionMarket[];
+  fimi?: FIMINarrative[];
+  trains?: Train[];
+  meshtastic?: MeshtasticNode[];
 }
 
 // ─── COMPONENT PROPS ────────────────────────────────────────────────────────
@@ -481,6 +585,11 @@ export interface ActiveLayers {
   datacenters: boolean;
   military_bases: boolean;
   power_plants: boolean;
+  prediction_markets: boolean;
+  ukraine_alerts: boolean;
+  fimi: boolean;
+  trains: boolean;
+  meshtastic: boolean;
 }
 
 export interface SelectedEntity {

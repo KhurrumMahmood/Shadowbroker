@@ -53,20 +53,30 @@ _DOMAIN_KEYWORDS: dict[str, list[str]] = {
     "infrastructure": [
         "power plant", "datacenter", "internet outage", "grid", "cable",
         "infrastructure", "pipeline", "refinery", "energy",
+        "train", "rail", "amtrak", "railway",
     ],
     "conflict": [
         "military base", "military posture", "military deployment",
         "conflict", "war", "tension", "crisis", "deployment",
         "troops", "posture", "defense", "defence", "combat",
         "hostile", "aggression",
+        "ukraine alert", "air raid", "artillery", "ukraine",
     ],
     "economic": [
         "oil", "stock", "price", "market", "trade", "sanctions",
         "economic", "financial", "commodity",
+        "prediction market", "polymarket", "kalshi", "odds", "probability",
+        "betting", "forecast",
     ],
     "intelligence": [
         "gps jamming", "ew", "electronic warfare", "surveillance", "recon",
         "intelligence", "sigint", "elint", "satellite", "spy",
+        "meshtastic", "mesh network", "lora",
+    ],
+    "disinformation": [
+        "fimi", "disinformation", "propaganda", "influence operation",
+        "fake news", "information warfare", "euvsdisinfo", "narrative",
+        "foreign interference", "manipulation",
     ],
 }
 
@@ -106,6 +116,7 @@ _DOMAIN_TOOL_HINTS: dict[str, list[str]] = {
     "conflict": ["query_data", "aggregate_data", "proximity_search"],
     "economic": ["web_search", "query_data"],
     "intelligence": ["query_data", "proximity_search", "anomaly_scan"],
+    "disinformation": ["query_data", "web_search"],
 }
 
 

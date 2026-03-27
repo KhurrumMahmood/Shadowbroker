@@ -148,6 +148,69 @@ _SEARCH_CONFIG = {
             "mag": e.get("mag", 0),
         },
     },
+    "prediction_markets": {
+        "fields": ["title", "category", "consensus_pct", "delta_pct"],
+        "entity_type": "prediction_market",
+        "compact": lambda m: {
+            "title": m.get("title", ""),
+            "category": m.get("category", ""),
+            "consensus_pct": m.get("consensus_pct"),
+            "delta_pct": m.get("delta_pct"),
+            "volume": m.get("volume", 0),
+            "sources": m.get("sources", []),
+            "_source": m.get("_source", "prediction_markets"),
+        },
+    },
+    "ukraine_alerts": {
+        "fields": ["alert_type", "location_title", "name_en"],
+        "entity_type": "ukraine_alert",
+        "compact": lambda a: {
+            "name_en": a.get("name_en", ""),
+            "alert_type": a.get("alert_type", ""),
+            "location_title": a.get("location_title", ""),
+            "started_at": a.get("started_at", ""),
+            "lat": a.get("lat"), "lng": a.get("lng"),
+            "_source": a.get("_source", "ukraine_alerts"),
+        },
+    },
+    "fimi": {
+        "fields": ["title", "primary_actor", "target_country", "threat_actors"],
+        "entity_type": "fimi_narrative",
+        "compact": lambda n: {
+            "title": n.get("title", ""),
+            "primary_actor": n.get("primary_actor", ""),
+            "target_country": n.get("target_country", ""),
+            "threat_actors": n.get("threat_actors", []),
+            "is_major_wave": n.get("is_major_wave", False),
+            "pub_date": n.get("pub_date", ""),
+            "_source": n.get("_source", "fimi"),
+        },
+    },
+    "trains": {
+        "fields": ["name", "operator", "country", "origin", "destination", "status"],
+        "entity_type": "train",
+        "compact": lambda t: {
+            "name": t.get("name", ""),
+            "operator": t.get("operator", ""),
+            "country": t.get("country", ""),
+            "origin": t.get("origin", ""),
+            "destination": t.get("destination", ""),
+            "speed": t.get("speed"),
+            "lat": t.get("lat"), "lng": t.get("lng"),
+            "_source": t.get("_source", "trains"),
+        },
+    },
+    "meshtastic": {
+        "fields": ["long_name", "short_name", "node_id", "hardware"],
+        "entity_type": "meshtastic_node",
+        "compact": lambda n: {
+            "name": n.get("long_name") or n.get("short_name", ""),
+            "node_id": n.get("node_id", ""),
+            "hardware": n.get("hardware", ""),
+            "lat": n.get("lat"), "lng": n.get("lng"),
+            "_source": n.get("_source", "meshtastic"),
+        },
+    },
 }
 
 _QUERYABLE_FIELDS = {
@@ -165,12 +228,17 @@ _QUERYABLE_FIELDS = {
     "datacenters": ["name", "company", "country"],
     "power_plants": ["name", "country", "fuel_type"],
     "earthquakes": ["place", "id", "mag"],
+    "prediction_markets": ["title", "category", "consensus_pct", "delta_pct"],
+    "ukraine_alerts": ["alert_type", "location_title", "name_en", "started_at"],
+    "fimi": ["title", "primary_actor", "target_country", "threat_actors"],
+    "trains": ["name", "operator", "country", "origin", "destination", "status"],
+    "meshtastic": ["long_name", "short_name", "node_id", "hardware"],
 }
 
 # Also used by scenario fixtures that have additional categories
 _EXTRA_CATEGORIES = {
     "gps_jamming", "news", "gdelt", "firms_fires", "internet_outages",
-    "satellites", "oil", "defense_stocks",
+    "satellites", "oil", "defense_stocks", "trending_markets",
 }
 
 _MAX_PER_CATEGORY = 100

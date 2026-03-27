@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass, field
 
 from services.agent.llm import call_llm_simple
 from services.agent.registry import create_default_registry
 from services.agent.router import SubTask
+from services.llm_assistant import _PERSONA_BRIEF
 
 logger = logging.getLogger(__name__)
 
@@ -106,10 +108,14 @@ class SubAgent:
 
     def _build_messages(self) -> list[dict]:
         system_prompt = (
-            f"You are a specialized analyst. "
+            f"{_PERSONA_BRIEF} You are focused on {self.sub_task.intent} analysis. "
             f"Analyze the following using your available tools and respond with JSON:\n"
             f'{{"summary": "...", "key_findings": ["..."], "entity_references": '
             f'[{{"type": "...", "id": "..."}}]}}\n'
+            f"Lead with the most significant finding. Flag anomalies. "
+            f"When referencing data, cite the source inline: "
+            f"[SOURCE: layer_name] (e.g. [SOURCE: prediction_markets], "
+            f"[SOURCE: ukraine_alerts], [SOURCE: fimi]). "
             f"Focus on: {self.sub_task.query_fragment}"
         )
         return [
@@ -125,7 +131,6 @@ class SubAgent:
             return json.loads(content)
         except json.JSONDecodeError:
             # Try to extract JSON from markdown code block
-            import re
             m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", content, re.DOTALL)
             if m:
                 try:
