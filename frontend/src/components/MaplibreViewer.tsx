@@ -48,7 +48,11 @@ import {
     svgAirlinerGrey, svgTurbopropGrey, svgBizjetGrey, svgHeliGrey,
     GROUNDED_ICON_MAP, COLOR_MAP_COMMERCIAL, COLOR_MAP_PRIVATE,
     COLOR_MAP_JETS, COLOR_MAP_MILITARY, MIL_SPECIAL_MAP,
+    makeShipClusterSvg, makeMilClusterSvg,
+    svgJammingIcon,
 } from "@/components/map/icons/AircraftIcons";
+import { GROUP_COLORS } from "@/components/map/icons/countryGroups";
+import { SHADOW_ICONS, SHADOW_ICON_MAP } from "@/components/map/icons/ShadowIcons";
 import { classifyAircraft } from "@/utils/aircraftClassification";
 import { makeSatSvg, MISSION_COLORS, MISSION_ICON_MAP } from "@/components/map/icons/SatelliteIcons";
 import { EMPTY_FC } from "@/components/map/mapConstants";
@@ -65,9 +69,51 @@ import {
     buildFirmsGeoJSON, buildInternetOutagesGeoJSON, buildDataCentersGeoJSON, buildPowerPlantsGeoJSON, buildMilitaryBasesGeoJSON,
     buildGdeltGeoJSON, buildLiveuaGeoJSON, buildFrontlineGeoJSON,
     buildFlightLayerGeoJSON, buildUavGeoJSON,
-    buildSatellitesGeoJSON, buildShipsGeoJSON, buildCarriersGeoJSON,
+    buildSatellitesGeoJSON, buildShipsGeoJSONByGroup, buildFeaturesByGroup, buildCarriersGeoJSON,
     type FlightLayerConfig,
 } from "@/components/map/geoJSONBuilders";
+
+// MapLibre data-driven expression: tint text labels by country group
+const COUNTRY_GROUP_TEXT_COLOR: maplibregl.ExpressionSpecification = [
+    'match', ['get', 'countryGroup'],
+    'nato', GROUP_COLORS.nato,
+    'csto', GROUP_COLORS.csto,
+    'nonaligned', GROUP_COLORS.nonaligned,
+    'convenience', GROUP_COLORS.convenience,
+    GROUP_COLORS.other
+];
+
+// Same palette but for SDF shadow icon tinting via icon-color paint
+const COUNTRY_GROUP_ICON_COLOR: maplibregl.ExpressionSpecification = [
+    'match', ['get', 'countryGroup'],
+    'nato', GROUP_COLORS.nato,
+    'csto', GROUP_COLORS.csto,
+    'nonaligned', GROUP_COLORS.nonaligned,
+    'convenience', GROUP_COLORS.convenience,
+    GROUP_COLORS.other
+];
+
+// Stacking offsets for per-group cluster icons — slight pixel shift so overlapping groups form a visual stack
+const GROUP_STACK_OFFSETS: Record<string, [number, number]> = {
+    other:       [0, 0],
+    convenience: [1.5, 1.5],
+    nonaligned:  [3, 3],
+    csto:        [4.5, 4.5],
+    nato:        [6, 6],
+};
+// Render order: other (bottom) → convenience → nonaligned → csto → nato (top)
+const GROUP_RENDER_ORDER = ['other', 'convenience', 'nonaligned', 'csto', 'nato'];
+
+// Shadow layer icon-size: ~20% larger than main for visible colored outline
+const SHADOW_ICON_SIZE: maplibregl.ExpressionSpecification = [
+    'interpolate', ['linear'], ['zoom'],
+    2, 0.5, 5, 0.7, 8, 0.95, 12, 1.2, 16, 1.4
+];
+// Ship shadow size (ships use slightly different size curve)
+const SHADOW_SHIP_ICON_SIZE: maplibregl.ExpressionSpecification = [
+    'interpolate', ['linear'], ['zoom'],
+    4, 0.55, 8, 0.7, 12, 0.85, 16, 1.1
+];
 
 const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyToLocation, selectedEntity, onMouseCoords, onRightClick, regionDossier, regionDossierLoading, onViewStateChange, measureMode, onMeasureClick, measurePoints, gibsDate, gibsOpacity, viewBoundsRef, setTrackedSdr, boxSelectMode, onBoxSelectResult, aiResultIdSet }: MaplibreViewerProps) => {
     const mapRef = useRef<MapRef>(null);
@@ -84,6 +130,21 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
 
     // Hover tooltip state
     const [hoverInfo, setHoverInfo] = useState<{ x: number; y: number; name: string; type: string } | null>(null);
+
+    // Cluster popup state
+    interface ClusterGroupInfo {
+        group: string;
+        count: number;
+        sourceId: string;
+        clusterId: number;
+        leaves: Array<{ name: string; type: string }>;
+    }
+    const [selectedCluster, setSelectedCluster] = useState<{
+        lng: number; lat: number;
+        entityType: string;
+        groups: ClusterGroupInfo[];
+        expandedGroup: string | null;
+    } | null>(null);
 
     // Apply active filters to data
     const filteredData = useMemo(() => {
@@ -300,6 +361,12 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
         activeLayers.gps_jamming ? buildJammingGeoJSON(data?.gps_jamming) : null,
         [activeLayers.gps_jamming, data?.gps_jamming]);
 
+    const jammingHighZones = useMemo(() =>
+        activeLayers.gps_jamming
+            ? (data?.gps_jamming || []).filter(z => z.severity === 'high').map(z => ({ lat: z.lat, lng: z.lng }))
+            : [],
+        [activeLayers.gps_jamming, data?.gps_jamming]);
+
     const cctvGeoJSON = useMemo(() =>
         activeLayers.cctv ? buildCctvGeoJSON(data?.cctv, inView) : null,
         [activeLayers.cctv, data?.cctv, inView]);
@@ -335,6 +402,8 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
         // Track which images are still loading so we can retry on styleimagemissing
         const pendingImages: Record<string, string> = {};
 
+        const pendingSdf = new Set<string>(); // track which IDs are SDF
+
         const loadImg = (id: string, url: string) => {
             if (!map.hasImage(id)) {
                 pendingImages[id] = url;
@@ -348,16 +417,31 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
             }
         };
 
+        const loadSdfImg = (id: string, url: string) => {
+            if (!map.hasImage(id)) {
+                pendingImages[id] = url;
+                pendingSdf.add(id);
+                const img = new Image();
+                img.crossOrigin = "anonymous";
+                img.src = url;
+                img.onload = () => {
+                    if (!map.hasImage(id)) map.addImage(id, img, { sdf: true });
+                    delete pendingImages[id];
+                };
+            }
+        };
+
         // Suppress "image not found" warnings — retry when the async load finishes
         map.on('styleimagemissing', (ev: any) => {
             const id = ev.id;
             const url = pendingImages[id];
             if (url) {
+                const isSdf = pendingSdf.has(id);
                 const img = new Image();
                 img.crossOrigin = "anonymous";
                 img.src = url;
                 img.onload = () => {
-                    if (!map.hasImage(id)) map.addImage(id, img);
+                    if (!map.hasImage(id)) map.addImage(id, img, isSdf ? { sdf: true } : undefined);
                     delete pendingImages[id];
                 };
             }
@@ -453,6 +537,21 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
             loadImg('fire-cluster-md', svgFireClusterMed);
             loadImg('fire-cluster-lg', svgFireClusterLarge);
             loadImg('fire-cluster-xl', svgFireClusterXL);
+            // Ship cluster icons: 4 sizes × 5 country groups
+            const clusterSizes = [['sm', 32], ['md', 40], ['lg', 48], ['xl', 56]] as const;
+            for (const [group, color] of Object.entries(GROUP_COLORS)) {
+                for (const [suffix, size] of clusterSizes) {
+                    loadImg(`ship-cluster-${group}-${suffix}`, makeShipClusterSvg(size, color));
+                }
+            }
+            // Military cluster icons: 4 sizes × 5 country groups
+            for (const [group, color] of Object.entries(GROUP_COLORS)) {
+                for (const [suffix, size] of clusterSizes) {
+                    loadImg(`mil-cluster-${group}-${suffix}`, makeMilClusterSvg(size, color));
+                }
+            }
+            // GPS jamming zone icon
+            loadImg('jamming-icon', svgJammingIcon);
             // Data center icon
             loadImg('datacenter', svgDataCenter);
             // Power plant icon
@@ -466,6 +565,10 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
             loadImg('sat-com', makeSatSvg('#44ff44'));
             loadImg('sat-station', makeSatSvg('#ffdd00'));
             loadImg('sat-gen', makeSatSvg('#aaaaaa'));
+            // SDF shadow icons for country-group colored outlines
+            for (const [id, url] of Object.entries(SHADOW_ICONS)) {
+                loadSdfImg(id, url);
+            }
         }, 0);
 
         setMapReady(true);
@@ -511,12 +614,16 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
         activeLayers.military ? buildFlightLayerGeoJSON(filteredData?.military_flights, milConfig, flightHelpers) : null,
         [activeLayers.military, filteredData?.military_flights, flightHelpers]);
 
-    const shipsGeoJSON = useMemo(() =>
-        buildShipsGeoJSON(filteredData?.ships, activeLayers, inView, interpShip),
-        [activeLayers.ships_military, activeLayers.ships_cargo, activeLayers.ships_civilian, activeLayers.ships_passenger, activeLayers.ships_tracked_yachts, filteredData?.ships, inView]);
+    const militaryByGroup = useMemo(() =>
+        buildFeaturesByGroup(milFlightsGeoJSON),
+        [milFlightsGeoJSON]);
+
+    const shipsByGroup = useMemo(() =>
+        buildShipsGeoJSONByGroup(filteredData?.ships, activeLayers, inView, interpShip),
+        [activeLayers.ships_military, activeLayers.ships_cargo, activeLayers.ships_civilian, activeLayers.ships_passenger, activeLayers.ships_tracked_yachts, filteredData?.ships, inView, interpShip]);
 
     // Extract cluster label positions via shared hook
-    const shipClusters = useClusterLabels(mapRef, 'ships', shipsGeoJSON);
+    // Ship cluster labels now rendered via symbol layer text-field, no HTML markers needed
     const eqClusters = useClusterLabels(mapRef, 'earthquakes', earthquakesGeoJSON);
 
     const carriersGeoJSON = useMemo(() =>
@@ -648,7 +755,7 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
 
             features.push({
                 type: 'Feature',
-                properties: { id: f.icao24 || i, type: 'tracked_flight', callsign: String(displayName), rotation: f.heading || 0, iconId },
+                properties: { id: f.icao24 || i, type: 'tracked_flight', callsign: String(displayName), rotation: f.heading || 0, iconId, shadowIconId: SHADOW_ICON_MAP[iconId] ?? 'shadow-plane', countryGroup: 'nato' },
                 geometry: { type: 'Point', coordinates: [lng, lat] }
             });
         }
@@ -680,9 +787,8 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
         commFlightsGeoJSON && 'commercial-flights-layer',
         privFlightsGeoJSON && 'private-flights-layer',
         privJetsGeoJSON && 'private-jets-layer',
-        milFlightsGeoJSON && 'military-flights-layer',
-        shipsGeoJSON && 'ships-clusters-layer',
-        shipsGeoJSON && 'ships-layer',
+        ...(militaryByGroup ? Object.keys(militaryByGroup).flatMap(g => [`mil-${g}-clusters`, `mil-${g}-layer`]) : []),
+        ...(shipsByGroup ? Object.keys(shipsByGroup).flatMap(g => [`ships-${g}-clusters`, `ships-${g}-layer`]) : []),
         carriersGeoJSON && 'carriers-layer',
         trackedFlightsGeoJSON && 'tracked-flights-layer',
         uavGeoJSON && 'uav-layer',
@@ -714,7 +820,6 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
     useImperativeSource(mapForHook, 'commercial-flights', commFlightsGeoJSON);
     useImperativeSource(mapForHook, 'private-flights', privFlightsGeoJSON);
     useImperativeSource(mapForHook, 'private-jets', privJetsGeoJSON);
-    useImperativeSource(mapForHook, 'military-flights', milFlightsGeoJSON);
     useImperativeSource(mapForHook, 'tracked-flights', trackedFlightsGeoJSON);
     useImperativeSource(mapForHook, 'uavs', uavGeoJSON);
     useImperativeSource(mapForHook, 'satellites', satellitesGeoJSON);
@@ -796,18 +901,76 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                         onMeasureClick({ lat: e.lngLat.lat, lng: e.lngLat.lng });
                         return;
                     }
+                    if (selectedCluster) {
+                        setSelectedCluster(null);
+                    }
                     if (selectedEntity) {
                         onEntityClick?.(null);
                     } else if (e.features && e.features.length > 0) {
                         const feature = e.features[0];
                         const props = feature.properties || {};
 
-                        // If the clicked feature is a cluster, zoom into it instead of selecting an entity
+                        // If the clicked feature is a cluster, show a combined popup with group breakdown
                         if (props.cluster) {
-                            mapRef.current?.flyTo({
-                                center: [e.lngLat.lng, e.lngLat.lat],
-                                zoom: viewState.zoom + 2,
-                                duration: 500
+                            const map = mapRef.current?.getMap();
+                            if (!map) return;
+                            const layerId = feature.layer?.id || '';
+                            // Determine entity type and source prefix from the layer ID
+                            let prefix = '';
+                            let entityType = '';
+                            if (layerId.startsWith('ships-')) {
+                                prefix = 'ships';
+                                entityType = 'ship';
+                            } else if (layerId.startsWith('mil-')) {
+                                prefix = 'mil';
+                                entityType = 'military_flight';
+                            } else {
+                                // Non-grouped clusters (datacenters, earthquakes, etc.) — just zoom
+                                mapRef.current?.flyTo({
+                                    center: [e.lngLat.lng, e.lngLat.lat],
+                                    zoom: viewState.zoom + 2,
+                                    duration: 500
+                                });
+                                return;
+                            }
+                            const clickPt = map.project(e.lngLat);
+                            const searchRadius = 50;
+                            const allGroups = ['nato', 'csto', 'nonaligned', 'convenience', 'other'];
+                            const groupPromises = allGroups.map(async (group) => {
+                                const srcId = `${prefix}-${group}`;
+                                const src = map.getSource(srcId) as maplibregl.GeoJSONSource | undefined;
+                                if (!src) return null;
+                                const clusterLayerId = `${prefix}-${group}-clusters`;
+                                try {
+                                    const rendered = map.queryRenderedFeatures(
+                                        [[clickPt.x - searchRadius, clickPt.y - searchRadius],
+                                         [clickPt.x + searchRadius, clickPt.y + searchRadius]],
+                                        { layers: [clusterLayerId] }
+                                    );
+                                    const clusterFeature = rendered.find(f => f.properties?.cluster);
+                                    if (!clusterFeature) return null;
+                                    const clusterId = clusterFeature.properties!.cluster_id as number;
+                                    const count = clusterFeature.properties!.point_count as number;
+                                    const leaves = await src.getClusterLeaves(clusterId, 20, 0);
+                                    return {
+                                        group, count, sourceId: srcId, clusterId,
+                                        leaves: leaves.map(l => ({
+                                            name: (l.properties?.name || l.properties?.callsign || '') as string,
+                                            type: (l.properties?.type || '') as string,
+                                        })),
+                                    };
+                                } catch { return null; }
+                            });
+                            Promise.all(groupPromises).then(results => {
+                                const groups = results.filter(Boolean) as ClusterGroupInfo[];
+                                if (groups.length > 0) {
+                                    setSelectedCluster({
+                                        lng: e.lngLat.lng, lat: e.lngLat.lat,
+                                        entityType,
+                                        groups,
+                                        expandedGroup: groups.length === 1 ? groups[0].group : null,
+                                    });
+                                }
                             });
                             return;
                         }
@@ -948,6 +1111,9 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
 
                 {/* commercial/private/military flights: data pushed imperatively */}
                     <Source id="commercial-flights" type="geojson" data={EMPTY_FC as any}>
+                        <Layer id="commercial-flights-shadow" type="symbol"
+                            layout={{ 'icon-image': ['get', 'shadowIconId'], 'icon-size': SHADOW_ICON_SIZE, 'icon-allow-overlap': true, 'icon-rotate': ['get', 'rotation'], 'icon-rotation-alignment': 'map' as const }}
+                            paint={{ 'icon-color': COUNTRY_GROUP_ICON_COLOR, 'icon-opacity': opacityFilter }} />
                         <Layer
                             id="commercial-flights-layer"
                             type="symbol"
@@ -965,7 +1131,7 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                             }}
                             paint={{
                                 'icon-opacity': opacityFilter,
-                                'text-color': '#67e8f9',
+                                'text-color': COUNTRY_GROUP_TEXT_COLOR,
                                 'text-halo-color': '#000000',
                                 'text-halo-width': 1,
                                 'text-opacity': 0.8,
@@ -974,6 +1140,9 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                     </Source>
 
                     <Source id="private-flights" type="geojson" data={EMPTY_FC as any}>
+                        <Layer id="private-flights-shadow" type="symbol"
+                            layout={{ 'icon-image': ['get', 'shadowIconId'], 'icon-size': SHADOW_ICON_SIZE, 'icon-allow-overlap': true, 'icon-rotate': ['get', 'rotation'], 'icon-rotation-alignment': 'map' as const }}
+                            paint={{ 'icon-color': COUNTRY_GROUP_ICON_COLOR, 'icon-opacity': opacityFilter }} />
                         <Layer
                             id="private-flights-layer"
                             type="symbol"
@@ -989,6 +1158,9 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                     </Source>
 
                     <Source id="private-jets" type="geojson" data={EMPTY_FC as any}>
+                        <Layer id="private-jets-shadow" type="symbol"
+                            layout={{ 'icon-image': ['get', 'shadowIconId'], 'icon-size': SHADOW_ICON_SIZE, 'icon-allow-overlap': true, 'icon-rotate': ['get', 'rotation'], 'icon-rotation-alignment': 'map' as const }}
+                            paint={{ 'icon-color': COUNTRY_GROUP_ICON_COLOR, 'icon-opacity': opacityFilter }} />
                         <Layer
                             id="private-jets-layer"
                             type="symbol"
@@ -1003,64 +1175,154 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                         />
                     </Source>
 
-                    <Source id="military-flights" type="geojson" data={EMPTY_FC as any}>
+                {/* Per-country-group military flight sources — each clusters independently */}
+                {militaryByGroup && Object.entries(militaryByGroup)
+                    .sort(([a], [b]) => GROUP_RENDER_ORDER.indexOf(a) - GROUP_RENDER_ORDER.indexOf(b))
+                    .map(([group, fc]) => (
+                    <Source
+                        key={`mil-${group}`}
+                        id={`mil-${group}`}
+                        type="geojson"
+                        data={fc as any}
+                        cluster={true}
+                        clusterMaxZoom={6}
+                        clusterRadius={50}
+                    >
                         <Layer
-                            id="military-flights-layer"
+                            id={`mil-${group}-clusters`}
                             type="symbol"
+                            filter={['has', 'point_count']}
+                            layout={{
+                                'icon-image': [
+                                    'step', ['get', 'point_count'],
+                                    `mil-cluster-${group}-sm`,
+                                    10, `mil-cluster-${group}-md`,
+                                    50, `mil-cluster-${group}-lg`,
+                                    200, `mil-cluster-${group}-xl`
+                                ],
+                                'icon-size': ['step', ['get', 'point_count'], 1.0, 10, 1.05, 50, 1.1, 200, 1.15],
+                                'icon-allow-overlap': true,
+                                'icon-ignore-placement': true,
+                                'text-field': '{point_count_abbreviated}',
+                                'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+                                'text-size': ['step', ['get', 'point_count'], 9, 10, 10, 50, 11, 200, 12],
+                                'text-offset': [0, 0.15],
+                                'text-allow-overlap': true,
+                            }}
+                            paint={{
+                                'icon-opacity': opacityFilter,
+                                'icon-translate': GROUP_STACK_OFFSETS[group] || [0, 0],
+                                'text-color': '#ffffff',
+                                'text-halo-color': 'rgba(0,0,0,0.8)',
+                                'text-halo-width': 1.2,
+                                'text-translate': GROUP_STACK_OFFSETS[group] || [0, 0],
+                            }}
+                        />
+                        <Layer
+                            id={`mil-${group}-shadow`}
+                            type="symbol"
+                            filter={['!', ['has', 'point_count']]}
+                            layout={{
+                                'icon-image': ['get', 'shadowIconId'],
+                                'icon-size': SHADOW_ICON_SIZE,
+                                'icon-allow-overlap': true,
+                                'icon-rotate': ['get', 'rotation'],
+                                'icon-rotation-alignment': 'map' as const,
+                            }}
+                            paint={{
+                                'icon-color': GROUP_COLORS[group] || GROUP_COLORS.other,
+                                'icon-opacity': opacityFilter,
+                            }}
+                        />
+                        <Layer
+                            id={`mil-${group}-layer`}
+                            type="symbol"
+                            filter={['!', ['has', 'point_count']]}
                             layout={{
                                 'icon-image': ['get', 'iconId'],
                                 'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.4, 5, 0.6, 8, 0.8, 12, 1.0, 16, 1.2],
                                 'icon-allow-overlap': true,
                                 'icon-rotate': ['get', 'rotation'],
-                                'icon-rotation-alignment': 'map'
+                                'icon-rotation-alignment': 'map',
+                                'text-field': ['step', ['zoom'], '', 8, ['get', 'callsign']],
+                                'text-size': 9,
+                                'text-offset': [0, 1.5],
+                                'text-optional': true,
+                                'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
                             }}
-                            paint={{ 'icon-opacity': opacityFilter }}
+                            paint={{
+                                'icon-opacity': opacityFilter,
+                                'text-color': GROUP_COLORS[group] || GROUP_COLORS.other,
+                                'text-halo-color': '#000000',
+                                'text-halo-width': 1,
+                                'text-opacity': 0.8,
+                            }}
                         />
                     </Source>
+                ))}
 
-                {shipsGeoJSON && (
+                {/* Per-country-group ship sources — each clusters independently */}
+                {shipsByGroup && Object.entries(shipsByGroup)
+                    .sort(([a], [b]) => GROUP_RENDER_ORDER.indexOf(a) - GROUP_RENDER_ORDER.indexOf(b))
+                    .map(([group, fc]) => (
                     <Source
-                        id="ships"
+                        key={`ships-${group}`}
+                        id={`ships-${group}`}
                         type="geojson"
-                        data={shipsGeoJSON as any}
+                        data={fc as any}
                         cluster={true}
                         clusterMaxZoom={8}
                         clusterRadius={40}
                     >
-                        {/* Clustered circles */}
                         <Layer
-                            id="ships-clusters-layer"
-                            type="circle"
+                            id={`ships-${group}-clusters`}
+                            type="symbol"
                             filter={['has', 'point_count']}
-                            paint={{
-                                'circle-opacity': opacityFilter,
-                                'circle-stroke-opacity': opacityFilter,
-                                'circle-color': 'rgba(30, 64, 175, 0.85)',
-                                'circle-radius': [
-                                    'step',
-                                    ['get', 'point_count'],
-                                    12,
-                                    10, 15,
-                                    100, 20,
-                                    1000, 25,
-                                    5000, 30
+                            layout={{
+                                'icon-image': [
+                                    'step', ['get', 'point_count'],
+                                    `ship-cluster-${group}-sm`,
+                                    10, `ship-cluster-${group}-md`,
+                                    50, `ship-cluster-${group}-lg`,
+                                    200, `ship-cluster-${group}-xl`
                                 ],
-                                'circle-stroke-width': 2,
-                                'circle-stroke-color': 'rgba(59, 130, 246, 1.0)'
+                                'icon-size': ['step', ['get', 'point_count'], 1.0, 10, 1.05, 50, 1.1, 200, 1.15],
+                                'icon-allow-overlap': true,
+                                'icon-ignore-placement': true,
+                                'text-field': '{point_count_abbreviated}',
+                                'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+                                'text-size': ['step', ['get', 'point_count'], 9, 10, 10, 50, 11, 200, 12],
+                                'text-offset': [0, 0.15],
+                                'text-allow-overlap': true,
+                            }}
+                            paint={{
+                                'icon-opacity': opacityFilter,
+                                'icon-translate': GROUP_STACK_OFFSETS[group] || [0, 0],
+                                'text-color': '#ffffff',
+                                'text-halo-color': 'rgba(0,0,0,0.8)',
+                                'text-halo-width': 1.2,
+                                'text-translate': GROUP_STACK_OFFSETS[group] || [0, 0],
                             }}
                         />
-
-                        {/* Cluster count - rendered via HTML markers below */}
                         <Layer
-                            id="ships-cluster-count-layer"
-                            type="circle"
-                            filter={['has', 'point_count']}
-                            paint={{ 'circle-radius': 0, 'circle-opacity': 0 }}
+                            id={`ships-${group}-shadow`}
+                            type="symbol"
+                            minzoom={4}
+                            filter={['!', ['has', 'point_count']]}
+                            layout={{
+                                'icon-image': ['get', 'shadowIconId'],
+                                'icon-size': SHADOW_SHIP_ICON_SIZE,
+                                'icon-allow-overlap': true,
+                                'icon-rotate': ['get', 'rotation'],
+                                'icon-rotation-alignment': 'map' as const,
+                            }}
+                            paint={{
+                                'icon-color': GROUP_COLORS[group] || GROUP_COLORS.other,
+                                'icon-opacity': opacityFilter,
+                            }}
                         />
-
-                        {/* Unclustered individual ships (Cargo, Tankers, etc.) */}
                         <Layer
-                            id="ships-layer"
+                            id={`ships-${group}-layer`}
                             type="symbol"
                             minzoom={4}
                             filter={['!', ['has', 'point_count']]}
@@ -1078,17 +1340,20 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                             }}
                             paint={{
                                 'icon-opacity': opacityFilter,
-                                'text-color': '#94a3b8',
+                                'text-color': GROUP_COLORS[group] || GROUP_COLORS.other,
                                 'text-halo-color': '#000000',
                                 'text-halo-width': 1,
                                 'text-opacity': 0.7,
                             }}
                         />
                     </Source>
-                )}
+                ))}
 
                 {carriersGeoJSON && (
                     <Source id="carriers" type="geojson" data={carriersGeoJSON as any}>
+                        <Layer id="carriers-shadow" type="symbol"
+                            layout={{ 'icon-image': 'shadow-carrier', 'icon-size': SHADOW_SHIP_ICON_SIZE, 'icon-allow-overlap': true, 'icon-rotate': ['get', 'rotation'], 'icon-rotation-alignment': 'map' as const }}
+                            paint={{ 'icon-color': COUNTRY_GROUP_ICON_COLOR, 'icon-opacity': opacityFilter }} />
                         <Layer
                             id="carriers-layer"
                             type="symbol"
@@ -1193,6 +1458,20 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                                 'circle-opacity': 0,
                             }}
                         />
+                        <Layer id="tracked-flights-shadow" type="symbol"
+                            layout={{
+                                'icon-image': ['get', 'shadowIconId'],
+                                'icon-size': ['case',
+                                    ['==', ['get', 'iconId'], 'svgPotusPlane'], 1.5,
+                                    ['==', ['get', 'iconId'], 'svgPotusHeli'], 1.5,
+                                    0.95
+                                ],
+                                'icon-allow-overlap': true,
+                                'icon-rotate': ['get', 'rotation'],
+                                'icon-rotation-alignment': 'map' as const,
+                            }}
+                            paint={{ 'icon-color': COUNTRY_GROUP_ICON_COLOR, 'icon-opacity': opacityFilter }}
+                        />
                         <Layer
                             id="tracked-flights-layer"
                             type="symbol"
@@ -1212,6 +1491,9 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                     </Source>
 
                     <Source id="uavs" type="geojson" data={EMPTY_FC as any}>
+                        <Layer id="uav-shadow" type="symbol"
+                            layout={{ 'icon-image': ['get', 'shadowIconId'], 'icon-size': SHADOW_ICON_SIZE, 'icon-allow-overlap': true, 'icon-rotate': ['get', 'rotation'], 'icon-rotation-alignment': 'map' as const }}
+                            paint={{ 'icon-color': COUNTRY_GROUP_ICON_COLOR, 'icon-opacity': opacityFilter }} />
                         <Layer
                             id="uav-layer"
                             type="symbol"
@@ -1261,7 +1543,7 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                 )}
 
                 {/* HTML labels for ship cluster counts (hidden when any entity popup is active) */}
-                {shipsGeoJSON && !selectedEntity && <ClusterCountLabels clusters={shipClusters} prefix="sc" />}
+                {/* Ship cluster counts now rendered via symbol layer text-field */}
 
                 {/* HTML labels for tracked flights — color-matched, zoom-gated for non-HVA */}
                 {trackedFlightsGeoJSON && !selectedEntity && data?.tracked_flights && (
@@ -1274,7 +1556,7 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                 )}
 
                 {/* HTML labels for tracked yachts (pink owner names) */}
-                {shipsGeoJSON && activeLayers.ships_tracked_yachts && !selectedEntity && data?.ships && (
+                {shipsByGroup && activeLayers.ships_tracked_yachts && !selectedEntity && data?.ships && (
                     <TrackedYachtLabels ships={data.ships} inView={inView} interpShip={interpShip} />
                 )}
 
@@ -1353,48 +1635,67 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                     </Source>
                 )}
 
-                {/* GPS Jamming Zones — red translucent grid squares */}
+                {/* GPS Jamming Zones — concentric gradient rings with severity coloring */}
                 {jammingGeoJSON && (
                     <Source id="gps-jamming" type="geojson" data={jammingGeoJSON as any}>
                         <Layer
                             id="gps-jamming-fill"
                             type="fill"
                             paint={{
-                                'fill-color': '#ff0040',
+                                'fill-color': [
+                                    'match', ['get', 'severity'],
+                                    'high', '#ff0040',
+                                    'medium', '#ff4060',
+                                    '#ff6080'
+                                ],
                                 'fill-opacity': ['get', 'opacity']
                             }}
                         />
                         <Layer
                             id="gps-jamming-outline"
                             type="line"
+                            filter={['==', ['get', 'ring'], 2]}
                             paint={{
-                                'line-color': '#ff0040',
-                                'line-width': 1.5,
-                                'line-opacity': 0.6
+                                'line-color': [
+                                    'match', ['get', 'severity'],
+                                    'high', '#ff0040',
+                                    'medium', '#ff4060',
+                                    '#ff6080'
+                                ],
+                                'line-width': 1,
+                                'line-opacity': 0.5,
+                                'line-dasharray': [4, 3]
                             }}
                         />
                         <Layer
-                            id="gps-jamming-label"
+                            id="gps-jamming-icon"
                             type="symbol"
+                            filter={['==', ['get', 'ring'], 0]}
                             layout={{
+                                'icon-image': 'jamming-icon',
+                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.4, 5, 0.55, 8, 0.7],
+                                'icon-allow-overlap': true,
                                 'text-field': ['concat', 'GPS JAM ', ['to-string', ['round', ['*', 100, ['get', 'ratio']]]], '%'],
-                                'text-size': [
-                                    'interpolate', ['linear'], ['zoom'],
-                                    2, 8,
-                                    5, 10,
-                                    8, 12
-                                ],
-                                'text-allow-overlap': false,
-                                'text-ignore-placement': false
+                                'text-size': ['interpolate', ['linear'], ['zoom'], 2, 8, 5, 10, 8, 12],
+                                'text-offset': [0, 1.5],
+                                'text-allow-overlap': false
                             }}
                             paint={{
                                 'text-color': '#ff4060',
                                 'text-halo-color': '#000000',
-                                'text-halo-width': 1.5
+                                'text-halo-width': 1.5,
+                                'icon-opacity': 0.9
                             }}
                         />
                     </Source>
                 )}
+
+                {/* GPS jamming pulse markers for high-severity zones */}
+                {jammingHighZones.map((z, i) => (
+                    <Marker key={`jam-pulse-${i}`} latitude={z.lat} longitude={z.lng} anchor="center">
+                        <div className="jamming-pulse-marker" />
+                    </Marker>
+                ))}
 
                 {/* CCTV Cameras — clustered green dots */}
                 {cctvGeoJSON && (
@@ -2642,6 +2943,78 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                         </div>
                     </Marker>
                 ))}
+
+                {/* Cluster detail popup */}
+                {selectedCluster && (
+                    <Popup
+                        longitude={selectedCluster.lng}
+                        latitude={selectedCluster.lat}
+                        closeButton={false}
+                        closeOnClick={false}
+                        onClose={() => setSelectedCluster(null)}
+                        anchor="bottom"
+                        offset={20}
+                        maxWidth="260px"
+                    >
+                        <div className="bg-[var(--bg-secondary)]/95 backdrop-blur-md border border-cyan-800/60 rounded-lg font-mono text-xs p-2 pointer-events-auto min-w-[180px]"
+                             onClick={(ev) => ev.stopPropagation()}>
+                            <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-[10px] text-gray-400 uppercase tracking-wider">
+                                    {selectedCluster.groups.reduce((s, g) => s + g.count, 0)}{' '}
+                                    {selectedCluster.entityType === 'ship' ? 'VESSELS' : 'AIRCRAFT'}
+                                </span>
+                                <button onClick={() => setSelectedCluster(null)}
+                                    className="text-gray-500 hover:text-gray-300 text-[10px] leading-none px-1">✕</button>
+                            </div>
+                            {selectedCluster.groups.map(g => (
+                                <div key={g.group} className="mb-1">
+                                    <button
+                                        onClick={() => setSelectedCluster(prev =>
+                                            prev ? { ...prev, expandedGroup: prev.expandedGroup === g.group ? null : g.group } : null
+                                        )}
+                                        className="flex items-center gap-1.5 w-full text-left py-0.5 hover:bg-white/5 rounded px-1 -mx-1"
+                                    >
+                                        <span className="w-2 h-2 rounded-full flex-shrink-0"
+                                            style={{ background: GROUP_COLORS[g.group] || GROUP_COLORS.other }} />
+                                        <span className="text-[11px] font-semibold"
+                                            style={{ color: GROUP_COLORS[g.group] || GROUP_COLORS.other }}>
+                                            {g.group.toUpperCase()}
+                                        </span>
+                                        <span className="text-gray-400 ml-auto text-[10px]">{g.count}</span>
+                                        <span className="text-gray-500 text-[9px]">
+                                            {selectedCluster.expandedGroup === g.group ? '▾' : '▸'}
+                                        </span>
+                                    </button>
+                                    {selectedCluster.expandedGroup === g.group && (
+                                        <ul className="ml-4 mt-0.5 text-gray-300 text-[10px] space-y-px">
+                                            {g.leaves.map((l, i) => (
+                                                <li key={i} className="truncate max-w-[200px]">
+                                                    {l.name || 'Unknown'}
+                                                </li>
+                                            ))}
+                                            {g.count > 20 && (
+                                                <li className="text-gray-500 italic">+{g.count - 20} more</li>
+                                            )}
+                                        </ul>
+                                    )}
+                                </div>
+                            ))}
+                            <button
+                                onClick={() => {
+                                    mapRef.current?.flyTo({
+                                        center: [selectedCluster.lng, selectedCluster.lat],
+                                        zoom: viewState.zoom + 2,
+                                        duration: 500
+                                    });
+                                    setSelectedCluster(null);
+                                }}
+                                className="mt-1 text-cyan-400 text-[10px] underline hover:text-cyan-300"
+                            >
+                                ZOOM IN
+                            </button>
+                        </div>
+                    </Popup>
+                )}
 
             </Map>
 

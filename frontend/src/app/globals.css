@@ -215,3 +215,18 @@ body {
   70% { transform: scale(1.5); opacity: 0.3; box-shadow: 0 0 20px 10px rgba(0, 255, 255, 0); }
   100% { transform: scale(1.5); opacity: 0; }
 }
+
+/* GPS jamming zone pulse for high-severity areas */
+.jamming-pulse-marker {
+  width: 50px;
+  height: 50px;
+  border-radius: 6px;
+  border: 1.5px solid #ff0040;
+  animation: jamming-pulse 2.5s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes jamming-pulse {
+  0% { opacity: 0.7; border-color: #ff0040; box-shadow: 0 0 8px rgba(255, 0, 64, 0.3); }
+  50% { opacity: 0.3; border-color: #ff4060; box-shadow: 0 0 20px rgba(255, 0, 64, 0.15); }
+  100% { opacity: 0.7; border-color: #ff0040; box-shadow: 0 0 8px rgba(255, 0, 64, 0.3); }
+}

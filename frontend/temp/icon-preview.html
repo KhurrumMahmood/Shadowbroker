@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>ShadowBroker Icon Preview</title>
+<style>
+  body { background: #0a0e1a; color: #e0e6f0; font-family: monospace; padding: 20px; }
+  h2 { color: #67e8f9; margin-top: 30px; border-bottom: 1px solid #1e293b; padding-bottom: 6px; }
+  .row { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-end; margin: 12px 0; }
+  .icon-box { text-align: center; }
+  .icon-box span { display: block; font-size: 9px; color: #94a3b8; margin-top: 4px; }
+  .size-note { font-size: 10px; color: #64748b; }
+</style>
+</head>
+<body>
+<h1>ShadowBroker Map Icon Preview</h1>
+<p class="size-note">All icons rendered at actual map sizes on dark background (matching map tiles)</p>
+
+<h2>Old Ship Icons (currently in use)</h2>
+<div class="row">
+  <div class="icon-box">
+    <svg width="12" height="24" viewBox="0 0 24 24" fill="none"><path d="M6 20 L6 8 L12 2 L18 8 L18 20 C18 22 6 22 6 20 Z" fill="gray" stroke="#000" stroke-width="1"/><polygon points="12,6 16,16 8,16" fill="#fff" stroke="#000" stroke-width="1"/></svg>
+    <span>Gray (civilian)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="16" height="32" viewBox="0 0 24 24" fill="none"><path d="M6 22 L6 6 L12 2 L18 6 L18 22 Z" fill="#ff2222" stroke="#000" stroke-width="1"/><rect x="8" y="15" width="8" height="4" fill="#880000" stroke="#000" stroke-width="1"/><rect x="8" y="7" width="8" height="6" fill="#444" stroke="#000" stroke-width="1"/></svg>
+    <span>Red (cargo)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="14" height="34" viewBox="0 0 24 24" fill="none"><path d="M7 22 L7 6 L12 1 L17 6 L17 22 Z" fill="yellow" stroke="#000" stroke-width="1"/><rect x="9" y="8" width="6" height="8" fill="#555" stroke="#000" stroke-width="1"/><circle cx="12" cy="18" r="1.5" fill="#000"/><line x1="12" y1="18" x2="12" y2="24" stroke="#000" stroke-width="1.5"/></svg>
+    <span>Yellow (military)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="16" height="32" viewBox="0 0 24 24" fill="none"><path d="M6 22 L6 6 L12 2 L18 6 L18 22 Z" fill="#3b82f6" stroke="#000" stroke-width="1"/></svg>
+    <span>Blue (civilian)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="18" height="36" viewBox="0 0 24 24" fill="none"><path d="M5 21 L5 8 L12 2 L19 8 L19 21 C19 23 5 23 5 21 Z" fill="white" stroke="#000" stroke-width="1"/><rect x="7" y="10" width="10" height="8" fill="#90cdf4" stroke="#000" stroke-width="1"/><circle cx="12" cy="14" r="2" fill="yellow" stroke="#000"/></svg>
+    <span>White (passenger)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="18" height="36" viewBox="0 0 24 24" fill="none"><path d="M5 21 L5 8 L12 2 L19 8 L19 21 C19 23 5 23 5 21 Z" fill="#FF69B4" stroke="#000" stroke-width="1"/><rect x="7" y="10" width="10" height="8" fill="#ff8dc7" stroke="#000" stroke-width="1"/><circle cx="12" cy="14" r="2" fill="white" stroke="#000"/></svg>
+    <span>Pink (tracked yacht)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="orange" stroke="black"><polygon points="3,21 21,21 20,4 16,4 16,3 12,3 12,4 4,4" /><rect x="15" y="6" width="3" height="10" /></svg>
+    <span>Carrier (old)</span>
+  </div>
+</div>
+
+<h2>New Differentiated Ship Type SVGs (makeShipSvg)</h2>
+<div class="row">
+  <div class="icon-box">
+    <svg width="16" height="32" viewBox="0 0 16 32">
+      <path d="M8 2 L3 10 L3 28 Q3 31 8 31 Q13 31 13 28 L13 10 Z" fill="#3b82f6" stroke="#000" stroke-width="1"/>
+      <rect x="5" y="12" width="6" height="4" rx="0.5" fill="#1e3a5f" stroke="#000" stroke-width="0.5"/>
+      <rect x="5" y="17" width="6" height="4" rx="0.5" fill="#1e3a5f" stroke="#000" stroke-width="0.5"/>
+      <rect x="6" y="22" width="4" height="5" rx="0.5" fill="#1e3a5f" stroke="#000" stroke-width="0.5"/>
+    </svg>
+    <span>Cargo (16x32)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="16" height="34" viewBox="0 0 16 34">
+      <path d="M8 1 L4 10 L4 30 Q4 33 8 33 Q12 33 12 30 L12 10 Z" fill="#3b82f6" stroke="#000" stroke-width="1"/>
+      <ellipse cx="8" cy="14" rx="3" ry="2.5" fill="#1e3a5f" stroke="#000" stroke-width="0.5"/>
+      <ellipse cx="8" cy="21" rx="3" ry="2.5" fill="#1e3a5f" stroke="#000" stroke-width="0.5"/>
+      <rect x="6.5" y="25" width="3" height="4" rx="0.5" fill="#1e3a5f" stroke="#000" stroke-width="0.5"/>
+    </svg>
+    <span>Tanker (16x34)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="14" height="34" viewBox="0 0 14 34">
+      <path d="M7 1 L4 8 L3 28 Q3 32 7 33 Q11 32 11 28 L10 8 Z" fill="#94a3b8" stroke="#000" stroke-width="1"/>
+      <line x1="7" y1="10" x2="7" y2="6" stroke="#67e8f9" stroke-width="1"/>
+      <line x1="5" y1="7" x2="9" y2="7" stroke="#67e8f9" stroke-width="0.8"/>
+    </svg>
+    <span>Military (14x34)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="18" height="36" viewBox="0 0 18 36">
+      <path d="M9 2 Q3 6 3 12 L3 31 Q3 35 9 35 Q15 35 15 31 L15 12 Q15 6 9 2 Z" fill="white" stroke="#000" stroke-width="1"/>
+      <rect x="5" y="14" width="8" height="5" rx="1" fill="#90cdf4" stroke="#000" stroke-width="0.5"/>
+      <rect x="6" y="10" width="6" height="3" rx="1" fill="#90cdf4" stroke="#000" stroke-width="0.5"/>
+      <rect x="8" y="24" width="2" height="4" fill="#90cdf4" stroke="#000" stroke-width="0.4"/>
+    </svg>
+    <span>Passenger (18x36)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="16" height="32" viewBox="0 0 16 32">
+      <path d="M8 1 L5 8 Q4 14 4 26 Q4 31 8 31 Q12 31 12 26 Q12 14 11 8 Z" fill="#f0f0f0" stroke="#000" stroke-width="1"/>
+      <path d="M6 12 L10 12 L10 20 Q8 22 6 20 Z" fill="#67e8f9" stroke="#000" stroke-width="0.5"/>
+    </svg>
+    <span>Yacht (16x32)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="22" height="22" viewBox="0 0 22 22">
+      <path d="M11 2 L4 8 L3 18 L4 21 L18 21 L19 18 L18 8 Z" fill="#555" stroke="#333" stroke-width="0.8"/>
+      <rect x="6" y="10" width="10" height="2" fill="#ff8c00" opacity="0.7"/>
+      <rect x="5" y="14" width="12" height="2" fill="#ff8c00" opacity="0.7"/>
+      <rect x="15" y="8" width="2" height="4" fill="#888" stroke="#333" stroke-width="0.5"/>
+    </svg>
+    <span>Carrier (22x22)</span>
+  </div>
+</div>
+
+<h2>Ship Cluster Icons (4 sizes)</h2>
+<div class="row">
+  <div class="icon-box">
+    <svg width="32" height="32" viewBox="0 0 24 48">
+      <path d="M12 2 L6 12 Q4 18 4 28 Q4 40 6 44 Q8 47 12 47 Q16 47 18 44 Q20 40 20 28 Q20 18 18 12 Z" fill="rgba(15,23,42,0.9)" stroke="#67e8f9" stroke-width="1.5" stroke-linejoin="round"/>
+      <line x1="7" y1="18" x2="17" y2="18" stroke="#67e8f9" stroke-width="0.8" opacity="0.6"/>
+      <rect x="9" y="34" width="6" height="6" rx="1" fill="rgba(15,23,42,0.9)" stroke="#94a3b8" stroke-width="0.8"/>
+    </svg>
+    <span>Sm (32px)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="40" height="40" viewBox="0 0 24 48">
+      <path d="M12 2 L6 12 Q4 18 4 28 Q4 40 6 44 Q8 47 12 47 Q16 47 18 44 Q20 40 20 28 Q20 18 18 12 Z" fill="rgba(15,23,42,0.9)" stroke="#67e8f9" stroke-width="1.5" stroke-linejoin="round"/>
+      <line x1="7" y1="18" x2="17" y2="18" stroke="#67e8f9" stroke-width="0.8" opacity="0.6"/>
+      <rect x="9" y="34" width="6" height="6" rx="1" fill="rgba(15,23,42,0.9)" stroke="#94a3b8" stroke-width="0.8"/>
+    </svg>
+    <span>Md (40px)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="48" height="48" viewBox="0 0 24 48">
+      <path d="M12 2 L6 12 Q4 18 4 28 Q4 40 6 44 Q8 47 12 47 Q16 47 18 44 Q20 40 20 28 Q20 18 18 12 Z" fill="rgba(15,23,42,0.9)" stroke="#67e8f9" stroke-width="1.5" stroke-linejoin="round"/>
+      <line x1="7" y1="18" x2="17" y2="18" stroke="#67e8f9" stroke-width="0.8" opacity="0.6"/>
+      <rect x="9" y="34" width="6" height="6" rx="1" fill="rgba(15,23,42,0.9)" stroke="#94a3b8" stroke-width="0.8"/>
+    </svg>
+    <span>Lg (48px)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="56" height="56" viewBox="0 0 24 48">
+      <path d="M12 2 L6 12 Q4 18 4 28 Q4 40 6 44 Q8 47 12 47 Q16 47 18 44 Q20 40 20 28 Q20 18 18 12 Z" fill="rgba(15,23,42,0.9)" stroke="#67e8f9" stroke-width="1.5" stroke-linejoin="round"/>
+      <line x1="7" y1="18" x2="17" y2="18" stroke="#67e8f9" stroke-width="0.8" opacity="0.6"/>
+      <rect x="9" y="34" width="6" height="6" rx="1" fill="rgba(15,23,42,0.9)" stroke="#94a3b8" stroke-width="0.8"/>
+    </svg>
+    <span>Xl (56px)</span>
+  </div>
+</div>
+
+<h2>Country-Group Colored Clusters (proposed)</h2>
+<div class="row">
+  <div class="icon-box">
+    <svg width="40" height="40" viewBox="0 0 24 48">
+      <path d="M12 2 L6 12 Q4 18 4 28 Q4 40 6 44 Q8 47 12 47 Q16 47 18 44 Q20 40 20 28 Q20 18 18 12 Z" fill="rgba(15,23,42,0.9)" stroke="#00e5ff" stroke-width="1.5" stroke-linejoin="round"/>
+      <line x1="7" y1="18" x2="17" y2="18" stroke="#00e5ff" stroke-width="0.8" opacity="0.6"/>
+      <rect x="9" y="34" width="6" height="6" rx="1" fill="rgba(15,23,42,0.9)" stroke="#00e5ff" stroke-width="0.8" opacity="0.5"/>
+    </svg>
+    <span>NATO (cyan)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="40" height="40" viewBox="0 0 24 48">
+      <path d="M12 2 L6 12 Q4 18 4 28 Q4 40 6 44 Q8 47 12 47 Q16 47 18 44 Q20 40 20 28 Q20 18 18 12 Z" fill="rgba(15,23,42,0.9)" stroke="#ff4444" stroke-width="1.5" stroke-linejoin="round"/>
+      <line x1="7" y1="18" x2="17" y2="18" stroke="#ff4444" stroke-width="0.8" opacity="0.6"/>
+      <rect x="9" y="34" width="6" height="6" rx="1" fill="rgba(15,23,42,0.9)" stroke="#ff4444" stroke-width="0.8" opacity="0.5"/>
+    </svg>
+    <span>CSTO (red)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="40" height="40" viewBox="0 0 24 48">
+      <path d="M12 2 L6 12 Q4 18 4 28 Q4 40 6 44 Q8 47 12 47 Q16 47 18 44 Q20 40 20 28 Q20 18 18 12 Z" fill="rgba(15,23,42,0.9)" stroke="#ffaa00" stroke-width="1.5" stroke-linejoin="round"/>
+      <line x1="7" y1="18" x2="17" y2="18" stroke="#ffaa00" stroke-width="0.8" opacity="0.6"/>
+      <rect x="9" y="34" width="6" height="6" rx="1" fill="rgba(15,23,42,0.9)" stroke="#ffaa00" stroke-width="0.8" opacity="0.5"/>
+    </svg>
+    <span>Non-Aligned (amber)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="40" height="40" viewBox="0 0 24 48">
+      <path d="M12 2 L6 12 Q4 18 4 28 Q4 40 6 44 Q8 47 12 47 Q16 47 18 44 Q20 40 20 28 Q20 18 18 12 Z" fill="rgba(15,23,42,0.9)" stroke="#8899aa" stroke-width="1.5" stroke-linejoin="round"/>
+      <line x1="7" y1="18" x2="17" y2="18" stroke="#8899aa" stroke-width="0.8" opacity="0.6"/>
+      <rect x="9" y="34" width="6" height="6" rx="1" fill="rgba(15,23,42,0.9)" stroke="#8899aa" stroke-width="0.8" opacity="0.5"/>
+    </svg>
+    <span>Convenience (slate)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="40" height="40" viewBox="0 0 24 48">
+      <path d="M12 2 L6 12 Q4 18 4 28 Q4 40 6 44 Q8 47 12 47 Q16 47 18 44 Q20 40 20 28 Q20 18 18 12 Z" fill="rgba(15,23,42,0.9)" stroke="#6688bb" stroke-width="1.5" stroke-linejoin="round"/>
+      <line x1="7" y1="18" x2="17" y2="18" stroke="#6688bb" stroke-width="0.8" opacity="0.6"/>
+      <rect x="9" y="34" width="6" height="6" rx="1" fill="rgba(15,23,42,0.9)" stroke="#6688bb" stroke-width="0.8" opacity="0.5"/>
+    </svg>
+    <span>Other (blue)</span>
+  </div>
+</div>
+
+<h2>GPS Jamming Icon</h2>
+<div class="row">
+  <div class="icon-box">
+    <svg width="16" height="16" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="11" fill="rgba(15,23,42,0.85)" stroke="#ff4060" stroke-width="1"/>
+      <path d="M9 16 A4 4 0 0 1 15 16" fill="none" stroke="#ff4060" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M6.5 14 A8 8 0 0 1 17.5 14" fill="none" stroke="#ff4060" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M4 12 A11 11 0 0 1 20 12" fill="none" stroke="#ff4060" stroke-width="1.2" stroke-linecap="round" opacity="0.7"/>
+      <line x1="5" y1="5" x2="19" y2="19" stroke="#ff4060" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    <span>16px (actual)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="32" height="32" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="11" fill="rgba(15,23,42,0.85)" stroke="#ff4060" stroke-width="1"/>
+      <path d="M9 16 A4 4 0 0 1 15 16" fill="none" stroke="#ff4060" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M6.5 14 A8 8 0 0 1 17.5 14" fill="none" stroke="#ff4060" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M4 12 A11 11 0 0 1 20 12" fill="none" stroke="#ff4060" stroke-width="1.2" stroke-linecap="round" opacity="0.7"/>
+      <line x1="5" y1="5" x2="19" y2="19" stroke="#ff4060" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    <span>32px (2x)</span>
+  </div>
+</div>
+
+<h2>Fighter Aircraft (old vs new)</h2>
+<div class="row">
+  <div class="icon-box">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="yellow" stroke="black"><path d="M12 2L14 8L18 10L14 16L15 22L12 20L9 22L10 16L6 10L10 8L12 2Z"/></svg>
+    <span>Old (diamond)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="yellow" stroke="black"><path d="M12 1 L13 5 L13.5 8 L18 11 L20 12 L18 13 L13.5 14 L14 18 L15.5 21 L14 20.5 L12 22 L10 20.5 L8.5 21 L10 18 L10.5 14 L6 13 L4 12 L6 11 L10.5 8 L11 5 Z"/></svg>
+    <span>New (delta)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="cyan" stroke="black"><path d="M12 1 L13 5 L13.5 8 L18 11 L20 12 L18 13 L13.5 14 L14 18 L15.5 21 L14 20.5 L12 22 L10 20.5 L8.5 21 L10 18 L10.5 14 L6 13 L4 12 L6 11 L10.5 8 L11 5 Z"/></svg>
+    <span>New (cyan)</span>
+  </div>
+</div>
+
+<h2>Aircraft Icons (selection)</h2>
+<div class="row">
+  <div class="icon-box">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="cyan" stroke="black"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>
+    <span>Commercial</span>
+  </div>
+  <div class="icon-box">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="#FF8C00" stroke="black"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>
+    <span>Private</span>
+  </div>
+  <div class="icon-box">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="yellow" stroke="black"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>
+    <span>Military</span>
+  </div>
+  <div class="icon-box">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="yellow" stroke="black"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="black" stroke-dasharray="2 2" stroke-width="1"/></svg>
+    <span>Heli (mil)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="orange" stroke="black"><path d="M12 2L15 8H9L12 2Z" /><rect x="8" y="8" width="8" height="2" /><path d="M4 10L10 14H14L20 10V12L14 16H10L4 12V10Z" /><circle cx="12" cy="14" r="2" fill="red"/></svg>
+    <span>Drone (old)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="20" height="20" viewBox="0 0 24 24">
+      <line x1="10" y1="10" x2="6" y2="6" stroke="#333" stroke-width="1.2"/>
+      <line x1="14" y1="10" x2="18" y2="6" stroke="#333" stroke-width="1.2"/>
+      <line x1="10" y1="14" x2="6" y2="18" stroke="#333" stroke-width="1.2"/>
+      <line x1="14" y1="14" x2="18" y2="18" stroke="#333" stroke-width="1.2"/>
+      <circle cx="6" cy="6" r="3" fill="none" stroke="#ff6b4a" stroke-width="1" opacity="0.8"/>
+      <circle cx="18" cy="6" r="3" fill="none" stroke="#ff6b4a" stroke-width="1" opacity="0.8"/>
+      <circle cx="6" cy="18" r="3" fill="none" stroke="#ff6b4a" stroke-width="1" opacity="0.8"/>
+      <circle cx="18" cy="18" r="3" fill="none" stroke="#ff6b4a" stroke-width="1" opacity="0.8"/>
+      <ellipse cx="12" cy="12" rx="2.5" ry="5" fill="orange" stroke="#333" stroke-width="0.8"/>
+    </svg>
+    <span>Drone (new)</span>
+  </div>
+</div>
+
+<h2>Carrier Icon (old vs new)</h2>
+<div class="row">
+  <div class="icon-box">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="orange" stroke="black"><polygon points="3,21 21,21 20,4 16,4 16,3 12,3 12,4 4,4" /><rect x="15" y="6" width="3" height="10" /></svg>
+    <span>Carrier (old)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="22" height="22" viewBox="0 0 22 22">
+      <path d="M11 2 L4 8 L3 18 L4 21 L18 21 L19 18 L18 8 Z" fill="#555" stroke="#333" stroke-width="0.8"/>
+      <rect x="6" y="10" width="10" height="2" fill="#ff8c00" opacity="0.7"/>
+      <rect x="5" y="14" width="12" height="2" fill="#ff8c00" opacity="0.7"/>
+      <rect x="15" y="8" width="2" height="4" fill="#888" stroke="#333" stroke-width="0.5"/>
+    </svg>
+    <span>Carrier (new)</span>
+  </div>
+</div>
+
+<h2>Military Cluster Icons (per-group)</h2>
+<div class="row">
+  <div class="icon-box">
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <circle cx="20" cy="20" r="18" fill="rgba(15,23,42,0.9)" stroke="#00e5ff" stroke-width="2"/>
+      <g transform="translate(20, 20) scale(0.917)">
+        <path d="M0 -11 L1 -7 L1.5 -4 L6 -1 L8 0 L6 1 L1.5 2 L2 6 L3.5 9 L2 8.5 L0 10 L-2 8.5 L-3.5 9 L-2 6 L-1.5 2 L-6 1 L-8 0 L-6 -1 L-1.5 -4 L-1 -7 Z" fill="white" opacity="0.85"/>
+      </g>
+    </svg>
+    <span>NATO (cyan)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <circle cx="20" cy="20" r="18" fill="rgba(15,23,42,0.9)" stroke="#ff4444" stroke-width="2"/>
+      <g transform="translate(20, 20) scale(0.917)">
+        <path d="M0 -11 L1 -7 L1.5 -4 L6 -1 L8 0 L6 1 L1.5 2 L2 6 L3.5 9 L2 8.5 L0 10 L-2 8.5 L-3.5 9 L-2 6 L-1.5 2 L-6 1 L-8 0 L-6 -1 L-1.5 -4 L-1 -7 Z" fill="white" opacity="0.85"/>
+      </g>
+    </svg>
+    <span>CSTO (red)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <circle cx="20" cy="20" r="18" fill="rgba(15,23,42,0.9)" stroke="#ffaa00" stroke-width="2"/>
+      <g transform="translate(20, 20) scale(0.917)">
+        <path d="M0 -11 L1 -7 L1.5 -4 L6 -1 L8 0 L6 1 L1.5 2 L2 6 L3.5 9 L2 8.5 L0 10 L-2 8.5 L-3.5 9 L-2 6 L-1.5 2 L-6 1 L-8 0 L-6 -1 L-1.5 -4 L-1 -7 Z" fill="white" opacity="0.85"/>
+      </g>
+    </svg>
+    <span>Non-Aligned (amber)</span>
+  </div>
+  <div class="icon-box">
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <circle cx="20" cy="20" r="18" fill="rgba(15,23,42,0.9)" stroke="#8899aa" stroke-width="2"/>
+      <g transform="translate(20, 20) scale(0.917)">
+        <path d="M0 -11 L1 -7 L1.5 -4 L6 -1 L8 0 L6 1 L1.5 2 L2 6 L3.5 9 L2 8.5 L0 10 L-2 8.5 L-3.5 9 L-2 6 L-1.5 2 L-6 1 L-8 0 L-6 -1 L-1.5 -4 L-1 -7 Z" fill="white" opacity="0.85"/>
+      </g>
+    </svg>
+    <span>Convenience (slate)</span>
+  </div>
+</div>
+
+</body>
+</html>

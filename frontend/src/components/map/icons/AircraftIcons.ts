@@ -24,7 +24,20 @@ export const svgHeliLime = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg x
 export const svgHeliWhiteAlert = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="white" stroke="#666"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="#999" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
 export const svgPlaneBlack = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#222" stroke="#444"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /></svg>`)}`;
 export const svgHeliBlack = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#222" stroke="#444"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="#444" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
-export const svgDrone = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="orange" stroke="black"><path d="M12 2L15 8H9L12 2Z" /><rect x="8" y="8" width="8" height="2" /><path d="M4 10L10 14H14L20 10V12L14 16H10L4 12V10Z" /><circle cx="12" cy="14" r="2" fill="red"/></svg>`)}`;
+// Top-down quadcopter: elongated body + 4 rotor circles on arms (inspired by Recraft drone-1.svg)
+export const svgDrone = `data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24">` +
+    `<line x1="10" y1="10" x2="6" y2="6" stroke="#333" stroke-width="1.2"/>` +
+    `<line x1="14" y1="10" x2="18" y2="6" stroke="#333" stroke-width="1.2"/>` +
+    `<line x1="10" y1="14" x2="6" y2="18" stroke="#333" stroke-width="1.2"/>` +
+    `<line x1="14" y1="14" x2="18" y2="18" stroke="#333" stroke-width="1.2"/>` +
+    `<circle cx="6" cy="6" r="3" fill="none" stroke="#ff6b4a" stroke-width="1" opacity="0.8"/>` +
+    `<circle cx="18" cy="6" r="3" fill="none" stroke="#ff6b4a" stroke-width="1" opacity="0.8"/>` +
+    `<circle cx="6" cy="18" r="3" fill="none" stroke="#ff6b4a" stroke-width="1" opacity="0.8"/>` +
+    `<circle cx="18" cy="18" r="3" fill="none" stroke="#ff6b4a" stroke-width="1" opacity="0.8"/>` +
+    `<ellipse cx="12" cy="12" rx="2.5" ry="5" fill="orange" stroke="#333" stroke-width="0.8"/>` +
+    `</svg>`
+)}`;
 export const svgPowerPlant = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="#78350f" stroke="#f59e0b" stroke-linejoin="round" stroke-linecap="round"/></svg>`)}`;
 export const svgDataCenter = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="1.5"><rect x="3" y="3" width="18" height="6" rx="1" fill="#2e1065"/><rect x="3" y="11" width="18" height="6" rx="1" fill="#2e1065"/><circle cx="7" cy="6" r="1" fill="#a78bfa"/><circle cx="7" cy="14" r="1" fill="#a78bfa"/><line x1="11" y1="6" x2="17" y2="6" stroke="#a78bfa" stroke-width="1"/><line x1="11" y1="14" x2="17" y2="14" stroke="#a78bfa" stroke-width="1"/><line x1="12" y1="19" x2="12" y2="22" stroke="#a78bfa" stroke-width="1.5"/></svg>`)}`;
 export const svgShipGray = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="12" height="24" viewBox="0 0 24 24" fill="none"><path d="M6 20 L6 8 L12 2 L18 8 L18 20 C18 22 6 22 6 20 Z" fill="gray" stroke="#000" stroke-width="1"/><polygon points="12,6 16,16 8,16" fill="#fff" stroke="#000" stroke-width="1"/></svg>`)}`;
@@ -33,7 +46,15 @@ export const svgShipYellow = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg
 export const svgShipBlue = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="32" viewBox="0 0 24 24" fill="none"><path d="M6 22 L6 6 L12 2 L18 6 L18 22 Z" fill="#3b82f6" stroke="#000" stroke-width="1"/></svg>`)}`;
 export const svgShipWhite = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="36" viewBox="0 0 24 24" fill="none"><path d="M5 21 L5 8 L12 2 L19 8 L19 21 C19 23 5 23 5 21 Z" fill="white" stroke="#000" stroke-width="1"/><rect x="7" y="10" width="10" height="8" fill="#90cdf4" stroke="#000" stroke-width="1"/><circle cx="12" cy="14" r="2" fill="yellow" stroke="#000"/></svg>`)}`;
 export const svgShipPink = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="36" viewBox="0 0 24 24" fill="none"><path d="M5 21 L5 8 L12 2 L19 8 L19 21 C19 23 5 23 5 21 Z" fill="#FF69B4" stroke="#000" stroke-width="1"/><rect x="7" y="10" width="10" height="8" fill="#ff8dc7" stroke="#000" stroke-width="1"/><circle cx="12" cy="14" r="2" fill="white" stroke="#000"/></svg>`)}`;
-export const svgCarrier = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="orange" stroke="black"><polygon points="3,21 21,21 20,4 16,4 16,3 12,3 12,4 4,4" /><rect x="15" y="6" width="3" height="10" /></svg>`)}`;
+// Top-down carrier: pointed bow, wide stern, flight deck stripes + island (inspired by Recraft aircraft-carrier-2.svg)
+export const svgCarrier = `data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">` +
+    `<path d="M11 2 L4 8 L3 18 L4 21 L18 21 L19 18 L18 8 Z" fill="#555" stroke="#333" stroke-width="0.8"/>` +
+    `<rect x="6" y="10" width="10" height="2" fill="#ff8c00" opacity="0.7"/>` +
+    `<rect x="5" y="14" width="12" height="2" fill="#ff8c00" opacity="0.7"/>` +
+    `<rect x="15" y="8" width="2" height="4" fill="#888" stroke="#333" stroke-width="0.5"/>` +
+    `</svg>`
+)}`;
 export const svgCctv = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="cyan" stroke-width="2"><path d="M16.75 12h3.632a1 1 0 0 1 .894 1.447l-2.034 4.069a1 1 0 0 1-.894.553H5.652a1 1 0 0 1-.894-.553L2.724 13.447A1 1 0 0 1 3.618 12h3.632M14 12V8a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v4a4 4 0 1 0 8 0Z" /></svg>`)}`;
 export const svgRadioTower = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.5"><line x1="12" y1="10" x2="12" y2="23" stroke="#f59e0b" stroke-width="2"/><line x1="8" y1="23" x2="16" y2="23" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/><line x1="9" y1="16" x2="15" y2="16" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="9" r="2" fill="#f59e0b" stroke="none"/><path d="M8 6a5.5 5.5 0 0 1 8 0" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round"/><path d="M5.5 3.5a9 9 0 0 1 13 0" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/></svg>`)}`;
 export const svgWarning = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="yellow" stroke="black"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>`)}`;
@@ -147,3 +168,155 @@ export const COLOR_MAP_PRIVATE: Record<string, string> = { heli: 'svgHeliOrange'
 export const COLOR_MAP_JETS: Record<string, string> = { heli: 'svgHeliPurple', turboprop: 'svgTurbopropPurple', bizjet: 'svgBizjetPurple', airliner: 'svgAirlinerPurple' };
 export const COLOR_MAP_MILITARY: Record<string, string> = { heli: 'svgHeli', turboprop: 'svgTurbopropYellow', bizjet: 'svgBizjetYellow', airliner: 'svgAirlinerYellow' };
 export const MIL_SPECIAL_MAP: Record<string, string> = { fighter: 'svgFighter', tanker: 'svgTanker', recon: 'svgRecon' };
+
+// ---------------------------------------------------------------------------
+// Generic Cluster Icon Factory — circle + silhouette path, reusable for any type
+// ---------------------------------------------------------------------------
+
+// Silhouette paths for cluster icons (origin-centered, designed for ~32px scale)
+const CLUSTER_SHIP_PATH = 'M0 -16 L-6 -6 L-7 8 Q-7 14 0 14 Q7 14 7 8 L6 -6 Z';
+const CLUSTER_FIGHTER_PATH = 'M0 -11 L1 -7 L1.5 -4 L6 -1 L8 0 L6 1 L1.5 2 L2 6 L3.5 9 L2 8.5 L0 10 L-2 8.5 L-3.5 9 L-2 6 L-1.5 2 L-6 1 L-8 0 L-6 -1 L-1.5 -4 L-1 -7 Z';
+
+export function makeClusterSvg(
+    silhouettePath: string,
+    size: number,
+    strokeColor: string,
+    pathScale = 1,
+): string {
+    const cx = size / 2;
+    const cy = size / 2;
+    const r = cx - 2;
+    const s = (size / 48) * pathScale;
+    return `data:image/svg+xml;utf8,${encodeURIComponent(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">` +
+        `<circle cx="${cx}" cy="${cy}" r="${r}" fill="rgba(15,23,42,0.9)" stroke="${strokeColor}" stroke-width="2"/>` +
+        `<g transform="translate(${cx}, ${cy}) scale(${s})">` +
+        `<path d="${silhouettePath}" fill="white" opacity="0.85"/>` +
+        `</g></svg>`
+    )}`;
+}
+
+export function makeShipClusterSvg(size: number, strokeColor = '#67e8f9'): string {
+    return makeClusterSvg(CLUSTER_SHIP_PATH, size, strokeColor);
+}
+
+export function makeMilClusterSvg(size: number, strokeColor = '#67e8f9'): string {
+    return makeClusterSvg(CLUSTER_FIGHTER_PATH, size, strokeColor, 1.1);
+}
+
+// Default neutral cluster icons (backward compat)
+export const svgShipClusterSm = makeShipClusterSvg(32);
+export const svgShipClusterMd = makeShipClusterSvg(40);
+export const svgShipClusterLg = makeShipClusterSvg(48);
+export const svgShipClusterXl = makeShipClusterSvg(56);
+
+// ---------------------------------------------------------------------------
+// Differentiated Ship Type SVGs — distinct silhouette per vessel class
+// ---------------------------------------------------------------------------
+export function makeShipSvg(
+    type: string,
+    fill: string,
+    stroke: string,
+    outlineColor: string,
+    width: number,
+    height: number,
+): string {
+    let inner = '';
+    // viewBox matches width x height for each type
+    switch (type) {
+        case 'cargo':
+            // Wide hull, flat deck with stacked container blocks, bridge at stern
+            inner =
+                `<path d="M${width / 2} 2 L3 10 L3 ${height - 4} Q3 ${height - 1} ${width / 2} ${height - 1} Q${width - 3} ${height - 1} ${width - 3} ${height - 4} L${width - 3} 10 Z" fill="${fill}" stroke="${stroke}" stroke-width="1"/>` +
+                `<rect x="5" y="12" width="${width - 10}" height="4" rx="0.5" fill="${outlineColor}" stroke="${stroke}" stroke-width="0.5"/>` +
+                `<rect x="5" y="17" width="${width - 10}" height="4" rx="0.5" fill="${outlineColor}" stroke="${stroke}" stroke-width="0.5"/>` +
+                `<rect x="${width / 2 - 2}" y="${height - 10}" width="4" height="5" rx="0.5" fill="${outlineColor}" stroke="${stroke}" stroke-width="0.5"/>`;
+            break;
+        case 'tanker':
+            // Long narrow hull with oval tanks on deck, bridge at stern
+            inner =
+                `<path d="M${width / 2} 1 L4 10 L4 ${height - 4} Q4 ${height - 1} ${width / 2} ${height - 1} Q${width - 4} ${height - 1} ${width - 4} ${height - 4} L${width - 4} 10 Z" fill="${fill}" stroke="${stroke}" stroke-width="1"/>` +
+                `<ellipse cx="${width / 2}" cy="14" rx="3" ry="2.5" fill="${outlineColor}" stroke="${stroke}" stroke-width="0.5"/>` +
+                `<ellipse cx="${width / 2}" cy="21" rx="3" ry="2.5" fill="${outlineColor}" stroke="${stroke}" stroke-width="0.5"/>` +
+                `<rect x="${width / 2 - 1.5}" y="${height - 9}" width="3" height="4" rx="0.5" fill="${outlineColor}" stroke="${stroke}" stroke-width="0.5"/>`;
+            break;
+        case 'military':
+            // Sleek angular hull with sharp bow, radar mast
+            inner =
+                `<path d="M${width / 2} 1 L${width / 2 - 3} 8 L${width / 2 - 4} ${height - 6} Q${width / 2 - 4} ${height - 2} ${width / 2} ${height - 1} Q${width / 2 + 4} ${height - 2} ${width / 2 + 4} ${height - 6} L${width / 2 + 3} 8 Z" fill="${fill}" stroke="${stroke}" stroke-width="1"/>` +
+                // Radar mast
+                `<line x1="${width / 2}" y1="10" x2="${width / 2}" y2="6" stroke="${outlineColor}" stroke-width="1"/>` +
+                `<line x1="${width / 2 - 2}" y1="7" x2="${width / 2 + 2}" y2="7" stroke="${outlineColor}" stroke-width="0.8"/>`;
+            break;
+        case 'passenger':
+            // Wide hull, multi-level superstructure with 2 decks, rounded bow
+            inner =
+                `<path d="M${width / 2} 2 Q3 6 3 12 L3 ${height - 5} Q3 ${height - 1} ${width / 2} ${height - 1} Q${width - 3} ${height - 1} ${width - 3} ${height - 5} L${width - 3} 12 Q${width - 3} 6 ${width / 2} 2 Z" fill="${fill}" stroke="${stroke}" stroke-width="1"/>` +
+                // Lower deck
+                `<rect x="5" y="14" width="${width - 10}" height="5" rx="1" fill="${outlineColor}" stroke="${stroke}" stroke-width="0.5"/>` +
+                // Upper deck
+                `<rect x="6" y="10" width="${width - 12}" height="3" rx="1" fill="${outlineColor}" stroke="${stroke}" stroke-width="0.5"/>` +
+                // Funnel
+                `<rect x="${width / 2 - 1}" y="${height - 12}" width="2" height="4" fill="${outlineColor}" stroke="${stroke}" stroke-width="0.4"/>`;
+            break;
+        case 'yacht':
+            // Slim hull, streamlined single-deck superstructure, sharp bow
+            inner =
+                `<path d="M${width / 2} 1 L${width / 2 - 3} 8 Q${width / 2 - 4} 14 ${width / 2 - 4} ${height - 6} Q${width / 2 - 4} ${height - 1} ${width / 2} ${height - 1} Q${width / 2 + 4} ${height - 1} ${width / 2 + 4} ${height - 6} Q${width / 2 + 4} 14 ${width / 2 + 3} 8 Z" fill="${fill}" stroke="${stroke}" stroke-width="1"/>` +
+                // Sleek cabin
+                `<path d="M${width / 2 - 2} 12 L${width / 2 + 2} 12 L${width / 2 + 2} 20 Q${width / 2} 22 ${width / 2 - 2} 20 Z" fill="${outlineColor}" stroke="${stroke}" stroke-width="0.5"/>`;
+            break;
+        case 'carrier':
+            // Flat-top flight deck with island structure (top-down, landscape)
+            inner =
+                `<path d="M2 ${height / 2} L5 3 L${width - 3} 2 L${width - 1} ${height / 2} L${width - 3} ${height - 2} L5 ${height - 1} Z" fill="${fill}" stroke="${stroke}" stroke-width="1"/>` +
+                // Flight deck line
+                `<line x1="6" y1="${height / 2}" x2="${width - 4}" y2="${height / 2}" stroke="${outlineColor}" stroke-width="0.6" stroke-dasharray="2 1"/>` +
+                // Island superstructure (starboard side)
+                `<rect x="${width - 8}" y="4" width="4" height="6" rx="0.5" fill="${outlineColor}" stroke="${stroke}" stroke-width="0.5"/>`;
+            break;
+        default:
+            // Fallback generic hull
+            inner =
+                `<path d="M${width / 2} 2 L3 8 L3 ${height - 4} Q3 ${height - 1} ${width / 2} ${height - 1} Q${width - 3} ${height - 1} ${width - 3} ${height - 4} L${width - 3} 8 Z" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`;
+    }
+    return `data:image/svg+xml;utf8,${encodeURIComponent(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${inner}</svg>`
+    )}`;
+}
+
+// Pre-built ship type SVGs (default palette: dark fill, cyan stroke, steel details)
+export const svgShipCargo = makeShipSvg('cargo', '#3b82f6', '#000', '#1e3a5f', 16, 32);
+export const svgShipTanker = makeShipSvg('tanker', '#3b82f6', '#000', '#1e3a5f', 16, 34);
+export const svgShipMilitary = makeShipSvg('military', '#94a3b8', '#000', '#67e8f9', 14, 34);
+export const svgShipPassenger = makeShipSvg('passenger', 'white', '#000', '#90cdf4', 18, 36);
+export const svgShipYacht = makeShipSvg('yacht', '#f0f0f0', '#000', '#67e8f9', 16, 32);
+export const svgShipCarrier = makeShipSvg('carrier', '#6b7280', '#000', '#f59e0b', 22, 22);
+
+// ---------------------------------------------------------------------------
+// GPS Jamming Icon — signal arcs with diagonal slash, red/orange on dark
+// ---------------------------------------------------------------------------
+export const svgJammingIcon = `data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24">` +
+    // Semi-transparent dark background circle
+    `<circle cx="12" cy="12" r="11" fill="rgba(15,23,42,0.45)" stroke="#ff4060" stroke-width="1.2"/>` +
+    // Signal arcs (bottom-center origin, radiating upward)
+    `<path d="M9 16 A4 4 0 0 1 15 16" fill="none" stroke="#ff4060" stroke-width="2" stroke-linecap="round"/>` +
+    `<path d="M6.5 14 A8 8 0 0 1 17.5 14" fill="none" stroke="#ff4060" stroke-width="2" stroke-linecap="round"/>` +
+    `<path d="M4 12 A11 11 0 0 1 20 12" fill="none" stroke="#ff4060" stroke-width="1.5" stroke-linecap="round" opacity="0.8"/>` +
+    // Diagonal slash
+    `<line x1="5" y1="5" x2="19" y2="19" stroke="#ff4060" stroke-width="2.5" stroke-linecap="round"/>` +
+    `</svg>`
+)}`;
+
+// ---------------------------------------------------------------------------
+// Improved Fighter Aircraft Path — swept delta wings with twin vertical tails
+// ---------------------------------------------------------------------------
+export const FIGHTER_PATH = "M12 1 L13 5 L13.5 8 L18 11 L20 12 L18 13 L13.5 14 L14 18 L15.5 21 L14 20.5 L12 22 L10 20.5 L8.5 21 L10 18 L10.5 14 L6 13 L4 12 L6 11 L10.5 8 L11 5 Z";
+
+export const svgFighterImproved = `data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="yellow" stroke="black"><path d="${FIGHTER_PATH}"/></svg>`
+)}`;
+export const svgFighterCyan = `data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="cyan" stroke="black"><path d="${FIGHTER_PATH}"/></svg>`
+)}`;

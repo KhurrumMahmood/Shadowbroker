@@ -575,8 +575,8 @@ export default function Dashboard() {
           flex items-center justify-center
           border transition-all duration-200
           ${aiPanelOpen
-            ? "border-cyan-400/50 shadow-[0_0_12px_rgba(34,211,238,0.12)]"
-            : "border-cyan-400/40"
+            ? "border-cyan-400/60 shadow-[0_0_14px_rgba(34,211,238,0.15)]"
+            : "border-cyan-400/50"
           }
         `}
       >
@@ -592,7 +592,7 @@ export default function Dashboard() {
             shadow-[0_0_20px_rgba(0,0,0,0.6)]
             ${aiPanelOpen
               ? "border-cyan-400/60 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.2)]"
-              : "border-cyan-800/60 text-cyan-500/80 hover:border-cyan-600/60 hover:text-cyan-400"
+              : "border-cyan-600/60 text-cyan-400 hover:border-cyan-500/60 hover:text-cyan-300"
             }
           `}
         >

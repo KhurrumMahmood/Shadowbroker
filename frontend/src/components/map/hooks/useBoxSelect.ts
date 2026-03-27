@@ -12,10 +12,8 @@ const LAYER_TYPE_MAP: Record<string, string> = {
   "commercial-flights-layer": "flight",
   "private-flights-layer": "private_flight",
   "private-jets-layer": "private_jet",
-  "military-flights-layer": "military_flight",
   "tracked-flights-layer": "tracked_flight",
   "uav-layer": "uav",
-  "ships-layer": "ship",
   "carriers-layer": "carrier",
   "satellites-layer": "satellite",
   "earthquakes-layer": "earthquake",
@@ -29,6 +27,21 @@ const LAYER_TYPE_MAP: Record<string, string> = {
   "power-plants-layer": "power_plant",
   "military-bases-layer": "military_base",
 };
+
+/** Per-group layers use dynamic IDs (e.g. mil-nato-layer, ships-csto-layer) */
+const PREFIX_TYPE_MAP: Array<[string, string]> = [
+  ["mil-", "military_flight"],
+  ["ships-", "ship"],
+];
+
+function resolveLayerType(layerId: string): string | undefined {
+  const direct = LAYER_TYPE_MAP[layerId];
+  if (direct) return direct;
+  for (const [prefix, type] of PREFIX_TYPE_MAP) {
+    if (layerId.startsWith(prefix) && layerId.endsWith("-layer")) return type;
+  }
+  return undefined;
+}
 
 export function useBoxSelect(
   mapRef: MapRef | null,
@@ -108,7 +121,7 @@ export function useBoxSelect(
 
       for (const f of rawFeatures) {
         const layerId = f.layer?.id;
-        const entityType = layerId ? LAYER_TYPE_MAP[layerId] : undefined;
+        const entityType = layerId ? resolveLayerType(layerId) : undefined;
         if (!entityType) continue;
         const id = f.properties?.icao24 || f.properties?.mmsi || f.properties?.id || f.properties?.name || "";
         const key = `${entityType}:${id}`;

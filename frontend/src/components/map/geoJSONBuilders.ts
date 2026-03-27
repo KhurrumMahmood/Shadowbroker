@@ -5,6 +5,8 @@
 import type { Earthquake, GPSJammingZone, FireHotspot, InternetOutage, DataCenter, MilitaryBase, PowerPlant, GDELTIncident, LiveUAmapIncident, CCTVCamera, KiwiSDR, FrontlineGeoJSON, UAV, Satellite, Ship, ActiveLayers } from "@/types/dashboard";
 import { classifyAircraft } from "@/utils/aircraftClassification";
 import { MISSION_COLORS, MISSION_ICON_MAP } from "@/components/map/icons/SatelliteIcons";
+import { getCountryGroup } from "@/components/map/icons/countryGroups";
+import { SHADOW_ICON_MAP } from "@/components/map/icons/ShadowIcons";
 
 type FC = GeoJSON.FeatureCollection | null;
 type InViewFilter = (lat: number, lng: number) => boolean;
@@ -33,13 +35,34 @@ export function buildEarthquakesGeoJSON(earthquakes?: Earthquake[]): FC {
 
 // ─── GPS Jamming Zones ──────────────────────────────────────────────────────
 
+/** Build a circular polygon (in degrees) corrected for latitude distortion. */
+function circlePolygon(lng: number, lat: number, radiusDeg: number, segments = 24): number[][] {
+    const cosLat = Math.cos(lat * Math.PI / 180) || 0.01; // avoid division by zero at poles
+    const coords: number[][] = [];
+    for (let i = 0; i <= segments; i++) {
+        const angle = (2 * Math.PI * i) / segments;
+        coords.push([
+            lng + (radiusDeg * Math.cos(angle)) / cosLat,
+            lat + radiusDeg * Math.sin(angle),
+        ]);
+    }
+    return coords;
+}
+
 export function buildJammingGeoJSON(zones?: GPSJammingZone[]): FC {
     if (!zones?.length) return null;
-    return {
-        type: 'FeatureCollection',
-        features: zones.map((zone, i) => {
-            const halfDeg = 0.5;
-            return {
+    const features: GeoJSON.Feature[] = [];
+    const baseOpacity: Record<string, number> = { high: 0.40, medium: 0.28, low: 0.16 };
+    // Concentric circular rings: inner (small, full opacity) → outer (large, faded)
+    const rings = [
+        { radiusDeg: 0.25, opacityMul: 1.0, ring: 0 },
+        { radiusDeg: 0.375, opacityMul: 0.55, ring: 1 },
+        { radiusDeg: 0.5, opacityMul: 0.25, ring: 2 },
+    ];
+
+    zones.forEach((zone, i) => {
+        for (const { radiusDeg, opacityMul, ring } of rings) {
+            features.push({
                 type: 'Feature' as const,
                 properties: {
                     id: i,
@@ -47,21 +70,18 @@ export function buildJammingGeoJSON(zones?: GPSJammingZone[]): FC {
                     ratio: zone.ratio,
                     degraded: zone.degraded,
                     total: zone.total,
-                    opacity: zone.severity === 'high' ? 0.45 : zone.severity === 'medium' ? 0.3 : 0.18
+                    ring,
+                    opacity: (baseOpacity[zone.severity] ?? 0.16) * opacityMul,
                 },
                 geometry: {
                     type: 'Polygon' as const,
-                    coordinates: [[
-                        [zone.lng - halfDeg, zone.lat - halfDeg],
-                        [zone.lng + halfDeg, zone.lat - halfDeg],
-                        [zone.lng + halfDeg, zone.lat + halfDeg],
-                        [zone.lng - halfDeg, zone.lat + halfDeg],
-                        [zone.lng - halfDeg, zone.lat - halfDeg]
-                    ]]
-                }
-            };
-        })
-    };
+                    coordinates: [circlePolygon(zone.lng, zone.lat, radiusDeg)],
+                },
+            });
+        }
+    });
+
+    return { type: 'FeatureCollection', features };
 }
 
 // ─── CCTV Cameras ──────────────────────────────────────────────────────────
@@ -119,7 +139,11 @@ export function buildFirmsGeoJSON(fires?: FireHotspot[]): FC {
         type: 'FeatureCollection',
         features: fires.map((f, i) => {
             const frp = f.frp || 0;
-            const iconId = frp >= 100 ? 'fire-darkred' : frp >= 20 ? 'fire-red' : frp >= 5 ? 'fire-orange' : 'fire-yellow';
+            let iconId: string;
+            if (frp >= 100) iconId = 'fire-darkred';
+            else if (frp >= 20) iconId = 'fire-red';
+            else if (frp >= 5) iconId = 'fire-orange';
+            else iconId = 'fire-yellow';
             return {
                 type: 'Feature' as const,
                 properties: {
@@ -223,7 +247,7 @@ export function buildPowerPlantsGeoJSON(plants?: PowerPlant[]): FC {
 const _ADVERSARY_COUNTRIES = new Set(["China", "Russia", "North Korea"]);
 const _ROC_COUNTRIES = new Set(["Taiwan"]);
 
-function _baseSide(country: string, operator: string): "red" | "blue" | "green" {
+function _baseSide(country: string): "red" | "blue" | "green" {
     if (_ADVERSARY_COUNTRIES.has(country)) return "red";
     if (_ROC_COUNTRIES.has(country)) return "green";
     return "blue";
@@ -242,7 +266,7 @@ export function buildMilitaryBasesGeoJSON(bases?: MilitaryBase[]): FC {
                 country: base.country || '',
                 operator: base.operator || '',
                 branch: base.branch || '',
-                side: _baseSide(base.country || '', base.operator || ''),
+                side: _baseSide(base.country || ''),
             },
             geometry: { type: 'Point' as const, coordinates: [base.lng, base.lat] }
         }))
@@ -351,7 +375,7 @@ export function buildFlightLayerGeoJSON(
             const [iLng, iLat] = interpFlight(f);
             return {
                 type: 'Feature' as const,
-                properties: { id: f.icao24 || f.callsign || `${idPrefix}${i}`, type: typeLabel, callsign: f.callsign || f.icao24, rotation, iconId },
+                properties: { id: f.icao24 || f.callsign || `${idPrefix}${i}`, type: typeLabel, callsign: f.callsign || f.icao24, rotation, iconId, shadowIconId: SHADOW_ICON_MAP[iconId] ?? 'shadow-plane', countryGroup: getCountryGroup(f.country) },
                 geometry: { type: 'Point' as const, coordinates: [iLng, iLat] }
             };
         }).filter(Boolean) as GeoJSON.Feature[]
@@ -375,6 +399,7 @@ export function buildUavGeoJSON(uavs?: UAV[], inView?: InViewFilter): FC {
                     callsign: uav.callsign,
                     rotation: uav.heading || 0,
                     iconId: 'svgDrone',
+                    shadowIconId: 'shadow-drone',
                     name: uav.aircraft_model || uav.callsign,
                     country: uav.country || '',
                     uav_type: uav.uav_type || '',
@@ -436,12 +461,12 @@ export function buildShipsGeoJSON(
 
             if (s.type === 'carrier') return null; // Handled by buildCarriersGeoJSON
 
-            if (isTrackedYacht) {
-                if (activeLayers?.ships_tracked_yachts === false) return null;
-            } else if (isMilitary && activeLayers?.ships_military === false) return null;
-            else if (isCargo && activeLayers?.ships_cargo === false) return null;
-            else if (isPassenger && activeLayers?.ships_passenger === false) return null;
-            else if (!isMilitary && !isCargo && !isPassenger && activeLayers?.ships_civilian === false) return null;
+            // Filter by layer toggle for this ship's category
+            if (isTrackedYacht && !activeLayers.ships_tracked_yachts) return null;
+            if (!isTrackedYacht && isMilitary && !activeLayers.ships_military) return null;
+            if (!isTrackedYacht && isCargo && !activeLayers.ships_cargo) return null;
+            if (!isTrackedYacht && isPassenger && !activeLayers.ships_passenger) return null;
+            if (!isTrackedYacht && !isMilitary && !isCargo && !isPassenger && !activeLayers.ships_civilian) return null;
 
             let iconId = 'svgShipBlue';
             if (isTrackedYacht) iconId = 'svgShipPink';
@@ -452,11 +477,41 @@ export function buildShipsGeoJSON(
             const [iLng, iLat] = interpShip(s);
             return {
                 type: 'Feature',
-                properties: { id: s.mmsi || s.name || `ship-${i}`, type: 'ship', name: s.name, rotation: s.heading || 0, iconId },
+                properties: { id: s.mmsi || s.name || `ship-${i}`, type: 'ship', name: s.name, rotation: s.heading || 0, iconId, shadowIconId: SHADOW_ICON_MAP[iconId] ?? 'shadow-ship-pointed', countryGroup: getCountryGroup(s.country) },
                 geometry: { type: 'Point', coordinates: [iLng, iLat] }
             };
         }).filter(Boolean) as GeoJSON.Feature[]
     };
+}
+
+const COUNTRY_GROUPS = ['nato', 'csto', 'nonaligned', 'convenience', 'other'] as const;
+
+/** Partition any FeatureCollection into per-country-group buckets for independent clustering. */
+export function buildFeaturesByGroup(
+    fc: GeoJSON.FeatureCollection | null
+): Record<string, GeoJSON.FeatureCollection> | null {
+    if (!fc?.features.length) return null;
+    const groups: Record<string, GeoJSON.Feature[]> = {};
+    for (const g of COUNTRY_GROUPS) groups[g] = [];
+    for (const f of fc.features) {
+        const g = (f.properties?.countryGroup as string) || 'other';
+        groups[g].push(f);
+    }
+    const result: Record<string, GeoJSON.FeatureCollection> = {};
+    for (const [g, features] of Object.entries(groups)) {
+        if (features.length > 0) result[g] = { type: 'FeatureCollection', features };
+    }
+    return Object.keys(result).length > 0 ? result : null;
+}
+
+/** Partition ships into per-country-group FeatureCollections for independent clustering. */
+export function buildShipsGeoJSONByGroup(
+    ships: Ship[] | undefined,
+    activeLayers: ActiveLayers,
+    inView: InViewFilter,
+    interpShip: (s: Ship) => [number, number]
+): Record<string, GeoJSON.FeatureCollection> | null {
+    return buildFeaturesByGroup(buildShipsGeoJSON(ships, activeLayers, inView, interpShip));
 }
 
 // ─── Carriers ───────────────────────────────────────────────────────────────
@@ -469,7 +524,7 @@ export function buildCarriersGeoJSON(ships: Ship[] | undefined): FC {
             if (s.type !== 'carrier' || s.lat == null || s.lng == null) return null;
             return {
                 type: 'Feature',
-                properties: { id: s.mmsi || s.name || `carrier-${i}`, type: 'ship', name: s.name, rotation: s.heading || 0, iconId: 'svgCarrier' },
+                properties: { id: s.mmsi || s.name || `carrier-${i}`, type: 'ship', name: s.name, rotation: s.heading || 0, iconId: 'svgCarrier', shadowIconId: 'shadow-carrier', countryGroup: getCountryGroup(s.country) },
                 geometry: { type: 'Point', coordinates: [s.lng, s.lat] }
             };
         }).filter(Boolean) as GeoJSON.Feature[]

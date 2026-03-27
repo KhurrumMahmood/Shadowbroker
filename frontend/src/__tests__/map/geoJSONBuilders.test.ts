@@ -82,31 +82,54 @@ describe('buildJammingGeoJSON', () => {
         expect(buildJammingGeoJSON([])).toBeNull();
     });
 
-    it('builds polygon features with correct opacity mapping', () => {
+    it('builds concentric ring features with correct opacity mapping', () => {
         const zones: GPSJammingZone[] = [
             { lat: 50, lng: 30, severity: 'high', ratio: 0.8, degraded: 100, total: 125 },
             { lat: 45, lng: 35, severity: 'medium', ratio: 0.5, degraded: 50, total: 100 },
             { lat: 40, lng: 25, severity: 'low', ratio: 0.2, degraded: 20, total: 100 },
         ];
         const result = buildJammingGeoJSON(zones);
-        expect(result!.features).toHaveLength(3);
-        expect(result!.features[0].properties?.opacity).toBe(0.45);
-        expect(result!.features[1].properties?.opacity).toBe(0.3);
-        expect(result!.features[2].properties?.opacity).toBe(0.18);
+        // 3 zones × 3 rings each = 9 features
+        expect(result!.features).toHaveLength(9);
+        // First zone (high): inner ring has full base opacity (0.40 * 1.0)
+        expect(result!.features[0].properties?.ring).toBe(0);
+        expect(result!.features[0].properties?.opacity).toBeCloseTo(0.40);
+        // Outer ring has faded opacity (0.40 * 0.25)
+        expect(result!.features[2].properties?.ring).toBe(2);
+        expect(result!.features[2].properties?.opacity).toBeCloseTo(0.10);
     });
 
-    it('builds correct 1°×1° polygon geometry', () => {
+    it('builds circular polygon geometry for inner and outer rings', () => {
         const zones: GPSJammingZone[] = [
             { lat: 50, lng: 30, severity: 'high', ratio: 0.8, degraded: 100, total: 125 },
         ];
         const result = buildJammingGeoJSON(zones);
-        const geom = result!.features[0].geometry;
-        expect(geom.type).toBe('Polygon');
-        if (geom.type === 'Polygon') {
-            const ring = geom.coordinates[0];
-            expect(ring).toHaveLength(5); // Closed ring
-            expect(ring[0]).toEqual([29.5, 49.5]);
-            expect(ring[2]).toEqual([30.5, 50.5]);
+        // Inner ring (0.25 degree radius circle)
+        const innerGeom = result!.features[0].geometry;
+        expect(innerGeom.type).toBe('Polygon');
+        if (innerGeom.type === 'Polygon') {
+            const ring = innerGeom.coordinates[0];
+            // 24 segments + 1 closing vertex = 25 points
+            expect(ring).toHaveLength(25);
+            // First and last vertex should be the same (closed ring)
+            expect(ring[0][0]).toBeCloseTo(ring[ring.length - 1][0], 10);
+            expect(ring[0][1]).toBeCloseTo(ring[ring.length - 1][1], 10);
+            // Circle should be roughly centered on the zone
+            const lngs = ring.map(c => c[0]);
+            const lats = ring.map(c => c[1]);
+            const avgLng = lngs.reduce((a, b) => a + b) / lngs.length;
+            const avgLat = lats.reduce((a, b) => a + b) / lats.length;
+            expect(avgLng).toBeCloseTo(30, 1);
+            expect(avgLat).toBeCloseTo(50, 1);
+        }
+        // Outer ring (0.5 degree radius) should span ~1° north-south
+        const outerGeom = result!.features[2].geometry;
+        if (outerGeom.type === 'Polygon') {
+            const ring = outerGeom.coordinates[0];
+            expect(ring).toHaveLength(25);
+            const lats = ring.map(c => c[1]);
+            const latSpan = Math.max(...lats) - Math.min(...lats);
+            expect(latSpan).toBeCloseTo(1.0, 1); // 0.5 radius × 2
         }
     });
 });
