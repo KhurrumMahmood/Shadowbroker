@@ -97,3 +97,8 @@ export const DUMMY_CHOKEPOINT_DATA: ChokeData = {
     brent: { price: 82.67, change_pct: -0.87 },
   },
 };
+
+/** Standardized dataset catalog for the artifacts showcase. */
+export const DATASETS = [
+  { key: "default", label: "6 GLOBAL CHOKEPOINTS", data: DUMMY_CHOKEPOINT_DATA },
+] as const;

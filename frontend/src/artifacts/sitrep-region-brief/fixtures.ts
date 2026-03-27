@@ -69,3 +69,8 @@ export const DUMMY_SITREP_DATA: SitrepData = {
 
   assessment: "ELEVATED RISK — Multiple indicators of rising tension in the Strait of Hormuz corridor. Iranian naval activity has increased with at least one tanker seizure reported in the last 24 hours. US CSG-2 (Eisenhower) is positioned in the Gulf of Oman providing overwatch. GPS jamming detected across two zones affecting commercial navigation. GDELT conflict scores averaging -5.8 across 5 events. Recommend heightened monitoring of IRGCN patrol patterns and tanker AIS gaps.",
 };
+
+/** Standardized dataset catalog for the artifacts showcase. */
+export const DATASETS = [
+  { key: "default", label: "PERSIAN GULF / HORMUZ", data: DUMMY_SITREP_DATA },
+] as const;

@@ -95,3 +95,8 @@ export const DUMMY_CONVERGENCE_DATA: ConvergenceData = {
     { name: "MOSKVA II", type: "military_vessel", flag: "RU", lat: 44.45, lng: 33.85 },
   ],
 };
+
+/** Standardized dataset catalog for the artifacts showcase. */
+export const DATASETS = [
+  { key: "default", label: "5 CONVERGENCE CLUSTERS", data: DUMMY_CONVERGENCE_DATA },
+] as const;

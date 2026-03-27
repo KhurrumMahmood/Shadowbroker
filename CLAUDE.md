@@ -236,6 +236,15 @@ Run tests after each stage.
 ## Related Docs
 
 - `docs/voice.md` — Voice communication architecture, hooks, design decisions, costs
+- `docs/shodan-research.md` — Shodan.io capabilities, API reference, and integration roadmap (ICS/SCADA, maritime, satellite, cross-domain correlations)
+- `docs/skills/` — Agent system operational patterns:
+  - `data-source-evaluator.md` — Structured pipeline for evaluating new feeds before integration (quality tiers, technical assessment, correlation value scoring)
+  - `intelligence-brief.md` — Multi-source intelligence brief generation (Flash/Standard/Deep formats, confidence levels, audience adaptation)
+  - `cross-domain-correlator.md` — Parallel domain agents + UNION merge for discovering correlations across aviation/maritime/financial/conflict/cyber/environmental feeds
+  - `agent-patterns.md` — Agent architecture selection guide (Tool-Use, ReAct, Plan-Execute, Reflexion, Monitor-Trigger) with failure modes and cost budgets
+  - `cross-domain-patterns.md` — Patterns transferred from marketing/sales/legal/finance/creative domains: significance scoring, Benford's Law spoofing detection, variance decomposition for anomaly explanation, provenance taxonomy, compliance tracking, visualization philosophy, audience adaptation (AIDA per persona), red-team simulation
+  - `user-model.md` — User profiling and adaptive intelligence: 5-question onboarding questionnaire, behavioral signal tracking, derived preferences, per-domain complexity adaptation, Quick Access panel with persona-specific artifact templates, pre-generation strategy
 - `frontend/README.md` — API URL configuration and theming
+- `docs/artifacts.md` — Artifact system: conventions, categories, fixture format, and checklist for adding new artifacts. Showcase at `/artifacts-list`.
 - `helm/chart/README.md` — Kubernetes Helm chart deployment
 - `test-silo/` — Phase 0 product research (archetypes, market analysis, roadmap). Snapshot from March 2026, not actively maintained.

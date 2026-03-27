@@ -21,6 +21,7 @@ export interface RegistryEntry {
   name: string;
   title: string;
   description: string;
+  category?: string;
   tags: string[];
   data_signature: string;
   current_version: number;

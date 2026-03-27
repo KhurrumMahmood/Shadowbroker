@@ -43,3 +43,8 @@ export const DUMMY_TRACKED_DATA: TrackedData = {
     { name: "INS Vikrant (R11)", lat: 15.40, lng: 73.80, location: "Arabian Sea", status: "Sea Trials" },
   ],
 };
+
+/** Standardized dataset catalog for the artifacts showcase. */
+export const DATASETS = [
+  { key: "default", label: "YACHTS / MILITARY / CARRIERS", data: DUMMY_TRACKED_DATA },
+] as const;

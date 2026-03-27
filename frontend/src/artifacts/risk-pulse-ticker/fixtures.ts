@@ -67,3 +67,8 @@ export const DUMMY_TICKER_DATA: TickerData = {
     { title: "Amazon fires rage unchecked as dry season peaks", source: "Guardian", published: "2026-03-25T20:00:00Z" },
   ],
 };
+
+/** Standardized dataset catalog for the artifacts showcase. */
+export const DATASETS = [
+  { key: "default", label: "MIXED GLOBAL EVENTS", data: DUMMY_TICKER_DATA },
+] as const;
