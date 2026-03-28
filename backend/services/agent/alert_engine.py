@@ -12,8 +12,13 @@ from services.agent.alert_checkers import (
     check_under_reported_crisis,
     check_ew_detection,
     check_vip_movement,
+    check_prediction_market_signal,
+    check_black_sea_escalation,
+    check_disinformation_divergence,
+    check_supply_chain_cascade,
 )
 from services.agent.datasource import DataSource
+from services.agent.significance import score_alert
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +31,10 @@ _ALL_CHECKERS = [
     check_under_reported_crisis,
     check_ew_detection,
     check_vip_movement,
+    check_prediction_market_signal,
+    check_black_sea_escalation,
+    check_disinformation_divergence,
+    check_supply_chain_cascade,
 ]
 
 
@@ -42,6 +51,7 @@ class AlertEngine:
             try:
                 alerts = checker(ds)
                 for alert in alerts:
+                    score_alert(alert, ds)
                     aid = self._store.save(alert)
                     if aid is not None:
                         saved += 1

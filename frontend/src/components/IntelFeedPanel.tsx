@@ -13,6 +13,7 @@ interface AlertItem {
   lat: number | null;
   lng: number | null;
   created_at: number;
+  significance: number | null;
 }
 
 interface IntelFeedPanelProps {
@@ -56,6 +57,15 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   under_reported_crisis: "UNREPORTED",
   ew_detection: "EW DETECTED",
   vip_movement: "VIP MOVEMENT",
+  correlation_rf_anomaly: "RF ANOMALY",
+  correlation_military_buildup: "MIL BUILDUP",
+  correlation_infra_cascade: "CORR INFRA CASCADE",
+  prediction_market_signal: "MARKET SIGNAL",
+  black_sea_escalation: "BLACK SEA",
+  disinformation_divergence: "DISINFO DIVERGENCE",
+  supply_chain_cascade: "SUPPLY CASCADE",
+  correlation_conflict_escalation: "CONFLICT ESCALATION",
+  correlation_fimi_amplification: "FIMI AMPLIFICATION",
 };
 
 function timeAgo(ts: number): string {
@@ -184,6 +194,19 @@ export default function IntelFeedPanel({
                       >
                         {ALERT_TYPE_LABELS[alert.alert_type] || alert.alert_type.toUpperCase()}
                       </span>
+                      {alert.significance != null && (
+                        <span
+                          className={`text-[8px] font-mono tracking-wider border rounded px-1 py-0.5 ${
+                            alert.significance >= 70
+                              ? "border-red-500/40 text-red-400"
+                              : alert.significance >= 40
+                                ? "border-yellow-500/40 text-yellow-400"
+                                : "border-cyan-500/40 text-cyan-400"
+                          }`}
+                        >
+                          {alert.significance}
+                        </span>
+                      )}
                     </div>
                     <button
                       type="button"

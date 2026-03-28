@@ -27,6 +27,10 @@ class Alert:
     data: dict = field(default_factory=dict)
     created_at: float = 0.0
     alert_id: str = ""
+    # Significance scoring (EXP-024/027) — None if no profile registered
+    significance: int | None = None
+    signal_score: float | None = None
+    routine_score: float | None = None
 
 
 class AlertStore:
@@ -108,6 +112,9 @@ class AlertStore:
                     "lat": alert.lat,
                     "lng": alert.lng,
                     "created_at": alert.created_at,
+                    "significance": alert.significance,
+                    "signal_score": alert.signal_score,
+                    "routine_score": alert.routine_score,
                 })
                 if len(result) >= limit:
                     break

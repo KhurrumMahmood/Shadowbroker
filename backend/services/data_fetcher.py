@@ -94,6 +94,32 @@ def _run_post_processing():
         logger.exception("Post-processing pipeline failed")
 
 
+def _run_correlation_engine():
+    """Run rule-based cross-layer correlation after slow-tier refresh.
+
+    Detects compound patterns: RF anomalies, military buildup, infrastructure
+    cascades. Findings are saved as alerts AND written to latest_data for
+    agent access.
+    """
+    try:
+        from services.correlation_engine import run_correlation_engine
+        from services.agent.datasource import InMemoryDataSource
+        from services.agent.stores import snapshot_store, baseline_store
+
+        with _data_lock:
+            data_copy = dict(latest_data)
+
+        ds = InMemoryDataSource(data_copy, snapshot_store=snapshot_store, baseline_store=baseline_store)
+        findings = run_correlation_engine(data_copy, ds=ds)
+
+        with _data_lock:
+            latest_data["correlation_alerts"] = findings
+        if findings:
+            _mark_fresh("correlation_alerts")
+    except Exception as e:
+        logger.debug(f"Correlation engine skipped: {e}")
+
+
 def _run_alert_engine():
     """Run proactive alert checkers against current data.
 
@@ -107,7 +133,8 @@ def _run_alert_engine():
         with _data_lock:
             data_copy = dict(latest_data)
 
-        ds = InMemoryDataSource(data_copy)
+        from services.agent.stores import snapshot_store, baseline_store
+        ds = InMemoryDataSource(data_copy, snapshot_store=snapshot_store, baseline_store=baseline_store)
         engine = AlertEngine()
         count = engine.run(ds)
         if count > 0:
@@ -187,7 +214,7 @@ def update_slow_data():
         fetch_disease_outbreaks,
         fetch_prediction_markets,
         fetch_fimi,
-        fetch_meshtastic,
+        # fetch_meshtastic has its own 4h scheduler (37MB response, too heavy for 5min slow tier)
         # datacenters, military_bases, power_plants are static files —
         # loaded once at startup via _load_static_infrastructure(), not every 5min
     ]
@@ -196,6 +223,7 @@ def update_slow_data():
         concurrent.futures.wait(futures)
     logger.info("Slow-tier update complete.")
     _run_post_processing()
+    _run_correlation_engine()
     _run_alert_engine()
 
 def _load_static_infrastructure():
