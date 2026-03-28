@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import ArtifactShell from "@/artifacts/_shared/ArtifactShell";
 import { useArtifactData } from "@/artifacts/_shared/useArtifactData";
 
@@ -160,6 +160,7 @@ export default function TrackedEntityDashboard({ initialData }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [exportLabel, setExportLabel] = useState("EXPORT LIST");
+  const [search, setSearch] = useState("");
 
   const allEntities = useMemo(() => {
     if (!data) return [];
@@ -171,14 +172,29 @@ export default function TrackedEntityDashboard({ initialData }: Props) {
   const carrierCount = useMemo(() => allEntities.filter((e) => e.category === "CARRIERS").length, [allEntities]);
 
   const filtered = useMemo(() => {
-    const list = filter === "ALL" ? allEntities : allEntities.filter((e) => e.category === filter);
+    let list = filter === "ALL" ? allEntities : allEntities.filter((e) => e.category === filter);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (e) =>
+          e.name.toLowerCase().includes(q) ||
+          e.subtype.toLowerCase().includes(q) ||
+          e.ownerFlag.toLowerCase().includes(q) ||
+          e.status.toLowerCase().includes(q),
+      );
+    }
     return [...list].sort((a, b) => {
       const av = a[sortKey];
       const bv = b[sortKey];
       const cmp = String(av).localeCompare(String(bv));
       return sortDir === "desc" ? -cmp : cmp;
     });
-  }, [allEntities, filter, sortKey, sortDir]);
+  }, [allEntities, filter, search, sortKey, sortDir]);
+
+  const handleFlyTo = useCallback((lat?: number, lng?: number) => {
+    if (lat == null || lng == null) return;
+    window.open(`/?flyTo=${lat},${lng},10`, "_blank");
+  }, []);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -215,7 +231,7 @@ export default function TrackedEntityDashboard({ initialData }: Props) {
 
   return (
     <ArtifactShell title="TRACKED ENTITY DASHBOARD">
-      {/* Header area */}
+      {/* Header area — clickable stats act as category filters */}
       <div
         style={{
           display: "flex",
@@ -226,12 +242,29 @@ export default function TrackedEntityDashboard({ initialData }: Props) {
           marginBottom: "12px",
         }}
       >
-        <span
-          className="sb-label"
-          style={{ fontFamily: "var(--sb-font-mono)", fontSize: "11px" }}
-        >
-          VESSELS: {vesselCount} | AIRCRAFT: {aircraftCount} | CARRIERS: {carrierCount} | TOTAL: {allEntities.length}
-        </span>
+        <div style={{ display: "flex", gap: "6px", alignItems: "center", fontFamily: "var(--sb-font-mono)", fontSize: "11px" }}>
+          {([["VESSELS", vesselCount], ["AIRCRAFT", aircraftCount], ["CARRIERS", carrierCount]] as [Category, number][]).map(([cat, count]) => (
+            <button
+              key={cat}
+              onClick={() => setFilter(filter === cat ? "ALL" : cat)}
+              style={{
+                background: filter === cat ? "rgba(34,211,238,0.15)" : "transparent",
+                border: `1px solid ${filter === cat ? "var(--sb-color-aviation)" : "var(--sb-border-accent)"}`,
+                color: filter === cat ? "var(--sb-color-aviation)" : "var(--sb-text-muted)",
+                fontFamily: "var(--sb-font-mono)",
+                fontSize: "10px",
+                padding: "3px 8px",
+                cursor: "pointer",
+                letterSpacing: "0.05em",
+              }}
+            >
+              {cat}: {count}
+            </button>
+          ))}
+          <span className="sb-label" style={{ fontSize: "10px", marginLeft: "4px" }}>
+            TOTAL: {allEntities.length}
+          </span>
+        </div>
 
         <button
           onClick={handleExport}
@@ -250,26 +283,25 @@ export default function TrackedEntityDashboard({ initialData }: Props) {
         </button>
       </div>
 
-      {/* Filter tabs */}
-      <div style={{ display: "flex", gap: "4px", marginBottom: "12px" }}>
-        {categories.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setFilter(cat)}
-            style={{
-              background: filter === cat ? "rgba(34,211,238,0.15)" : "transparent",
-              border: `1px solid ${filter === cat ? "var(--sb-color-aviation)" : "var(--sb-border-accent)"}`,
-              color: filter === cat ? "var(--sb-color-aviation)" : "var(--sb-text-muted)",
-              fontFamily: "var(--sb-font-mono)",
-              fontSize: "10px",
-              padding: "3px 10px",
-              cursor: "pointer",
-              letterSpacing: "0.05em",
-            }}
-          >
-            {cat}
-          </button>
-        ))}
+      {/* Search */}
+      <div style={{ marginBottom: "12px" }}>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name, type, owner, status..."
+          style={{
+            width: "100%",
+            background: "rgba(0,0,0,0.4)",
+            border: "1px solid var(--sb-border-accent)",
+            color: "var(--sb-text-primary)",
+            fontFamily: "var(--sb-font-mono)",
+            fontSize: "11px",
+            padding: "6px 10px",
+            letterSpacing: "0.05em",
+            outline: "none",
+          }}
+        />
       </div>
 
       {/* Entity table */}
@@ -315,7 +347,31 @@ export default function TrackedEntityDashboard({ initialData }: Props) {
                   {e.category === "VESSELS" ? "VESSEL" : e.category === "AIRCRAFT" ? "AIRCRAFT" : "CARRIER"}
                 </span>
               </td>
-              <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{e.name}</td>
+              <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+                {e.lat != null && e.lng != null ? (
+                  <button
+                    onClick={() => handleFlyTo(e.lat, e.lng)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--sb-text-secondary)",
+                      fontFamily: "inherit",
+                      fontSize: "inherit",
+                      fontWeight: "inherit",
+                      cursor: "pointer",
+                      padding: 0,
+                      textDecoration: "underline",
+                      textDecorationStyle: "dotted",
+                      textUnderlineOffset: "3px",
+                    }}
+                    title={`Fly to ${e.name} on map`}
+                  >
+                    {e.name}
+                  </button>
+                ) : (
+                  e.name
+                )}
+              </td>
               <td style={{ color: "var(--sb-text-muted)" }}>{e.subtype}</td>
               <td style={{ color: "var(--sb-text-secondary)" }}>{e.ownerFlag}</td>
               <td style={{ fontFamily: "var(--sb-font-mono)", fontSize: "11px", color: "var(--sb-text-muted)" }}>

@@ -127,9 +127,16 @@ Single-page app in `frontend/src/app/page.tsx` (`Dashboard` component).
 - Slow: every 120s (news, stocks, earthquakes, weather) — 5s during startup burst
 - Uses ETag conditional requests (`If-None-Match`) for bandwidth savings
 
-**Map:** `MaplibreViewer.tsx` is the core rendering component, loaded via `next/dynamic` with SSR disabled. GeoJSON builders in `src/components/map/geoJSONBuilders.ts` convert API data to map layers.
+**Map:** `MaplibreViewer.tsx` is the core rendering component, loaded via `next/dynamic` with SSR disabled. GeoJSON builders in `src/components/map/geoJSONBuilders.ts` convert API data to map layers. `useCompositeClusters.ts` merges nearby markers across different entity types into composite clusters at lower zoom levels.
 
 **State:** React context (`DashboardDataContext`) + hooks. No external state library.
+
+**Shared utilities:**
+- `src/utils/viewportFilter.ts` — `classifyShipCategory()`, `inBounds()`, viewport counting helpers used by left panel and map
+- `src/utils/layerSearch.ts` — `buildSearchIndex()` / `searchWithIndex()` for pre-computed entity search (used by `LayerSearchPane`)
+- `src/hooks/useCategoryCycler.ts` — `entityDisplayName()` + `toSelectedEntity()` shared across AI results, layer search, and category cycling
+
+**AI assistant entity resolution chain:** LLM emits `result_entities: [{type, id}]` → frontend `useAIResultCycler.ts` normalizes type via `TYPE_ALIASES` → maps to data key via `TYPE_TO_DATA_KEY` → `findEntityInData()` searches the live data array by multiple identifier fields (case-insensitive, with numeric coordinate fallback for fires/GDELT). Only entity types present in backend `_SEARCH_CONFIG` can produce valid IDs. See `docs/ai-chat-system.md` for details.
 
 **Voice:** Military radio-style voice interface — wake word ("Jarvis") + VAD recording + cloud STT/TTS. See `docs/voice.md` for architecture, hooks, design decisions, and costs.
 
@@ -260,5 +267,7 @@ Full reference: `memory/reference_ralph_wiggum.md` | Self-analysis: `memory/feed
   - `user-model.md` — User profiling and adaptive intelligence: 5-question onboarding questionnaire, behavioral signal tracking, derived preferences, per-domain complexity adaptation, Quick Access panel with persona-specific artifact templates, pre-generation strategy
 - `frontend/README.md` — API URL configuration and theming
 - `docs/artifacts.md` — Artifact system: conventions, categories, fixture format, and checklist for adding new artifacts. Showcase at `/artifacts`.
+- `docs/ai-chat-system.md` — AI chat panel: button types, entity resolution, layer toggles, artifact chips, known issues
+- `docs/ux-backlog.md` — UX improvement tracker with completion status
 - `helm/chart/README.md` — Kubernetes Helm chart deployment
 - `test-silo/` — Phase 0 product research (archetypes, market analysis, roadmap). Snapshot from March 2026, not actively maintained.

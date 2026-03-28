@@ -213,8 +213,15 @@ export default function AIAssistantPanel({
     },
     onError: (msg) => {
       console.warn("[Voice]", msg);
+      setVoiceError(msg);
     },
   });
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!voiceError) return;
+    const t = setTimeout(() => setVoiceError(null), 5000);
+    return () => clearTimeout(t);
+  }, [voiceError]);
 
   /** Live dashboard data mapped to the shape the active artifact expects.
    *  When useDummyData is set (by the LLM on explicit user request), loads fixture data instead. */
@@ -900,6 +907,11 @@ export default function AIAssistantPanel({
 
               {/* Input / Voice Indicator */}
               <div className="px-3 py-2.5 border-t border-cyan-800/40 relative">
+                {voiceError && (
+                  <div className="px-2 py-1 mb-1">
+                    <span className="text-[8px] font-mono text-red-400">{voiceError}</span>
+                  </div>
+                )}
                 {voiceMode.isActive && voiceMode.state !== "off" ? (
                   <>
                     <VoiceIndicator state={voiceMode.state} progressText={progressText} />

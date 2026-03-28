@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SHADOWBROKER - MILAIR CONFLICTZONE MONITOR</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        :root {
+            --sb-bg-primary: #000000;
+            --sb-bg-secondary: rgb(5,5,8);
+            --sb-text-primary: rgb(243,244,246);
+            --sb-text-secondary: #22d3ee;
+            --sb-border: rgba(8,145,178,0.4);
+            --sb-font: 'Courier New', Courier, monospace;
+            --sb-aviation: #22d3ee;
+            --sb-critical: #f87171;
+            --sb-elevated: #fbbf24;
+            --sb-normal: #4ade80;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--sb-bg-primary); color: var(--sb-text-primary); font-family: var(--sb-font); font-size: 11px; letter-spacing: 0.05em; min-height: 100vh; padding: 16px; }
+        .sb-container { max-width: 1400px; margin: 0 auto; }
+        .sb-header { text-align: center; padding: 12px 0; border-bottom: 1px solid var(--sb-border); margin-bottom: 16px; }
+        .sb-heading { font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--sb-text-secondary); font-weight: normal; }
+        .sb-heading-lg { font-size: 16px; text-shadow: 0 0 10px rgba(34,211,238,0.5); }
+        .sb-subheading { font-size: 10px; letter-spacing: 0.15em; color: var(--sb-text-primary); opacity: 0.6; margin-top: 4px; }
+        .sb-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 16px; }
+        .sb-card { background: var(--sb-bg-secondary); border: 1px solid var(--sb-border); border-radius: 2px; padding: 14px; position: relative; overflow: hidden; }
+        .sb-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--sb-text-secondary), transparent); }
+        .sb-label { font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--sb-text-secondary); opacity: 0.8; margin-bottom: 6px; display: block; }
+        .sb-value { font-size: 28px; font-weight: bold; letter-spacing: 0.1em; margin-bottom: 4px; }
+        .sb-unit { font-size: 10px; opacity: 0.6; text-transform: uppercase; }
+        .sb-badge { display: inline-block; padding: 3px 7px; border-radius: 2px; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: bold; }
+        .sb-badge-critical { background: rgba(248,113,113,0.2); color: var(--sb-critical); border: 1px solid var(--sb-critical); }
+        .sb-badge-elevated { background: rgba(251,191,36,0.2); color: var(--sb-elevated); border: 1px solid var(--sb-elevated); }
+        .sb-badge-normal { background: rgba(74,222,128,0.2); color: var(--sb-normal); border: 1px solid var(--sb-normal); }
+        .sb-stat-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px dashed rgba(8,145,178,0.2); }
+        .sb-stat-row:last-child { border-bottom: none; }
+        #map-container { width: 100%; height: 380px; background: var(--sb-bg-secondary); }
+        .sb-chart-wrap { height: 260px; }
+        .sb-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+        .sb-table th { text-align: left; padding: 10px; border-bottom: 1px solid var(--sb-border); letter-spacing: 0.15em; text-transform: uppercase; color: var(--sb-text-secondary); font-weight: normal; }
+        .sb-table td { padding: 10px; border-bottom: 1px solid rgba(8,145,178,0.2); }
+        .sb-table tr:hover { background: rgba(34,211,238,0.05); }
+        .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; box-shadow: 0 0 5px currentColor; }
+        .sb-footer { text-align: center; padding: 16px; border-top: 1px solid var(--sb-border); margin-top: 16px; font-size: 9px; opacity: 0.5; letter-spacing: 0.1em; }
+        .tooltip { position: absolute; background: var(--sb-bg-secondary); border: 1px solid var(--sb-border); padding: 8px; font-size: 10px; pointer-events: none; z-index: 1000; font-family: var(--sb-font); color: var(--sb-text-primary); }
+        @media (max-width: 768px) { .sb-grid { grid-template-columns: 1fr 1fr; } .sb-heading-lg { font-size: 13px; } #map-container { height: 260px; } .sb-chart-wrap { height: 200px; } }
+        @media (max-width: 480px) { .sb-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="sb-container">
+        <div class="sb-header">
+            <h1 class="sb-heading sb-heading-lg">MILAIR CONFLICT ZONE SURVEILLANCE</h1>
+            <div class="sb-subheading">REAL-TIME TACTICAL AIRSPACE MONITORING | 7 CONFLICT ZONES | CLASSIFICATION: TIER-1 OSINT</div>
+        </div>
+
+        <div class="sb-grid">
+            <div class="sb-card">
+                <span class="sb-label">Active Military Flights</span>
+                <div class="sb-value">23</div>
+                <div class="sb-unit">AIRBORNE ASSETS</div>
+                <span class="sb-badge sb-badge-elevated" style="margin-top:6px">ELEVATED</span>
+            </div>
+            <div class="sb-card">
+                <span class="sb-label">Conflict Zones Monitored</span>
+                <div class="sb-value">7</div>
+                <div class="sb-unit">HOT REGIONS</div>
+                <span class="sb-badge sb-badge-critical" style="margin-top:6px">3 CRITICAL</span>
+            </div>
+            <div class="sb-card">
+                <span class="sb-label">Avg Response Time</span>
+                <div class="sb-value">4.2</div>
+                <div class="sb-unit">MINUTES</div>
+                <span class="sb-badge sb-badge-normal" style="margin-top:6px">OPTIMAL</span>
+            </div>
+            <div class="sb-card">
+                <span class="sb-label">Detection Rate</span>
+                <div class="sb-value">98.7</div>
+                <div class="sb-unit">PERCENT</div>
+                <span class="sb-badge sb-badge-normal" style="margin-top:6px">ACTIVE</span>
+            </div>
+        </div>
+
+        <!-- Map -->
+        <div class="sb-card" style="margin-bottom:16px">
+            <span class="sb-label">Global Conflict Zone Map — Military Flight Disposition</span>
+            <div id="map-container"></div>
+            <p style="margin-top:8px;font-size:9px;opacity:0.5;">RED = CRITICAL ZONE | AMBER = ELEVATED | CYAN = AIRCRAFT | Projection: Equirectangular</p>
+        </div>
+
+        <!-- Charts + zone breakdown -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+            <div class="sb-card">
+                <span class="sb-label">Activity — Last 24 Hours</span>
+                <div class="sb-chart-wrap"><canvas id="activityChart"></canvas></div>
+            </div>
+            <div class="sb-card">
+                <span class="sb-label">Flights by Conflict Zone</span>
+                <div class="sb-chart-wrap"><canvas id="zoneChart"></canvas></div>
+            </div>
+        </div>
+
+        <!-- Zone status -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+            <div class="sb-card">
+                <span class="sb-label">Zone Threat Status</span>
+                <div class="sb-stat-row"><span>Eastern Ukraine / Black Sea</span><span class="sb-badge sb-badge-critical">CRITICAL</span></div>
+                <div class="sb-stat-row"><span>Red Sea / Bab el-Mandeb</span><span class="sb-badge sb-badge-critical">CRITICAL</span></div>
+                <div class="sb-stat-row"><span>Taiwan Strait / SCS</span><span class="sb-badge sb-badge-critical">CRITICAL</span></div>
+                <div class="sb-stat-row"><span>Strait of Hormuz</span><span class="sb-badge sb-badge-elevated">ELEVATED</span></div>
+                <div class="sb-stat-row"><span>Syria / Eastern Med</span><span class="sb-badge sb-badge-elevated">ELEVATED</span></div>
+                <div class="sb-stat-row"><span>Korean Peninsula</span><span class="sb-badge sb-badge-elevated">ELEVATED</span></div>
+                <div class="sb-stat-row"><span>Sahel / W. Africa</span><span class="sb-badge sb-badge-normal">STANDARD</span></div>
+            </div>
+            <div class="sb-card">
+                <span class="sb-label">Force Composition</span>
+                <div class="sb-stat-row"><span>Fighter / Interceptor</span><span style="font-weight:bold">8</span></div>
+                <div class="sb-stat-row"><span>ISR / AWACS</span><span style="font-weight:bold">5</span></div>
+                <div class="sb-stat-row"><span>Bomber / Strike</span><span style="font-weight:bold">3</span></div>
+                <div class="sb-stat-row"><span>Transport / Tanker</span><span style="font-weight:bold">4</span></div>
+                <div class="sb-stat-row"><span>UAV / RPAS</span><span style="font-weight:bold">2</span></div>
+                <div class="sb-stat-row"><span>Maritime Patrol</span><span style="font-weight:bold">1</span></div>
+            </div>
+        </div>
+
+        <!-- Flight table -->
+        <div class="sb-card">
+            <span class="sb-label">Recent Military Flight Detections</span>
+            <table class="sb-table">
+                <thead>
+                    <tr><th>Callsign</th><th>Type</th><th>Conflict Zone</th><th>Altitude</th><th>Speed</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="status-dot" style="color:var(--sb-aviation)"></span>FORTE12</td>
+                        <td>RQ-4B Global Hawk</td><td>Eastern Ukraine</td><td>55,000 FT</td><td>340 KTS</td>
+                        <td><span class="sb-badge sb-badge-critical">ISR ORBIT</span></td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-dot" style="color:var(--sb-aviation)"></span>ROYAF01</td>
+                        <td>F-16C</td><td>Strait of Hormuz</td><td>25,000 FT</td><td>540 KTS</td>
+                        <td><span class="sb-badge sb-badge-critical">COMBAT AIR PATROL</span></td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-dot" style="color:var(--sb-aviation)"></span>CHNAV06</td>
+                        <td>J-16</td><td>Taiwan Strait</td><td>32,000 FT</td><td>620 KTS</td>
+                        <td><span class="sb-badge sb-badge-elevated">INTERCEPT</span></td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-dot" style="color:var(--sb-aviation)"></span>RUSAF99</td>
+                        <td>Tu-95MS Bear-H</td><td>Black Sea</td><td>28,000 FT</td><td>395 KTS</td>
+                        <td><span class="sb-badge sb-badge-critical">STRIKE PKG</span></td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-dot" style="color:var(--sb-aviation)"></span>NATOAW01</td>
+                        <td>E-3A Sentry</td><td>Poland Border</td><td>33,000 FT</td><td>460 KTS</td>
+                        <td><span class="sb-badge sb-badge-normal">AWACS</span></td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-dot" style="color:var(--sb-aviation)"></span>USARMY22</td>
+                        <td>C-130J Hercules</td><td>Eastern Ukraine</td><td>18,000 FT</td><td>280 KTS</td>
+                        <td><span class="sb-badge sb-badge-elevated">LOGISTICS</span></td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-dot" style="color:var(--sb-aviation)"></span>REDHK31</td>
+                        <td>P-8A Poseidon</td><td>Red Sea</td><td>22,000 FT</td><td>490 KTS</td>
+                        <td><span class="sb-badge sb-badge-critical">MPA SEARCH</span></td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-dot" style="color:var(--sb-aviation)"></span>DRGN21</td>
+                        <td>MQ-9 Reaper</td><td>Sahel</td><td>18,000 FT</td><td>180 KTS</td>
+                        <td><span class="sb-badge sb-badge-normal">ISR</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="sb-footer">
+            LAST UPDATE: 2025-03-28 14:23:17 UTC | CLASSIFICATION: TIER-1 OSINT | SHADOWBROKER NODE-7
+        </div>
+    </div>
+
+    <script>
+        // === D3 Map ===
+        var mapEl = document.getElementById('map-container');
+        var w = mapEl.clientWidth, h = 380;
+        var projection = d3.geoEquirectangular().scale(200).center([40, 25]).translate([w / 2, h / 2]);
+        var svg = d3.select('#map-container').append('svg').attr('width', w).attr('height', h);
+
+        // ESRI satellite tiles
+        var tileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+        var zoom = 3;
+        function lat2tile(lat, z) { return Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * (1 << z)); }
+        function lng2tile(lng, z) { return Math.floor((lng + 180) / 360 * (1 << z)); }
+        function tile2lat(y, z) { var n = Math.PI - 2 * Math.PI * y / (1 << z); return 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n))); }
+        function tile2lng(x, z) { return x / (1 << z) * 360 - 180; }
+
+        // Calculate visible tile range from projection bounds
+        var topLeft = projection.invert([0, 0]);
+        var bottomRight = projection.invert([w, h]);
+        var tyMin = lat2tile(topLeft[1], zoom), tyMax = lat2tile(bottomRight[1], zoom);
+        var txMin = lng2tile(topLeft[0], zoom), txMax = lng2tile(bottomRight[0], zoom);
+
+        for (var ty = tyMin; ty <= tyMax; ty++) {
+            for (var tx = txMin; tx <= txMax; tx++) {
+                var p1 = projection([tile2lng(tx, zoom), tile2lat(ty, zoom)]);
+                var p2 = projection([tile2lng(tx + 1, zoom), tile2lat(ty + 1, zoom)]);
+                if (p1 && p2) {
+                    svg.append('image')
+                        .attr('href', tileUrl.replace('{z}', zoom).replace('{y}', ty).replace('{x}', tx))
+                        .attr('x', p1[0]).attr('y', p1[1])
+                        .attr('width', p2[0] - p1[0]).attr('height', p2[1] - p1[1])
+                        .attr('opacity', 0.5)
+                        .style('filter', 'brightness(0.4) contrast(1.2) saturate(0.6)');
+                }
+            }
+        }
+
+        // Graticule
+        svg.append('path')
+            .datum(d3.geoGraticule10())
+            .attr('d', d3.geoPath(projection))
+            .attr('fill', 'none').attr('stroke', 'rgba(8,145,178,0.12)').attr('stroke-width', 0.5);
+
+        // Conflict zones — pulsing rings
+        var zones = [
+            { name: 'Eastern Ukraine', lat: 48.5, lng: 37.5, level: 'critical', flights: 6 },
+            { name: 'Red Sea / Bab el-Mandeb', lat: 13.5, lng: 43.5, level: 'critical', flights: 4 },
+            { name: 'Taiwan Strait / SCS', lat: 24.0, lng: 120.0, level: 'critical', flights: 5 },
+            { name: 'Strait of Hormuz', lat: 26.5, lng: 56.2, level: 'elevated', flights: 3 },
+            { name: 'Syria / E. Med', lat: 35.0, lng: 37.0, level: 'elevated', flights: 2 },
+            { name: 'Korean Peninsula', lat: 38.0, lng: 127.0, level: 'elevated', flights: 2 },
+            { name: 'Sahel / W. Africa', lat: 14.0, lng: 2.0, level: 'normal', flights: 1 }
+        ];
+
+        var zoneColor = { critical: '#f87171', elevated: '#fbbf24', normal: '#4ade80' };
+
+        zones.forEach(function(z) {
+            var p = projection([z.lng, z.lat]);
+            if (!p) return;
+            // Outer pulse ring
+            svg.append('circle').attr('cx', p[0]).attr('cy', p[1]).attr('r', 20)
+                .attr('fill', 'none').attr('stroke', zoneColor[z.level]).attr('stroke-width', 1).attr('stroke-dasharray', '3,3').attr('opacity', 0.6);
+            // Inner fill
+            svg.append('circle').attr('cx', p[0]).attr('cy', p[1]).attr('r', 10)
+                .attr('fill', zoneColor[z.level]).attr('fill-opacity', 0.2)
+                .attr('stroke', zoneColor[z.level]).attr('stroke-width', 1.5);
+            // Label
+            svg.append('text').attr('x', p[0]).attr('y', p[1] - 24)
+                .text(z.name.toUpperCase())
+                .attr('fill', '#f3f4f6').attr('font-size', '8px').attr('font-family', 'monospace')
+                .attr('text-anchor', 'middle').attr('opacity', 0.85);
+            // Flight count
+            svg.append('text').attr('x', p[0]).attr('y', p[1] + 4)
+                .text(z.flights)
+                .attr('fill', '#fff').attr('font-size', '10px').attr('font-family', 'monospace')
+                .attr('text-anchor', 'middle').attr('font-weight', 'bold');
+        });
+
+        // Individual aircraft markers
+        var flights = [
+            { cs: 'FORTE12', lat: 48.8, lng: 36.0, zone: 'Ukraine' },
+            { cs: 'RUSAF99', lat: 44.5, lng: 34.0, zone: 'Black Sea' },
+            { cs: 'NATOAW01', lat: 52.0, lng: 20.0, zone: 'Poland' },
+            { cs: 'USARMY22', lat: 50.2, lng: 30.5, zone: 'Ukraine' },
+            { cs: 'CHNAV06', lat: 24.5, lng: 119.0, zone: 'Taiwan Strait' },
+            { cs: 'ROYAF01', lat: 26.8, lng: 56.0, zone: 'Hormuz' },
+            { cs: 'REDHK31', lat: 14.2, lng: 42.5, zone: 'Red Sea' },
+            { cs: 'DRGN21', lat: 15.0, lng: 1.5, zone: 'Sahel' }
+        ];
+
+        flights.forEach(function(f) {
+            var p = projection([f.lng, f.lat]);
+            if (!p) return;
+            // Diamond marker for aircraft
+            var d = 'M' + p[0] + ',' + (p[1] - 5) + 'L' + (p[0] + 4) + ',' + p[1] + 'L' + p[0] + ',' + (p[1] + 5) + 'L' + (p[0] - 4) + ',' + p[1] + 'Z';
+            svg.append('path').attr('d', d).attr('fill', '#22d3ee').attr('stroke', '#fff').attr('stroke-width', 0.5);
+            svg.append('text').attr('x', p[0] + 7).attr('y', p[1] + 3)
+                .text(f.cs).attr('fill', '#22d3ee').attr('font-size', '7px').attr('font-family', 'monospace').attr('opacity', 0.9);
+        });
+
+        // === Chart.js — Activity over 24 hours ===
+        var hours = [];
+        var actCritical = [], actElevated = [], actNormal = [];
+        for (var i = 0; i < 24; i++) {
+            var hr = (new Date().getHours() - 23 + i + 24) % 24;
+            hours.push(String(hr).padStart(2, '0') + ':00');
+            actCritical.push(Math.round(3 + Math.random() * 5));
+            actElevated.push(Math.round(2 + Math.random() * 4));
+            actNormal.push(Math.round(1 + Math.random() * 2));
+        }
+
+        new Chart(document.getElementById('activityChart').getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: hours,
+                datasets: [
+                    { label: 'CRITICAL', data: actCritical, borderColor: '#f87171', backgroundColor: 'rgba(248,113,113,0.1)', fill: true, tension: 0.3, pointRadius: 0 },
+                    { label: 'ELEVATED', data: actElevated, borderColor: '#fbbf24', backgroundColor: 'rgba(251,191,36,0.05)', fill: true, tension: 0.3, pointRadius: 0 },
+                    { label: 'STANDARD', data: actNormal, borderColor: '#4ade80', backgroundColor: 'rgba(74,222,128,0.05)', fill: true, tension: 0.3, pointRadius: 0 }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { labels: { color: '#f3f4f6', font: { size: 9, family: 'Courier New' } } } },
+                scales: {
+                    x: { ticks: { color: '#f3f4f6', font: { size: 8 }, maxRotation: 45 }, grid: { color: 'rgba(8,145,178,0.15)' } },
+                    y: { ticks: { color: '#f3f4f6', font: { size: 8 } }, grid: { color: 'rgba(8,145,178,0.15)' } }
+                }
+            }
+        });
+
+        // === Chart.js — Flights by zone ===
+        new Chart(document.getElementById('zoneChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: ['UKRAINE', 'RED SEA', 'TAIWAN', 'HORMUZ', 'SYRIA', 'KOREA', 'SAHEL'],
+                datasets: [{
+                    label: 'FLIGHTS',
+                    data: [6, 4, 5, 3, 2, 2, 1],
+                    backgroundColor: ['#f87171', '#f87171', '#f87171', '#fbbf24', '#fbbf24', '#fbbf24', '#4ade80'],
+                    borderColor: ['#ef4444', '#ef4444', '#ef4444', '#f59e0b', '#f59e0b', '#f59e0b', '#22c55e'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { ticks: { color: '#f3f4f6', font: { size: 8 } }, grid: { color: 'rgba(8,145,178,0.15)' } },
+                    y: { ticks: { color: '#f3f4f6', font: { size: 9, family: 'Courier New' } }, grid: { color: 'rgba(8,145,178,0.1)' } }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

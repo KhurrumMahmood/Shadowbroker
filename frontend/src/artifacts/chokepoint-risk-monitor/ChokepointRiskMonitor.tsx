@@ -5,6 +5,7 @@ import * as d3 from "d3";
 import { feature } from "topojson-client";
 import type { Topology, GeometryCollection } from "topojson-specification";
 import { useArtifactData } from "@/artifacts/_shared/useArtifactData";
+import { renderSatelliteTiles } from "@/artifacts/_shared/d3SatelliteTiles";
 
 /* ── Data interfaces ── */
 
@@ -295,6 +296,9 @@ export default function ChokepointRiskMonitor({ initialData }: Props) {
 
     const path = d3.geoPath().projection(projection);
     const mapGroup = svgSel.append("g");
+
+    // Satellite imagery background
+    renderSatelliteTiles(mapGroup, projection, width, height);
 
     // Load world outline (with abort on unmount/re-render)
     const abortCtl = new AbortController();

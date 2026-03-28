@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import ArtifactShell from "@/artifacts/_shared/ArtifactShell";
 import { useArtifactData } from "@/artifacts/_shared/useArtifactData";
 
@@ -46,16 +46,43 @@ export default function EntityRiskDashboard({ initialData }: Props) {
   const data = useArtifactData<EntityData>(initialData);
   const [sortKey, setSortKey] = useState<SortKey>("risk_level");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [search, setSearch] = useState("");
+  const [domainFilter, setDomainFilter] = useState<string>("ALL");
+
+  const domains = useMemo(() => {
+    if (!data?.entities) return [];
+    const unique = [...new Set(data.entities.map((e) => e.domain))];
+    return unique.sort();
+  }, [data]);
 
   const entities = useMemo(() => {
     if (!data?.entities) return [];
-    return [...data.entities].sort((a, b) => {
+    let list = data.entities;
+    if (domainFilter !== "ALL") {
+      list = list.filter((e) => e.domain === domainFilter);
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (e) =>
+          e.name.toLowerCase().includes(q) ||
+          e.domain.toLowerCase().includes(q) ||
+          e.type.toLowerCase().includes(q) ||
+          e.summary.toLowerCase().includes(q),
+      );
+    }
+    return [...list].sort((a, b) => {
       const av = a[sortKey];
       const bv = b[sortKey];
       const cmp = typeof av === "number" ? av - (bv as number) : String(av).localeCompare(String(bv));
       return sortDir === "desc" ? -cmp : cmp;
     });
-  }, [data, sortKey, sortDir]);
+  }, [data, domainFilter, search, sortKey, sortDir]);
+
+  const handleFlyTo = useCallback((lat: number, lng: number) => {
+    if (lat === 0 && lng === 0) return;
+    window.open(`/?flyTo=${lat},${lng},10`, "_blank");
+  }, []);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -81,6 +108,49 @@ export default function EntityRiskDashboard({ initialData }: Props) {
 
   return (
     <ArtifactShell title="ENTITY RISK DASHBOARD">
+      {/* Search */}
+      <div style={{ marginBottom: "10px" }}>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name, domain, type, or summary..."
+          style={{
+            width: "100%",
+            background: "rgba(0,0,0,0.4)",
+            border: "1px solid var(--sb-border-accent)",
+            color: "var(--sb-text-primary)",
+            fontFamily: "var(--sb-font-mono)",
+            fontSize: "11px",
+            padding: "6px 10px",
+            letterSpacing: "0.05em",
+            outline: "none",
+          }}
+        />
+      </div>
+
+      {/* Domain filter tabs */}
+      <div style={{ display: "flex", gap: "4px", marginBottom: "12px", flexWrap: "wrap" }}>
+        {["ALL", ...domains].map((d) => (
+          <button
+            key={d}
+            onClick={() => setDomainFilter(d)}
+            style={{
+              background: domainFilter === d ? "rgba(34,211,238,0.15)" : "transparent",
+              border: `1px solid ${domainFilter === d ? "var(--sb-color-aviation)" : "var(--sb-border-accent)"}`,
+              color: domainFilter === d ? "var(--sb-color-aviation)" : "var(--sb-text-muted)",
+              fontFamily: "var(--sb-font-mono)",
+              fontSize: "10px",
+              padding: "3px 10px",
+              cursor: "pointer",
+              letterSpacing: "0.05em",
+            }}
+          >
+            {d.toUpperCase()}
+          </button>
+        ))}
+      </div>
+
       <table className="sb-table">
         <thead>
           <tr>
@@ -106,9 +176,33 @@ export default function EntityRiskDashboard({ initialData }: Props) {
           </tr>
         </thead>
         <tbody>
-          {entities.map((e) => (
-            <tr key={e.name}>
-              <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{e.name}</td>
+          {entities.map((e, i) => (
+            <tr key={`${e.domain}-${e.name}-${i}`}>
+              <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+                {e.lat !== 0 || e.lng !== 0 ? (
+                  <button
+                    onClick={() => handleFlyTo(e.lat, e.lng)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--sb-text-secondary)",
+                      fontFamily: "inherit",
+                      fontSize: "inherit",
+                      fontWeight: "inherit",
+                      cursor: "pointer",
+                      padding: 0,
+                      textDecoration: "underline",
+                      textDecorationStyle: "dotted",
+                      textUnderlineOffset: "3px",
+                    }}
+                    title={`Fly to ${e.name} on map`}
+                  >
+                    {e.name}
+                  </button>
+                ) : (
+                  e.name
+                )}
+              </td>
               <td>
                 <span
                   className="sb-badge"

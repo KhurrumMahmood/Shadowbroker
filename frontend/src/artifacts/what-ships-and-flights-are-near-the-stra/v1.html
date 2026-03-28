@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STRAIT OF HORMUZ SITREP</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        :root {
+            --sb-bg-primary: #000000;
+            --sb-bg-secondary: rgb(5,5,8);
+            --sb-text-primary: rgb(243,244,246);
+            --sb-text-secondary: #22d3ee;
+            --sb-border: rgba(8,145,178,0.4);
+            --sb-font: 'Courier New', Courier, monospace;
+            --sb-aviation: #22d3ee;
+            --sb-maritime: #60a5fa;
+            --sb-infrastructure: #a78bfa;
+            --sb-intelligence: #4ade80;
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: var(--sb-bg-primary);
+            color: var(--sb-text-primary);
+            font-family: var(--sb-font);
+            font-size: 11px;
+            margin: 0;
+            padding: 16px;
+            line-height: 1.4;
+        }
+        
+        .sb-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .sb-header {
+            border-bottom: 1px solid var(--sb-border);
+            padding-bottom: 8px;
+            margin-bottom: 16px;
+        }
+        
+        .sb-heading {
+            color: var(--sb-text-secondary);
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            font-size: 12px;
+            margin: 0;
+            font-weight: normal;
+        }
+        
+        .sb-subheading {
+            color: var(--sb-text-primary);
+            opacity: 0.6;
+            letter-spacing: 0.1em;
+            font-size: 10px;
+            margin: 4px 0 0 0;
+        }
+        
+        .sb-card {
+            background: var(--sb-bg-secondary);
+            border: 1px solid var(--sb-border);
+            padding: 12px;
+            margin-bottom: 12px;
+            border-radius: 2px;
+        }
+        
+        .sb-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 12px;
+        }
+        
+        .sb-stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0;
+            border-bottom: 1px dashed rgba(8,145,178,0.2);
+        }
+        
+        .sb-stat-row:last-child {
+            border-bottom: none;
+        }
+        
+        .sb-label {
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--sb-text-primary);
+            opacity: 0.7;
+            font-size: 10px;
+        }
+        
+        .sb-value {
+            color: var(--sb-text-primary);
+            font-weight: bold;
+            text-align: right;
+        }
+        
+        .sb-badge-critical {
+            background: #f87171;
+            color: #000;
+            padding: 2px 6px;
+            border-radius: 2px;
+            font-size: 9px;
+            font-weight: bold;
+            letter-spacing: 0.1em;
+        }
+        
+        .sb-badge-elevated {
+            background: #fbbf24;
+            color: #000;
+            padding: 2px 6px;
+            border-radius: 2px;
+            font-size: 9px;
+            font-weight: bold;
+            letter-spacing: 0.1em;
+        }
+        
+        .sb-badge-normal {
+            background: #4ade80;
+            color: #000;
+            padding: 2px 6px;
+            border-radius: 2px;
+            font-size: 9px;
+            font-weight: bold;
+            letter-spacing: 0.1em;
+        }
+        
+        .sb-entity-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid rgba(8,145,178,0.2);
+            padding: 8px;
+        }
+        
+        .sb-entity-list::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .sb-entity-list::-webkit-scrollbar-track {
+            background: var(--sb-bg-primary);
+        }
+        
+        .sb-entity-list::-webkit-scrollbar-thumb {
+            background: var(--sb-border);
+        }
+        
+        .sb-entity-item {
+            padding: 6px;
+            margin-bottom: 4px;
+            background: rgba(8,145,178,0.1);
+            border-left: 3px solid var(--sb-maritime);
+        }
+        
+        .sb-entity-item.aviation {
+            border-left-color: var(--sb-aviation);
+        }
+        
+        .sb-entity-item.infrastructure {
+            border-left-color: var(--sb-infrastructure);
+        }
+        
+        #map-container {
+            width: 100%;
+            height: 400px;
+            background: var(--sb-bg-secondary);
+        }
+        
+        .tooltip {
+            position: absolute;
+            background: var(--sb-bg-secondary);
+            border: 1px solid var(--sb-border);
+            padding: 8px;
+            font-size: 10px;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        
+        @media (max-width: 600px) {
+            body {
+                padding: 8px;
+            }
+            .sb-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="sb-container">
+        <div class="sb-header">
+            <h1 class="sb-heading">STRAIT OF HORMUZ - OPERATIONAL SITUATION REPORT</h1>
+            <p class="sb-subheading">Last updated: 2024 | Classified: LEVEL III</p>
+        </div>
+
+        <div class="sb-grid">
+            <div class="sb-card">
+                <h2 class="sb-heading">Mission Summary</h2>
+                <div class="sb-stat-row">
+                    <span class="sb-label">Search Radius</span>
+                    <span class="sb-value">200KM FROM CENTER</span>
+                </div>
+                <div class="sb-stat-row">
+                    <span class="sb-label">Vessels Detected</span>
+                    <span class="sb-value">39</span>
+                </div>
+                <div class="sb-stat-row">
+                    <span class="sb-label">Aircraft Tracked</span>
+                    <span class="sb-value">1</span>
+                </div>
+                <div class="sb-stat-row">
+                    <span class="sb-label">Coverage Status</span>
+                    <span class="sb-value"><span class="sb-badge-elevated">PARTIAL</span></span>
+                </div>
+                <div class="sb-stat-row">
+                    <span class="sb-label">Primary Activity</span>
+                    <span class="sb-value">UAE WATERS</span>
+                </div>
+            </div>
+
+            <div class="sb-card">
+                <h2 class="sb-heading">Vessel Statistics</h2>
+                <canvas id="vesselChart" width="300" height="200"></canvas>
+            </div>
+
+            <div class="sb-card">
+                <h2 class="sb-heading">Coverage Analysis</h2>
+                <div class="sb-stat-row">
+                    <span class="sb-label">0-100km Zone</span>
+                    <span class="sb-value"><span class="sb-badge-critical">MINIMAL</span></span>
+                </div>
+                <div class="sb-stat-row">
+                    <span class="sb-label">100-200km Zone</span>
+                    <span class="sb-value"><span class="sb-badge-normal">HIGH</span></span>
+                </div>
+                <div class="sb-stat-row">
+                    <span class="sb-label">Dark Vessels</span>
+                    <span class="sb-value">3+</span>
+                </div>
+                <div class="sb-stat-row">
+                    <span class="sb-label">Data Gap Cause</span>
+                    <span class="sb-value">RESTRICTED AIS</span>
+                </div>
+                <div class="sb-stat-row">
+                    <span class="sb-label">Strategic Impact</span>
+                    <span class="sb-value">20% GLOBAL TRADE</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="sb-card">
+            <h2 class="sb-heading">Geographic Distribution</h2>
+            <div id="map-container"></div>
+            <p style="margin-top: 8px; font-size: 9px; opacity: 0.6;">CENTER: 26.5°N, 56.5°E | DUBAI/JEBEL ALI: ~150km NE | CONCENTRATIONS IN UAE WATERS</p>
+        </div>
+
+        <div class="sb-grid">
+            <div class="sb-card">
+                <h2 class="sb-heading">Vessel Registry</h2>
+                <div class="sb-entity-list">
+                    <div class="sb-entity-item">
+                        <div class="sb-stat-row">
+                            <span class="sb-label">TANDIS 31</span>
+                            <span class="sb-value">IRAN | #422881200</span>
+                        </div>
+                    </div>
+                    <div class="sb-entity-item">
+                        <div class="sb-stat-row">
+                            <span class="sb-label">AL SALAM II</span>
+                            <span class="sb-value">KUWAIT | #447158000</span>
+                        </div>
+                    </div>
+                    <div class="sb-entity-item">
+                        <div class="sb-stat-row">
+                            <span class="sb-label">SUMMIT SUCCESS</span>
+                            <span class="sb-value">MARSHALL ISLANDS | #538006523</span>
+                        </div>
+                    </div>
+                    <div class="sb-entity-item">
+                        <div class="sb-stat-row">
+                            <span class="sb-label">RAWABI 208</span>
+                            <span class="sb-value">TUVALU | #572525220</span>
+                        </div>
+                    </div>
+                    <div class="sb-entity-item">
+                        <div class="sb-stat-row">
+                            <span class="sb-label">BARDSEY ISLAND</span>
+                            <span class="sb-value">UK | #235083529</span>
+                        </div>
+                    </div>
+                    <div class="sb-entity-item">
+                        <div class="sb-stat-row">
+                            <span class="sb-label">BLISS</span>
+                            <span class="sb-value">CAYMAN ISLANDS | #319065700</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sb-card">
+                <h2 class="sb-heading">Aircraft Track</h2>
+                <div class="sb-entity-item aviation">
+                    <div class="sb-stat-row">
+                        <span class="sb-label">Callsign</span>
+                        <span class="sb-value">UAE4</span>
+                    </div>
+                    <div class="sb-stat-row">
+                        <span class="sb-label">Type</span>
+                        <span class="sb-value">A388 | A6-EUK</span>
+                    </div>
+                    <div class="sb-stat-row">
+                        <span class="sb-label">Route</span>
+                        <span class="sb-value">LONDON → DUBAI</span>
+                    </div>
+                    <div class="sb-stat-row">
+                        <span class="sb-label">Status</span>
+                        <span class="sb-value"><span class="sb-badge-normal">ON APPROACH</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sb-card">
+                <h2 class="sb-heading">Critical Infrastructure</h2>
+                <div class="sb-entity-list">
+                    <div class="sb-entity-item infrastructure">
+                        <div class="sb-stat-row">
+                            <span class="sb-label">Bandar Abbas Int'l</span>
+                            <span class="sb-value">OIKB | BND</span>
+                        </div>
+                    </div>
+                    <div class="sb-entity-item infrastructure">
+                        <div class="sb-stat-row">
+                            <span class="sb-label">Qeshm Int'l</span>
+                            <span class="sb-value">OIKQ | GSM</span>
+                        </div>
+                    </div>
+                    <div class="sb-entity-item infrastructure">
+                        <div class="sb-stat-row">
+                            <span class="sb-label">Bandar Abbas Gas</span>
+                            <span class="sb-value">50MW</span>
+                        </div>
+                    </div>
+                    <div class="sb-entity-item infrastructure">
+                        <div class="sb-stat-row">
+                            <span class="sb-label">Bandar Abbas Oil</span>
+                            <span class="sb-value">1,280MW</span>
+                        </div>
+                    </div>
+                    <div class="sb-entity-item infrastructure">
+                        <div class="sb-stat-row">
+                            <span class="sb-label">Qeshm Pasargard</span>
+                            <span class="sb-value">540MW</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Vessel chart
+        const ctx = document.getElementById('vesselChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['TANKERS', 'CARGO', 'PLEASURE', 'SERVICE', 'DARK'],
+                datasets: [{
+                    label: 'VESSELS',
+                    data: [12, 15, 4, 5, 3],
+                    backgroundColor: '#60a5fa',
+                    borderColor: '#22d3ee',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    title: {
+                        display: true,
+                        text: 'VESSEL TYPES WITHIN 200KM',
+                        color: 'rgb(243,244,246)',
+                        font: { size: 10, family: 'Courier New' }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: 'rgb(243,244,246)', font: { size: 9 } },
+                        grid: { color: 'rgba(8,145,178,0.2)' }
+                    },
+                    y: {
+                        ticks: { color: 'rgb(243,244,246)', font: { size: 9 } },
+                        grid: { color: 'rgba(8,145,178,0.2)' }
+                    }
+                }
+            }
+        });
+
+        // D3 Map
+        const width = document.getElementById('map-container').clientWidth;
+        const height = 400;
+        const projection = d3.geoEquirectangular()
+            .scale(8000)
+            .center([56.5, 26.5])
+            .translate([width / 2, height / 2]);
+
+        const svg = d3.select('#map-container')
+            .append('svg')
+            .attr('width', width)
+            .attr('height', height);
+
+        // Graticule
+        svg.append('g')
+            .selectAll('path')
+            .data(d3.geoGraticule10())
+            .join('path')
+            .attr('d', d3.geoPath(projection))
+            .attr('fill', 'none')
+            .attr('stroke', 'rgba(8,145,178,0.2)')
+            .attr('stroke-width', 0.5);
+
+        // Radius circles
+        const center = projection([56.5, 26.5]);
+        svg.append('circle')
+            .attr('cx', center[0])
+            .attr('cy', center[1])
+            .attr('r', 80)
+            .attr('fill', 'none')
+            .attr('stroke', '#f87171')
+            .attr('stroke-width', 1)
+            .attr('stroke-dasharray', '4,4');
+
+        svg.append('circle')
+            .attr('cx', center[0])
+            .attr('cy', center[1])
+            .attr('r', 160)
+            .attr('fill', 'none')
+            .attr('stroke', '#fbbf24')
+            .attr('stroke-width', 1)
+            .attr('stroke-dasharray', '2,2');
+
+        svg.append('text')
+            .attr('x', center[0])
+            .attr('y', center[1] - 85)
+            .text('100KM')
+            .attr('fill', '#f87171')
+            .attr('font-size', '9px')
+            .attr('font-family', 'monospace')
+            .attr('text-anchor', 'middle');
+
+        svg.append('text')
+            .attr('x', center[0])
+            .attr('y', center[1] - 165)
+            .text('200KM')
+            .attr('fill', '#fbbf24')
+            .attr('font-size', '9px')
+            .attr('font-family', 'monospace')
+            .attr('text-anchor', 'middle');
+
+        // Entities
+        const entities = [
+            {type: 'strait', coords: [56.5, 26.5], name: 'STRAIT CENTER', color: '#f87171'},
+            {type: 'airport', coords: [56.37, 27.22], name: 'BND', color: '#a78bfa'},
+            {type: 'airport', coords: [56.28, 26.79], name: 'GSM', color: '#a78bfa'},
+            {type: 'ship', coords: [55.8, 26.2], name: 'TANDIS 31', color: '#60a5fa'},
+            {type: 'ship', coords: [55.6, 25.8], name: 'AL SALAM II', color: '#60a5fa'},
+            {type: 'ship', coords: [55.3, 25.4], name: 'SUMMIT', color: '#60a5fa'},
+            {type: 'ship', coords: [55.5, 25.6], name: 'RAWABI 208', color: '#60a5fa'},
+            {type: 'ship', coords: [55.7, 25.2], name: 'BARDSEY', color: '#60a5fa'},
+            {type: 'ship', coords: [55.4, 25.5], name: 'BLISS', color: '#60a5fa'},
+            {type: 'flight', coords: [55.2, 26.1], name: 'UAE4', color: '#22d3ee'},
+            {type: 'dubai', coords: [55.3, 25.2], name: 'DUBAI/JEBEL ALI', color: '#fbbf24'}
+        ];
+
+        svg.selectAll('.entity')
+            .data(entities)
+            .enter()
+            .append('circle')
+            .attr('cx', d => projection(d.coords)[0])
+            .attr('cy', d => projection(d.coords)[1])
+            .attr('r', d => d.type === 'strait' ? 5 : d.type === 'flight' ? 6 : 4)
+            .attr('fill', d => d.color)
+            .attr('stroke', '#000')
+            .attr('stroke-width', 1)
+            .on('mouseover', function(event, d) {
+                const tooltip = d3.select('body')
+                    .append('div')
+                    .attr('class', 'tooltip')
+                    .style('left', (event.pageX + 10) + 'px')
+                    .style('top', (event.pageY - 10) + 'px')
+                    .text(d.name + ' | ' + d.coords[1].toFixed(2) + '°N, ' + d.coords[0].toFixed(2) + '°E');
+            })
+            .on('mouseout', function() {
+                d3.select('.tooltip').remove();
+            });
+
+        svg.selectAll('.label')
+            .data(entities)
+            .enter()
+            .append('text')
+            .attr('x', d => projection(d.coords)[0] + 6)
+            .attr('y', d => projection(d.coords)[1] + 3)
+            .text(d => d.name)
+            .attr('fill', 'rgb(243,244,246)')
+            .attr('font-size', '8px')
+            .attr('font-family', 'monospace')
+            .attr('opacity', 0.8);
+    </script>
+</body>
+</html>

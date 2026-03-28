@@ -1,71 +1,64 @@
-# UX Backlog — Post-Visual Foundation
+# UX Backlog
 
-Issues observed on the live site (2026-03-27). To be addressed after the visual foundation overhaul (icon sizing, consistent clustering, composite clusters).
-
----
-
-## Bug Fixes
-
-### "Show N Results" in chat is broken
-The button calls `aiCycler.setResults()` which resolves entity IDs via `findEntityInData()` against live data. The user reports it has never worked. Likely cause: entity ID format mismatch between backend response (`result_entities`) and frontend data lookup. Needs debugging with real AI responses.
-
-**Files:** `useAIResultCycler.ts` (resolution logic), `AIAssistantPanel.tsx` (click handler), backend assistant response format.
+Issues observed on the live site. Tracked with completion status.
 
 ---
 
-## Interactivity
+## Completed (2026-03-28)
+
+### SHOW N RESULTS in chat — FIXED
+Backend was emitting unmatchable IDs (fires: `id:?`, GDELT: aggregate names). Fixed by:
+- Adding coordinate-based IDs to fire and GDELT compact formats in `llm_assistant.py`
+- Hardening `findEntityInData()`: case-insensitive matching, numeric coordinate comparison, GeoJSON `geometry.coordinates` fallback
+- Filtering unreachable entity types (not in `_SEARCH_CONFIG`) from `result_entities`
+- Adding `noneResolved` feedback state to `useAIResultCycler`
+
+**Files changed:** `llm_assistant.py`, `useAIResultCycler.ts`, `AIAssistantPanel.tsx`
+
+### Layer search pane — DONE
+New `LayerSearchPane.tsx` component. Click a category in the left panel → search/filter pane scoped to that layer. Click-to-select and fly-to. Uses pre-computed search index (`buildSearchIndex()` in `layerSearch.ts`).
+
+### Viewport-specific counts — DONE
+Left panel (`WorldviewLeftPanel.tsx`) shows viewport-filtered counts using `viewportFilter.ts` utilities. Ship counts broken down by category via shared `classifyShipCategory()`.
+
+### Composite clustering — DONE
+`useCompositeClusters.ts` merges nearby markers across entity types into composite cluster markers at lower zoom levels. Prevents marker overlap.
+
+### Intel feed improvements — DONE
+`IntelFeedPanel.tsx`: per-alert copy button (tracks `copiedId` not boolean), fly-to for geo-located alerts, significance score display.
+
+### Aircraft icon redesign — DONE
+`AircraftIcons.ts` / `ShadowIcons.ts`: colored outline icons by category, improved visual hierarchy.
+
+### Map declutter — DONE
+`mapConstants.ts`: consolidated zoom thresholds. Viewport bounds equality check in `page.tsx` to prevent drag re-render churn.
+
+---
+
+## Open
 
 ### Panel z-index stacking — bring to front on click
-Currently fixed: Brief z-400, IntelFeed z-500, AI z-600. Clicking a panel doesn't raise it above others. Need a dynamic z-index manager that assigns highest z to the most recently interacted panel.
+Panels have fixed z-index (Brief z-400, IntelFeed z-500, AI z-600). Clicking doesn't raise them. Need dynamic z-index manager.
 
-**Files:** `page.tsx` (panel state), all panel components (ViewportBriefPanel, IntelFeedPanel, AIAssistantPanel).
+**Files:** `page.tsx`, all panel components.
 
-### Alert detail drill-down (IntelFeedPanel)
-Alert cards (e.g., "Disinfo Divergence") show title + description but no way to see underlying data, the significance breakdown (signal/routine sub-scores), or why the system thinks so. Need expandable detail view per alert showing:
-- Significance score breakdown (signal components + routine components)
-- Raw data from `alert.data`
-- "View on map" for geo-located alerts (already exists for some)
-- Link to related entities if applicable
+### Alert detail drill-down
+Alert cards show title + description but no significance breakdown, raw data, or component-level scoring.
 
-**Files:** `IntelFeedPanel.tsx`, may need backend changes to expose component-level scoring detail.
+**Files:** `IntelFeedPanel.tsx`, possibly backend scoring detail exposure.
 
-### Layer toggle chips in chat — discoverability
-The AI already renders clickable layer chips ("MILITARY ON" / "CARGO OFF") below responses. User didn't notice them. May need visual prominence improvements — larger chips, animation on first appearance, or a brief tooltip.
+### Layer toggle chip discoverability
+AI renders clickable layer chips but they're easy to miss. May need visual prominence or animation.
 
-**Files:** `AIAssistantPanel.tsx` (chip rendering in `renderCoreChips()`).
+**Files:** `AIAssistantPanel.tsx` (`renderCoreChips()`).
 
----
+### AIS strategic chokepoint subscriptions
+AIS WebSocket narrows to viewport. Strategic areas (Hormuz, Malacca, Suez) show zero ships if not recently viewed. Needs always-subscribed regions. `chokepoints.py` has the bbox definitions.
 
-## Viewport Intelligence
+**Files:** `ais_proxy.js`, `ais_stream.py`, `chokepoints.py`.
 
-### Viewport-specific counts in left panel + Focus Mode
-Left panel shows global counts (`data?.ships?.length`). User wants viewport-specific counts with a toggle between global and viewport. A "Focus Mode" that:
-- Filters left panel counts to current map bounds
-- Makes the AI context-aware of what's in the viewport (already partially done via viewport brief)
-- Persists as a mode toggle, not per-query
+### Artifacts registry returning 500
+The artifacts button in chat shows "REGISTRY UNAVAILABLE". Needs investigation.
 
-**Files:** `WorldviewLeftPanel.tsx` (count display), `page.tsx` (map bounds state), `useDataPolling.ts` (data context).
-
-### Layer search pane from left panel
-Clicking a layer should open a search/filter pane scoped to that layer. E.g., click "Ships" → type "Strait of Hormuz" → see a list of ships in that area. Results should:
-- List with click-to-select and click-to-fly-to
-- Cycle through visually (existing category cycler is sequential only, no search)
-- Minimizable to a floating bar for cycling without blocking the map
-- Draggable to reposition
-- Could use the existing AI backend or a simpler text-match filter
-
-**Files:** New component needed. Builds on `useCategoryCycler.ts` pattern.
-
----
-
-## Data / Architecture
-
-### Ships missing at Strait of Hormuz — AIS viewport subscription
-The AIS WebSocket subscription dynamically narrows to the user's current viewport. If you haven't panned to an area recently, no AIS data arrives. Stale vessels are pruned after 15 minutes. This means strategic chokepoints (Hormuz, Malacca, Suez, Bab el-Mandeb, Taiwan Strait) can show zero ships if you haven't looked there.
-
-Needs a "regions of interest" system that keeps strategic areas subscribed regardless of viewport. Could be:
-- A static list of always-subscribed bounding boxes for key chokepoints
-- User-configurable watchlist regions
-- Multiple overlapping AIS subscriptions (one for viewport, one for strategic areas)
-
-**Files:** `ais_proxy.js` (WebSocket subscription), `ais_stream.py` (bbox management), `main.py` (viewport POST handler).
+### Voice/Comms not requesting mic permission
+Clicking voice input doesn't trigger browser mic permission prompt.

@@ -208,7 +208,7 @@ export default function ArtifactPanel({
               </div>
             )}
             {isReact && ReactComponent ? (
-              <div style={{ minHeight: (expanded || sidePaneMode) ? "100%" : "280px", padding: 12, background: "#000" }}>
+              <div style={{ height: (expanded || sidePaneMode) ? "100%" : undefined, minHeight: (expanded || sidePaneMode) ? undefined : "280px", overflowY: "auto", padding: 12, background: "#000" }}>
                 <Suspense fallback={null}>
                   <ReactComponent initialData={data} />
                 </Suspense>

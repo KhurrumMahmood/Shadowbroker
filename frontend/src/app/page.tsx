@@ -234,6 +234,24 @@ export default function Dashboard() {
   // Layer search pane state
   const [layerSearch, setLayerSearch] = useState<{ layerId: string; layerName: string } | null>(null);
 
+  // URL param support: ?flyTo=lat,lng,zoom
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const flyTo = params.get("flyTo");
+    if (flyTo) {
+      const [lat, lng, zoom] = flyTo.split(",").map(Number);
+      if (!isNaN(lat) && !isNaN(lng) && isFinite(lat) && isFinite(lng)
+          && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        const clampedZoom = Math.max(1, Math.min(zoom || 8, 22));
+        setFlyToLocation({ lat, lng, zoom: clampedZoom, ts: Date.now() });
+      }
+      // Clean up flyTo param only, preserve any other query params
+      const url = new URL(window.location.href);
+      url.searchParams.delete("flyTo");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, []);
+
   // Eavesdrop Mode State
   const [isEavesdropping, setIsEavesdropping] = useState(false);
   const [eavesdropLocation, setEavesdropLocation] = useState<{ lat: number, lng: number } | null>(null);

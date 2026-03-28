@@ -217,14 +217,16 @@ export function useVoiceMode({
   const activate = useCallback(() => {
     if (stateRef.current !== "off") return;
 
-    if (settings.mode === "tactical") {
+    if (settings.mode === "tactical" && settings.picovoiceAccessKey) {
+      // Full tactical: wake word → record → "over" terminates
       setVoiceState("standby");
       wakeWord.start();
     } else {
+      // Casual mode, or tactical fallback when Picovoice key is missing
       setVoiceState("listening");
       voiceInput.startListening();
     }
-  }, [settings.mode, setVoiceState, wakeWord, voiceInput]);
+  }, [settings.mode, settings.picovoiceAccessKey, setVoiceState, wakeWord, voiceInput]);
 
   const deactivateInternal = useCallback(() => {
     clearFollowUpTimer();

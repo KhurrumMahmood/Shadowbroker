@@ -1,62 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
-
-interface RegistryEntry {
-  name: string;
-  title: string;
-  tags: string[];
-  current_version: number;
-  type: string;
-}
+import registry from "@/artifacts/registry.json";
 
 interface ArtifactBrowserProps {
   onSelect: (artifact: { name: string; title: string; version: number; type: string }) => void;
 }
 
 export default function ArtifactBrowser({ onSelect }: ArtifactBrowserProps) {
-  const [entries, setEntries] = useState<RegistryEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch("/api/artifacts/registry")
-      .then((r) => {
-        if (!r.ok) throw new Error(`Registry returned ${r.status}`);
-        return r.json();
-      })
-      .then((data) => {
-        setEntries(Array.isArray(data) ? data : []);
-        setLoading(false);
-      })
-      .catch((e) => {
-        setError(e.message || "Failed to load registry");
-        setLoading(false);
-      });
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="p-4 text-center">
-        <span className="text-[9px] font-mono tracking-[0.2em] text-cyan-600 animate-pulse">
-          LOADING REGISTRY...
-        </span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-6 text-center">
-        <p className="text-[9px] font-mono tracking-[0.15em] text-red-400">
-          REGISTRY UNAVAILABLE
-        </p>
-        <p className="text-[8px] font-mono text-red-700 mt-2">
-          {error}
-        </p>
-      </div>
-    );
-  }
+  const entries = registry.artifacts;
 
   if (entries.length === 0) {
     return (

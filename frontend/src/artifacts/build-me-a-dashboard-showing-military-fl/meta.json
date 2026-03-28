@@ -1,0 +1,28 @@
+{
+  "name": "build-me-a-dashboard-showing-military-fl",
+  "title": "Build me a dashboard showing military flights n...",
+  "tags": [
+    "aviation",
+    "flight",
+    "flights",
+    "military",
+    "mil",
+    "intelligence",
+    "conflict",
+    "map",
+    "chart",
+    "dashboard",
+    "convergence"
+  ],
+  "data_signature": "chart",
+  "versions": [
+    {
+      "version": 1,
+      "note": "Generated for query: Build me a dashboard showing military flights near conflict zones with a chart o",
+      "created_at": "2026-03-26T09:43:50.392685+00:00"
+    }
+  ],
+  "current_version": 1,
+  "created_by_admin": false,
+  "accepts_data": {}
+}
