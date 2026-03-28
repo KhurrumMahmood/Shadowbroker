@@ -22,7 +22,7 @@ import OnboardingModal, { useOnboarding } from "@/components/OnboardingModal";
 import ChangelogModal, { useChangelog } from "@/components/ChangelogModal";
 import type { SelectedEntity } from "@/types/dashboard";
 import { NOMINATIM_DEBOUNCE_MS } from "@/lib/constants";
-import { useDataPolling } from "@/hooks/useDataPolling";
+import { useDashboardDataSource } from "@/hooks/useDashboardDataSource";
 import { useReverseGeocode } from "@/hooks/useReverseGeocode";
 import { useRegionDossier } from "@/hooks/useRegionDossier";
 import { DEFAULT_LAYERS, PRESETS, type PresetKey } from "@/lib/presets";
@@ -134,7 +134,7 @@ function LocateBar({ onLocate }: { onLocate: (lat: number, lng: number) => void 
 }
 
 export default function Dashboard() {
-  const { data, dataVersion, backendStatus } = useDataPolling();
+  const { data, dataVersion, backendStatus, isDemo, demoKey, overlayName } = useDashboardDataSource();
   const { mouseCoords, locationLabel, handleMouseCoords } = useReverseGeocode();
   const [selectedEntity, setSelectedEntity] = useState<SelectedEntity | null>(null);
   const [trackedSdr, setTrackedSdr] = useState<any>(null);
@@ -746,6 +746,26 @@ export default function Dashboard() {
       {/* v0.4 CHANGELOG MODAL — shows once per version after onboarding */}
       {!showOnboarding && showChangelog && (
         <ChangelogModal onClose={() => setShowChangelog(false)} />
+      )}
+
+      {/* DEMO MODE BANNER */}
+      {isDemo && (
+        <div className="absolute top-0 left-0 right-0 z-[9000] flex items-center justify-center py-1.5 bg-amber-950/90 border-b border-amber-500/40 backdrop-blur-sm">
+          <span className="text-[10px] font-mono tracking-widest text-amber-400">
+            DEMO: {demoKey}{overlayName ? ` / ${overlayName}` : ""} — STATIC SNAPSHOT, NOT LIVE DATA
+          </span>
+          <button
+            onClick={() => {
+              const url = new URL(window.location.href);
+              url.searchParams.delete("demo");
+              url.searchParams.delete("overlay");
+              window.location.href = url.toString();
+            }}
+            className="ml-4 text-[9px] font-mono tracking-wider text-amber-500 hover:text-amber-300 underline underline-offset-2"
+          >
+            EXIT DEMO
+          </button>
+        </div>
       )}
 
       {/* BACKEND DISCONNECTED BANNER */}

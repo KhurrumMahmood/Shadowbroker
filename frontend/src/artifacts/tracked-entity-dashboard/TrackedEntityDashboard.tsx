@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback } from "react";
 import ArtifactShell from "@/artifacts/_shared/ArtifactShell";
 import { useArtifactData } from "@/artifacts/_shared/useArtifactData";
+import { buildFlyToUrl } from "@/utils/demoParams";
 
 interface TrackedShip {
   name: string;
@@ -193,7 +194,7 @@ export default function TrackedEntityDashboard({ initialData }: Props) {
 
   const handleFlyTo = useCallback((lat?: number, lng?: number) => {
     if (lat == null || lng == null) return;
-    window.open(`/?flyTo=${lat},${lng},10`, "_blank");
+    window.open(buildFlyToUrl(lat, lng, 10), "_blank");
   }, []);
 
   const handleSort = (key: SortKey) => {

@@ -607,6 +607,45 @@ async def system_update(request: Request):
     return result
 
 # ---------------------------------------------------------------------------
+# Snapshots — capture & list frozen feed data for demo mode
+# ---------------------------------------------------------------------------
+
+_SNAPSHOT_DIR = Path(os.environ.get(
+    "SNAPSHOT_DIR",
+    str(Path(__file__).resolve().parent.parent / "frontend" / "public" / "snapshots"),
+))
+
+
+@app.post("/api/snapshots/capture", dependencies=[Depends(require_admin)])
+@limiter.limit("5/minute")
+async def snapshot_capture(request: Request, key: str = Query(..., min_length=1, max_length=100,
+                                                              pattern=r"^[a-zA-Z0-9_-]+$")):
+    """Capture a frozen snapshot of all current feed data for demo mode."""
+    data = get_latest_data()
+    data["freshness"] = dict(source_timestamps)
+    data["_snapshot_meta"] = {
+        "captured_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "key": key,
+    }
+    _SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = _SNAPSHOT_DIR / f"{key}.json"
+    out_path.write_text(json_mod.dumps(data, default=str), encoding="utf-8")
+    size_mb = round(out_path.stat().st_size / (1024 * 1024), 2)
+    logger.info(f"Snapshot captured: {key} ({size_mb} MB)")
+    return {"status": "ok", "key": key, "size_mb": size_mb}
+
+
+@app.get("/api/snapshots/list", dependencies=[Depends(require_admin)])
+@limiter.limit("30/minute")
+async def snapshot_list(request: Request):
+    """List available snapshots and overlays."""
+    if not _SNAPSHOT_DIR.is_dir():
+        return {"snapshots": []}
+    files = sorted(f.name for f in _SNAPSHOT_DIR.glob("*.json") if f.name != ".gitkeep")
+    return {"snapshots": files}
+
+
+# ---------------------------------------------------------------------------
 # AI Assistant
 # ---------------------------------------------------------------------------
 
