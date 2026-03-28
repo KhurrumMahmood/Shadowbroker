@@ -204,6 +204,13 @@ export function makeMilClusterSvg(size: number, strokeColor = '#67e8f9'): string
     return makeClusterSvg(CLUSTER_FIGHTER_PATH, size, strokeColor, 1.1);
 }
 
+// Commercial flight cluster — airliner silhouette
+const CLUSTER_AIRLINER_PATH = 'M0 -10 L1 -6 L1.5 -3 L7 0 L9 1 L7 2 L1.5 3 L2 7 L4 9 L2 8.5 L0 10 L-2 8.5 L-4 9 L-2 7 L-1.5 3 L-7 2 L-9 1 L-7 0 L-1.5 -3 L-1 -6 Z';
+
+export function makeFlightClusterSvg(size: number, strokeColor = '#22d3ee'): string {
+    return makeClusterSvg(CLUSTER_AIRLINER_PATH, size, strokeColor, 1.0);
+}
+
 // Default neutral cluster icons (backward compat)
 export const svgShipClusterSm = makeShipClusterSvg(32);
 export const svgShipClusterMd = makeShipClusterSvg(40);

@@ -48,7 +48,7 @@ import {
     svgAirlinerGrey, svgTurbopropGrey, svgBizjetGrey, svgHeliGrey,
     GROUNDED_ICON_MAP, COLOR_MAP_COMMERCIAL, COLOR_MAP_PRIVATE,
     COLOR_MAP_JETS, COLOR_MAP_MILITARY, MIL_SPECIAL_MAP,
-    makeShipClusterSvg, makeMilClusterSvg,
+    makeShipClusterSvg, makeMilClusterSvg, makeFlightClusterSvg,
     makePowerPlantClusterSvg, makeDatacenterClusterSvg, makeEarthquakeClusterSvg,
     makeCctvClusterSvg, makeRadioClusterSvg, makeMeshClusterSvg,
     svgJammingIcon,
@@ -562,6 +562,10 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                     loadImg(`mil-cluster-${group}-${suffix}`, makeMilClusterSvg(size, color));
                 }
             }
+            // Flight cluster icons: 4 sizes (cyan, for commercial flights)
+            for (const [suffix, size] of CLUSTER_SIZES) {
+                loadImg(`flight-cluster-${suffix}`, makeFlightClusterSvg(size));
+            }
             // Entity-type cluster icons: 4 sizes × 6 types
             const clusterTypes = [
                 ['pp-cluster', makePowerPlantClusterSvg],
@@ -818,6 +822,7 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
 
     // Interactive layer IDs for click handling
     const activeInteractiveLayerIds = [
+        commFlightsGeoJSON && 'commercial-flights-clusters',
         commFlightsGeoJSON && 'commercial-flights-layer',
         privFlightsGeoJSON && 'private-flights-layer',
         privJetsGeoJSON && 'private-jets-layer',
@@ -1149,13 +1154,46 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                 )}
 
                 {/* commercial/private/military flights: data pushed imperatively */}
-                    <Source id="commercial-flights" type="geojson" data={EMPTY_FC as any}>
+                    <Source id="commercial-flights" type="geojson" data={EMPTY_FC as any}
+                        cluster={true} clusterMaxZoom={7} clusterRadius={50}>
+                        {/* Cluster layer — visible at zoom ≤ 7 where individual planes would overlap */}
+                        <Layer
+                            id="commercial-flights-clusters"
+                            type="symbol"
+                            filter={['has', 'point_count']}
+                            layout={{
+                                'icon-image': [
+                                    'step', ['get', 'point_count'],
+                                    'flight-cluster-sm',
+                                    10, 'flight-cluster-md',
+                                    50, 'flight-cluster-lg',
+                                    200, 'flight-cluster-xl'
+                                ],
+                                'icon-size': ['step', ['get', 'point_count'], 1.0, 10, 1.05, 50, 1.1, 200, 1.15],
+                                'icon-allow-overlap': true,
+                                'icon-ignore-placement': true,
+                                'text-field': '{point_count_abbreviated}',
+                                'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+                                'text-size': ['step', ['get', 'point_count'], 9, 10, 10, 50, 11, 200, 12],
+                                'text-offset': [0, 0.15],
+                                'text-allow-overlap': true,
+                            }}
+                            paint={{
+                                'icon-opacity': opacityFilter,
+                                'text-color': '#ffffff',
+                                'text-halo-color': 'rgba(0,0,0,0.8)',
+                                'text-halo-width': 1.2,
+                            }}
+                        />
+                        {/* Individual planes — only shown at zoom > 7 (unclustered) */}
                         <Layer id="commercial-flights-shadow" type="symbol"
+                            filter={['!', ['has', 'point_count']]}
                             layout={{ 'icon-image': ['get', 'shadowIconId'], 'icon-size': SHADOW_ICON_SIZE, 'icon-allow-overlap': true, 'icon-rotate': ['get', 'rotation'], 'icon-rotation-alignment': 'map' as const }}
                             paint={{ 'icon-color': COUNTRY_GROUP_ICON_COLOR, 'icon-opacity': opacityFilter }} />
                         <Layer
                             id="commercial-flights-layer"
                             type="symbol"
+                            filter={['!', ['has', 'point_count']]}
                             layout={{
                                 'icon-image': ['get', 'iconId'],
                                 'icon-size': ICON_SIZE,
