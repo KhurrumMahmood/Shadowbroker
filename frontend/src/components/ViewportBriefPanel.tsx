@@ -23,6 +23,8 @@ interface ViewportBriefPanelProps {
   onClose: () => void;
   onEntityClick: (entity: { type: string; id: string | number; name: string }) => void;
   onApplyLayers: (layers: Record<string, boolean>) => void;
+  isTop?: boolean;
+  onBringToFront?: () => void;
 }
 
 export type { BriefData, NotableEntity };
@@ -33,13 +35,16 @@ export default function ViewportBriefPanel({
   onClose,
   onEntityClick,
   onApplyLayers,
+  isTop,
+  onBringToFront,
 }: ViewportBriefPanelProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 20 }}
-      className="absolute bottom-24 left-1/2 -translate-x-1/2 z-[400] w-[500px] max-w-[90vw] pointer-events-auto"
+      onMouseDown={onBringToFront}
+      className={`absolute bottom-24 left-1/2 -translate-x-1/2 ${isTop ? 'z-[700]' : 'z-[400]'} w-[500px] max-w-[90vw] pointer-events-auto`}
     >
       <div className="bg-black/90 backdrop-blur-md border border-cyan-800/60 rounded-xl shadow-[0_4px_30px_rgba(0,0,0,0.5)] flex flex-col max-h-[400px]">
         {/* Header */}

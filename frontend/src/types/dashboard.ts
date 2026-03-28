@@ -634,6 +634,7 @@ export interface MaplibreViewerProps {
   onEavesdropClick?: (coords: { lat: number; lng: number }) => void;
   onCameraMove?: (coords: { lat: number; lng: number }) => void;
   viewBoundsRef?: React.RefObject<{ south: number; west: number; north: number; east: number } | null>;
+  onViewBoundsChange?: (bounds: { south: number; west: number; north: number; east: number }) => void;
   trackedSdr?: KiwiSDR | null;
   setTrackedSdr?: (sdr: KiwiSDR | null) => void;
   boxSelectMode?: boolean;

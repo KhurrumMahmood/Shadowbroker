@@ -62,18 +62,36 @@ export function getEntities(layerId: string, data: DashboardData): { items: any[
       return { items: data.military_bases ?? [], entityType: "military_base" };
     case "power_plants":
       return { items: data.power_plants ?? [], entityType: "power_plant" };
+    case "gps_jamming":
+      return { items: data.gps_jamming ?? [], entityType: "gps_jamming" };
+    case "prediction_markets":
+      return { items: data.prediction_markets ?? [], entityType: "prediction_market" };
+    case "ukraine_alerts":
+      return { items: data.ukraine_alerts ?? [], entityType: "ukraine_alert" };
+    case "fimi":
+      return { items: data.fimi ?? [], entityType: "fimi_narrative" };
+    case "trains":
+      return { items: data.trains ?? [], entityType: "train" };
+    case "meshtastic":
+      return { items: data.meshtastic ?? [], entityType: "meshtastic_node" };
     default:
       return { items: [], entityType: "" };
   }
 }
 
+/** Extract a human-readable display name from an entity's fields. */
+export function entityDisplayName(item: any): string {
+  return (
+    item.callsign || item.name || item.tracked_name || item.yacht_name ||
+    item.title || item.place || item.region_name || item.company ||
+    item.mmsi || item.icao24 || item.id || ""
+  );
+}
+
 /** Build a SelectedEntity from a raw data item + entity type */
 export function toSelectedEntity(item: any, entityType: string): SelectedEntity {
   const id = item.icao24 || item.mmsi || item.id || item.name || `${item.lat}-${item.lng}`;
-  const name =
-    item.callsign || item.name || item.tracked_name || item.yacht_name ||
-    item.place || item.title || item.region_name || item.company || "";
-  return { id, type: entityType, name, extra: item };
+  return { id, type: entityType, name: entityDisplayName(item), extra: item };
 }
 
 export interface CyclerState {

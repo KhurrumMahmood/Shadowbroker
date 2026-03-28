@@ -64,14 +64,7 @@ def _centroid(items: list[dict]) -> tuple[float, float]:
 # ---------------------------------------------------------------------------
 # Static reference data
 # ---------------------------------------------------------------------------
-_CHOKEPOINTS = [
-    {"name": "Strait of Hormuz", "lat": 26.5, "lng": 56.3, "radius_km": 150},
-    {"name": "Suez Canal", "lat": 30.0, "lng": 32.5, "radius_km": 100},
-    {"name": "Strait of Malacca", "lat": 2.5, "lng": 101.5, "radius_km": 150},
-    {"name": "Bab-el-Mandeb", "lat": 12.6, "lng": 43.3, "radius_km": 100},
-    {"name": "Panama Canal", "lat": 9.1, "lng": -79.7, "radius_km": 80},
-    {"name": "Taiwan Strait", "lat": 24.5, "lng": 119.5, "radius_km": 200},
-]
+from services.chokepoints import CHOKEPOINTS as _CHOKEPOINTS
 
 _SANCTIONED_ZONES = [
     {"name": "Iran", "lat": 27.0, "lng": 56.0, "radius_km": 300},

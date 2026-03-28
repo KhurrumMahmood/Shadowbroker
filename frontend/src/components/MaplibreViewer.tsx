@@ -49,19 +49,21 @@ import {
     GROUNDED_ICON_MAP, COLOR_MAP_COMMERCIAL, COLOR_MAP_PRIVATE,
     COLOR_MAP_JETS, COLOR_MAP_MILITARY, MIL_SPECIAL_MAP,
     makeShipClusterSvg, makeMilClusterSvg,
+    makePowerPlantClusterSvg, makeDatacenterClusterSvg, makeEarthquakeClusterSvg,
+    makeCctvClusterSvg, makeRadioClusterSvg, makeMeshClusterSvg,
     svgJammingIcon,
 } from "@/components/map/icons/AircraftIcons";
 import { GROUP_COLORS } from "@/components/map/icons/countryGroups";
 import { SHADOW_ICONS, SHADOW_ICON_MAP } from "@/components/map/icons/ShadowIcons";
 import { classifyAircraft } from "@/utils/aircraftClassification";
 import { makeSatSvg, MISSION_COLORS, MISSION_ICON_MAP } from "@/components/map/icons/SatelliteIcons";
-import { EMPTY_FC } from "@/components/map/mapConstants";
+import { EMPTY_FC, ICON_SIZE, SHADOW_ICON_SIZE, SHADOW_SHIP_ICON_SIZE, CLUSTER_SIZES, GROUP_RENDER_ORDER, ALL_CLUSTER_LAYER_IDS } from "@/components/map/mapConstants";
 import { useImperativeSource } from "@/components/map/hooks/useImperativeSource";
-import { ClusterCountLabels, TrackedFlightLabels, CarrierLabels, TrackedYachtLabels, UavLabels, EarthquakeLabels, ThreatMarkers } from "@/components/map/MapMarkers";
+import { TrackedFlightLabels, CarrierLabels, TrackedYachtLabels, UavLabels, EarthquakeLabels, ThreatMarkers, CompositeClusterMarkers } from "@/components/map/MapMarkers";
+import { useCompositeClusters } from "@/components/map/hooks/useCompositeClusters";
 import type { MaplibreViewerProps } from "@/types/dashboard";
 import { INTERP_TICK_MS, ALERT_BOX_WIDTH_PX, ALERT_MAX_OFFSET_PX } from "@/lib/constants";
 import { useInterpolation } from "@/components/map/hooks/useInterpolation";
-import { useClusterLabels } from "@/components/map/hooks/useClusterLabels";
 import { useBoxSelect } from "@/components/map/hooks/useBoxSelect";
 import { spreadAlertItems } from "@/utils/alertSpread";
 import {
@@ -101,21 +103,8 @@ const GROUP_STACK_OFFSETS: Record<string, [number, number]> = {
     csto:        [4.5, 4.5],
     nato:        [6, 6],
 };
-// Render order: other (bottom) → convenience → nonaligned → csto → nato (top)
-const GROUP_RENDER_ORDER = ['other', 'convenience', 'nonaligned', 'csto', 'nato'];
 
-// Shadow layer icon-size: ~20% larger than main for visible colored outline
-const SHADOW_ICON_SIZE: maplibregl.ExpressionSpecification = [
-    'interpolate', ['linear'], ['zoom'],
-    2, 0.5, 5, 0.7, 8, 0.95, 12, 1.2, 16, 1.4
-];
-// Ship shadow size (ships use slightly different size curve)
-const SHADOW_SHIP_ICON_SIZE: maplibregl.ExpressionSpecification = [
-    'interpolate', ['linear'], ['zoom'],
-    4, 0.55, 8, 0.7, 12, 0.85, 16, 1.1
-];
-
-const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyToLocation, selectedEntity, onMouseCoords, onRightClick, regionDossier, regionDossierLoading, onViewStateChange, measureMode, onMeasureClick, measurePoints, gibsDate, gibsOpacity, viewBoundsRef, setTrackedSdr, boxSelectMode, onBoxSelectResult, aiResultIdSet }: MaplibreViewerProps) => {
+const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyToLocation, selectedEntity, onMouseCoords, onRightClick, regionDossier, regionDossierLoading, onViewStateChange, measureMode, onMeasureClick, measurePoints, gibsDate, gibsOpacity, viewBoundsRef, onViewBoundsChange, setTrackedSdr, boxSelectMode, onBoxSelectResult, aiResultIdSet }: MaplibreViewerProps) => {
     const mapRef = useRef<MapRef>(null);
     const [mapReady, setMapReady] = useState(false);
     const { theme } = useTheme();
@@ -241,7 +230,14 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                 east: b.getEast(),
             };
         }
-        
+        // Notify parent of bounds change (for Focus Mode viewport filtering)
+        onViewBoundsChange?.({
+            south: b.getSouth(),
+            west: b.getWest(),
+            north: b.getNorth(),
+            east: b.getEast(),
+        });
+
         // Debounce POSTing viewport bounds to backend for dynamic AIS stream filtering
         if (boundsTimerRef.current) clearTimeout(boundsTimerRef.current);
         boundsTimerRef.current = setTimeout(() => {
@@ -256,7 +252,7 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                 })
             }).catch(e => console.error("Failed to update backend viewport:", e));
         }, 1500); // 1.5s debounce after map stops moving
-    }, [viewBoundsRef]);
+    }, [viewBoundsRef, onViewBoundsChange]);
 
     // Fast bounds check — used by all GeoJSON builders and Marker loops
     const inView = useCallback((lat: number, lng: number) =>
@@ -554,16 +550,30 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
             loadImg('fire-cluster-lg', svgFireClusterLarge);
             loadImg('fire-cluster-xl', svgFireClusterXL);
             // Ship cluster icons: 4 sizes × 5 country groups
-            const clusterSizes = [['sm', 32], ['md', 40], ['lg', 48], ['xl', 56]] as const;
+            // CLUSTER_SIZES imported from mapConstants
             for (const [group, color] of Object.entries(GROUP_COLORS)) {
-                for (const [suffix, size] of clusterSizes) {
+                for (const [suffix, size] of CLUSTER_SIZES) {
                     loadImg(`ship-cluster-${group}-${suffix}`, makeShipClusterSvg(size, color));
                 }
             }
             // Military cluster icons: 4 sizes × 5 country groups
             for (const [group, color] of Object.entries(GROUP_COLORS)) {
-                for (const [suffix, size] of clusterSizes) {
+                for (const [suffix, size] of CLUSTER_SIZES) {
                     loadImg(`mil-cluster-${group}-${suffix}`, makeMilClusterSvg(size, color));
+                }
+            }
+            // Entity-type cluster icons: 4 sizes × 6 types
+            const clusterTypes = [
+                ['pp-cluster', makePowerPlantClusterSvg],
+                ['dc-cluster', makeDatacenterClusterSvg],
+                ['eq-cluster', makeEarthquakeClusterSvg],
+                ['cctv-cluster', makeCctvClusterSvg],
+                ['radio-cluster', makeRadioClusterSvg],
+                ['mesh-cluster', makeMeshClusterSvg],
+            ] as const;
+            for (const [prefix, factory] of clusterTypes) {
+                for (const [suffix, size] of CLUSTER_SIZES) {
+                    loadImg(`${prefix}-${suffix}`, factory(size));
                 }
             }
             // GPS jamming zone icon
@@ -638,9 +648,17 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
         buildShipsGeoJSONByGroup(filteredData?.ships, activeLayers, inView, interpShip),
         [activeLayers.ships_military, activeLayers.ships_cargo, activeLayers.ships_civilian, activeLayers.ships_passenger, activeLayers.ships_tracked_yachts, filteredData?.ships, inView, interpShip]);
 
-    // Extract cluster label positions via shared hook
-    // Ship cluster labels now rendered via symbol layer text-field, no HTML markers needed
-    const eqClusters = useClusterLabels(mapRef, 'earthquakes', earthquakesGeoJSON);
+    // Cluster labels now rendered via symbol layer text-field, no HTML markers needed
+
+    // Cross-layer composite clusters: build full layer ID list including per-group dynamics
+    const allClusterLayerIds = useMemo(() => {
+        const ids = [...ALL_CLUSTER_LAYER_IDS];
+        for (const group of GROUP_RENDER_ORDER) {
+            ids.push(`mil-${group}-clusters`, `ships-${group}-clusters`);
+        }
+        return ids;
+    }, []);
+    const compositeClusters = useCompositeClusters(mapRef, allClusterLayerIds, viewState.zoom);
 
     const carriersGeoJSON = useMemo(() =>
         activeLayers.ships_military ? buildCarriersGeoJSON(filteredData?.ships) : null,
@@ -811,24 +829,23 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
         gdeltGeoJSON && 'gdelt-layer',
         liveuaGeoJSON && 'liveuamap-layer',
         frontlineGeoJSON && 'ukraine-frontline-layer',
+        earthquakesGeoJSON && 'earthquakes-clusters',
         earthquakesGeoJSON && 'earthquakes-layer',
         satellitesGeoJSON && 'satellites-layer',
         cctvGeoJSON && 'cctv-clusters',
-        cctvGeoJSON && 'cctv-cluster-count',
         cctvGeoJSON && 'cctv-layer',
         kiwisdrGeoJSON && 'kiwisdr-clusters',
         kiwisdrGeoJSON && 'kiwisdr-layer',
         internetOutagesGeoJSON && 'internet-outages-layer',
         dataCentersGeoJSON && 'datacenters-clusters',
-        dataCentersGeoJSON && 'datacenters-cluster-count',
         dataCentersGeoJSON && 'datacenters-layer',
         powerPlantsGeoJSON && 'power-plants-clusters',
-        powerPlantsGeoJSON && 'power-plants-cluster-count',
         powerPlantsGeoJSON && 'power-plants-layer',
         militaryBasesGeoJSON && 'military-bases-layer',
         ukraineAlertsGeoJSON && 'ukraine-alerts-layer',
         fimiGeoJSON && 'fimi-layer',
         trainsGeoJSON && 'trains-layer',
+        meshtasticGeoJSON && 'meshtastic-clusters',
         meshtasticGeoJSON && 'meshtastic-layer',
         firmsGeoJSON && 'firms-clusters',
         firmsGeoJSON && 'firms-viirs-layer'
@@ -1106,9 +1123,9 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                             layout={{
                                 'icon-image': ['get', 'iconId'],
                                 'icon-size': ['interpolate', ['linear'], ['zoom'],
-                                    2, 0.4,
-                                    5, 0.6,
-                                    8, 0.8,
+                                    2, 0.6,
+                                    5, 0.75,
+                                    8, 0.9,
                                     12, 1.0
                                 ],
                                 'icon-allow-overlap': true,
@@ -1141,7 +1158,7 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                             type="symbol"
                             layout={{
                                 'icon-image': ['get', 'iconId'],
-                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.4, 5, 0.6, 8, 0.8, 12, 1.0, 16, 1.2],
+                                'icon-size': ICON_SIZE,
                                 'icon-allow-overlap': true,
                                 'icon-rotate': ['get', 'rotation'],
                                 'icon-rotation-alignment': 'map',
@@ -1170,7 +1187,7 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                             type="symbol"
                             layout={{
                                 'icon-image': ['get', 'iconId'],
-                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.4, 5, 0.6, 8, 0.8, 12, 1.0, 16, 1.2],
+                                'icon-size': ICON_SIZE,
                                 'icon-allow-overlap': true,
                                 'icon-rotate': ['get', 'rotation'],
                                 'icon-rotation-alignment': 'map'
@@ -1188,7 +1205,7 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                             type="symbol"
                             layout={{
                                 'icon-image': ['get', 'iconId'],
-                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.4, 5, 0.6, 8, 0.8, 12, 1.0, 16, 1.2],
+                                'icon-size': ICON_SIZE,
                                 'icon-allow-overlap': true,
                                 'icon-rotate': ['get', 'rotation'],
                                 'icon-rotation-alignment': 'map'
@@ -1262,7 +1279,7 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                             filter={['!', ['has', 'point_count']]}
                             layout={{
                                 'icon-image': ['get', 'iconId'],
-                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.4, 5, 0.6, 8, 0.8, 12, 1.0, 16, 1.2],
+                                'icon-size': ICON_SIZE,
                                 'icon-allow-overlap': true,
                                 'icon-rotate': ['get', 'rotation'],
                                 'icon-rotation-alignment': 'map',
@@ -1350,7 +1367,7 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                             filter={['!', ['has', 'point_count']]}
                             layout={{
                                 'icon-image': ['get', 'iconId'],
-                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.4, 5, 0.6, 8, 0.8, 12, 1.0, 16, 1.2],
+                                'icon-size': ICON_SIZE,
                                 'icon-allow-overlap': true,
                                 'icon-rotate': ['get', 'rotation'],
                                 'icon-rotation-alignment': 'map',
@@ -1381,7 +1398,7 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                             type="symbol"
                             layout={{
                                 'icon-image': 'svgCarrier',
-                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.4, 5, 0.6, 8, 0.8, 12, 1.0, 16, 1.2],
+                                'icon-size': ICON_SIZE,
                                 'icon-allow-overlap': true,
                                 'icon-rotate': ['get', 'rotation'],
                                 'icon-rotation-alignment': 'map'
@@ -1521,7 +1538,7 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                             type="symbol"
                             layout={{
                                 'icon-image': ['get', 'iconId'],
-                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.4, 5, 0.6, 8, 0.8, 12, 1.0, 16, 1.2],
+                                'icon-size': ICON_SIZE,
                                 'icon-allow-overlap': true,
                                 'icon-rotate': ['get', 'rotation'],
                                 'icon-rotation-alignment': 'map'
@@ -1557,7 +1574,7 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                             minzoom={4}
                             layout={{
                                 'icon-image': ['get', 'iconId'],
-                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.4, 5, 0.6, 8, 0.8, 12, 1.0, 16, 1.2],
+                                'icon-size': ICON_SIZE,
                                 'icon-allow-overlap': true,
                             }}
                         />
@@ -1582,9 +1599,6 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                     <TrackedYachtLabels ships={data.ships} inView={inView} interpShip={interpShip} />
                 )}
 
-                {/* HTML labels for earthquake cluster counts (hidden when any entity popup is active) */}
-                {earthquakesGeoJSON && !selectedEntity && <ClusterCountLabels clusters={eqClusters} prefix="eqc" />}
-
                 {/* HTML labels for UAVs (orange names) */}
                 {uavGeoJSON && !selectedEntity && data?.uavs && (
                     <UavLabels uavs={data.uavs} inView={inView} />
@@ -1593,6 +1607,11 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                 {/* HTML labels for earthquakes (yellow) - only show when zoomed in (~2000 miles = zoom ~5) */}
                 {earthquakesGeoJSON && !selectedEntity && viewState.zoom >= 5 && data?.earthquakes && (
                     <EarthquakeLabels earthquakes={data.earthquakes} inView={inView} />
+                )}
+
+                {/* Cross-layer composite clusters at low zoom */}
+                {viewState.zoom < 7 && compositeClusters.length > 0 && (
+                    <CompositeClusterMarkers clusters={compositeClusters} />
                 )}
 
                 {/* Maplibre HTML Custom Markers for high-importance Threat Overlays (highest z-index) */}
@@ -1623,24 +1642,20 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                         clusterMaxZoom={10}
                         clusterRadius={60}
                     >
-                        {/* Earthquake cluster circles */}
+                        {/* Earthquake clusters — icon+badge */}
                         <Layer
-                            id="eq-clusters-layer"
-                            type="circle"
+                            id="earthquakes-clusters"
+                            type="symbol"
                             filter={['has', 'point_count']}
-                            paint={{
-                                'circle-color': 'rgba(255, 170, 0, 0.85)',
-                                'circle-radius': [
-                                    'step',
-                                    ['get', 'point_count'],
-                                    12,
-                                    5, 16,
-                                    10, 20,
-                                    20, 24
-                                ],
-                                'circle-stroke-width': 2,
-                                'circle-stroke-color': 'rgba(255, 200, 0, 1.0)'
+                            layout={{
+                                'icon-image': ['step', ['get', 'point_count'],
+                                    'eq-cluster-sm', 10, 'eq-cluster-md', 50, 'eq-cluster-lg', 200, 'eq-cluster-xl'],
+                                'text-field': '{point_count_abbreviated}',
+                                'text-size': ['step', ['get', 'point_count'], 9, 10, 10, 50, 11, 200, 12],
+                                'icon-allow-overlap': true,
+                                'text-allow-overlap': true,
                             }}
+                            paint={{ 'text-color': '#fff', 'text-halo-color': '#000', 'text-halo-width': 1 }}
                         />
                         {/* Individual (unclustered) earthquake icons */}
                         <Layer
@@ -1695,7 +1710,7 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                             filter={['==', ['get', 'ring'], 0]}
                             layout={{
                                 'icon-image': 'jamming-icon',
-                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.4, 5, 0.55, 8, 0.7],
+                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.55, 5, 0.65, 8, 0.8],
                                 'icon-allow-overlap': true,
                                 'text-field': ['concat', 'GPS JAM ', ['to-string', ['round', ['*', 100, ['get', 'ratio']]]], '%'],
                                 'text-size': ['interpolate', ['linear'], ['zoom'], 2, 8, 5, 10, 8, 12],
@@ -1722,34 +1737,18 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                 {/* CCTV Cameras — clustered green dots */}
                 {cctvGeoJSON && (
                     <Source id="cctv" type="geojson" data={cctvGeoJSON as any} cluster={true} clusterRadius={50} clusterMaxZoom={14}>
-                        {/* Cluster circles — green, sized by count */}
+                        {/* CCTV clusters — icon+badge */}
                         <Layer
                             id="cctv-clusters"
-                            type="circle"
-                            filter={['has', 'point_count']}
-                            paint={{
-                                'circle-color': '#22c55e',
-                                'circle-radius': [
-                                    'step', ['get', 'point_count'],
-                                    14, 10,
-                                    18, 50,
-                                    24, 200,
-                                    30
-                                ],
-                                'circle-opacity': 0.8,
-                                'circle-stroke-width': 2,
-                                'circle-stroke-color': '#16a34a'
-                            }}
-                        />
-                        {/* Cluster count labels */}
-                        <Layer
-                            id="cctv-cluster-count"
                             type="symbol"
                             filter={['has', 'point_count']}
                             layout={{
+                                'icon-image': ['step', ['get', 'point_count'],
+                                    'cctv-cluster-sm', 10, 'cctv-cluster-md', 50, 'cctv-cluster-lg', 200, 'cctv-cluster-xl'],
                                 'text-field': '{point_count_abbreviated}',
-                                'text-size': 12,
-                                'text-allow-overlap': true
+                                'text-size': ['step', ['get', 'point_count'], 9, 10, 10, 50, 11, 200, 12],
+                                'icon-allow-overlap': true,
+                                'text-allow-overlap': true,
                             }}
                             paint={{
                                 'text-color': '#ffffff',
@@ -1781,39 +1780,20 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                 {/* KiwiSDR Receivers — radio tower icons with pulse rings */}
                 {kiwisdrGeoJSON && (
                     <Source id="kiwisdr" type="geojson" data={kiwisdrGeoJSON as any} cluster={true} clusterRadius={50} clusterMaxZoom={14}>
-                        {/* Pulse ring behind clusters */}
-                        <Layer
-                            id="kiwisdr-cluster-pulse"
-                            type="circle"
-                            filter={['has', 'point_count']}
-                            paint={{
-                                'circle-radius': ['step', ['get', 'point_count'], 20, 10, 26, 50, 32, 200, 40],
-                                'circle-color': 'rgba(245, 158, 11, 0.08)',
-                                'circle-stroke-width': 1.5,
-                                'circle-stroke-color': 'rgba(245, 158, 11, 0.35)',
-                                'circle-blur': 0.4,
-                            }}
-                        />
-                        {/* Clusters — tower icon with count */}
+                        {/* KiwiSDR clusters — icon+badge */}
                         <Layer
                             id="kiwisdr-clusters"
                             type="symbol"
                             filter={['has', 'point_count']}
                             layout={{
-                                'icon-image': 'svgRadioTower',
-                                'icon-size': 0.9,
-                                'icon-allow-overlap': true,
+                                'icon-image': ['step', ['get', 'point_count'],
+                                    'radio-cluster-sm', 10, 'radio-cluster-md', 50, 'radio-cluster-lg', 200, 'radio-cluster-xl'],
                                 'text-field': '{point_count_abbreviated}',
-                                'text-size': 10,
-                                'text-offset': [0, 1.4],
+                                'text-size': ['step', ['get', 'point_count'], 9, 10, 10, 50, 11, 200, 12],
+                                'icon-allow-overlap': true,
                                 'text-allow-overlap': true,
-                                'text-font': ['Noto Sans Bold'],
                             }}
-                            paint={{
-                                'text-color': '#f59e0b',
-                                'text-halo-color': '#000000',
-                                'text-halo-width': 1.5,
-                            }}
+                            paint={{ 'text-color': '#fff', 'text-halo-color': '#000', 'text-halo-width': 1 }}
                         />
                         {/* Pulse ring behind individual towers */}
                         <Layer
@@ -1835,7 +1815,7 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                             filter={['!', ['has', 'point_count']]}
                             layout={{
                                 'icon-image': 'svgRadioTower',
-                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.5, 8, 0.8, 14, 1.0],
+                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.6, 8, 0.85, 14, 1.0],
                                 'icon-allow-overlap': true,
                             }}
                         />
@@ -2054,28 +2034,20 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                 {/* Meshtastic LoRa nodes — clustered teal circles */}
                 {meshtasticGeoJSON && (
                     <Source id="meshtastic" type="geojson" data={meshtasticGeoJSON as any} cluster={true} clusterRadius={40} clusterMaxZoom={10}>
+                        {/* Meshtastic clusters — icon+badge */}
                         <Layer
                             id="meshtastic-clusters"
-                            type="circle"
-                            filter={['has', 'point_count']}
-                            paint={{
-                                'circle-color': '#14b8a6',
-                                'circle-radius': ['step', ['get', 'point_count'], 10, 10, 14, 50, 18],
-                                'circle-opacity': 0.7,
-                                'circle-stroke-width': 1,
-                                'circle-stroke-color': 'rgba(0,0,0,0.4)',
-                            }}
-                        />
-                        <Layer
-                            id="meshtastic-cluster-count"
                             type="symbol"
                             filter={['has', 'point_count']}
                             layout={{
+                                'icon-image': ['step', ['get', 'point_count'],
+                                    'mesh-cluster-sm', 10, 'mesh-cluster-md', 50, 'mesh-cluster-lg', 200, 'mesh-cluster-xl'],
                                 'text-field': '{point_count_abbreviated}',
-                                'text-size': 10,
-                                'text-font': ['Noto Sans Bold'],
+                                'text-size': ['step', ['get', 'point_count'], 9, 10, 10, 50, 11, 200, 12],
+                                'icon-allow-overlap': true,
+                                'text-allow-overlap': true,
                             }}
-                            paint={{ 'text-color': '#ffffff' }}
+                            paint={{ 'text-color': '#fff', 'text-halo-color': '#000', 'text-halo-width': 1 }}
                         />
                         <Layer
                             id="meshtastic-layer"
@@ -2095,32 +2067,20 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                 {/* Data Center positions */}
                 {dataCentersGeoJSON && (
                     <Source id="datacenters" type="geojson" data={dataCentersGeoJSON as any} cluster={true} clusterRadius={30} clusterMaxZoom={8}>
-                        {/* Cluster circles */}
+                        {/* Datacenter clusters — icon+badge */}
                         <Layer
                             id="datacenters-clusters"
-                            type="circle"
-                            filter={['has', 'point_count']}
-                            paint={{
-                                'circle-color': '#7c3aed',
-                                'circle-radius': ['step', ['get', 'point_count'], 12, 10, 16, 50, 20],
-                                'circle-opacity': 0.7,
-                                'circle-stroke-width': 1,
-                                'circle-stroke-color': '#a78bfa',
-                            }}
-                        />
-                        <Layer
-                            id="datacenters-cluster-count"
                             type="symbol"
                             filter={['has', 'point_count']}
                             layout={{
+                                'icon-image': ['step', ['get', 'point_count'],
+                                    'dc-cluster-sm', 10, 'dc-cluster-md', 50, 'dc-cluster-lg', 200, 'dc-cluster-xl'],
                                 'text-field': '{point_count_abbreviated}',
-                                'text-font': ['Noto Sans Bold'],
-                                'text-size': 10,
+                                'text-size': ['step', ['get', 'point_count'], 9, 10, 10, 50, 11, 200, 12],
+                                'icon-allow-overlap': true,
                                 'text-allow-overlap': true,
                             }}
-                            paint={{
-                                'text-color': '#e9d5ff',
-                            }}
+                            paint={{ 'text-color': '#fff', 'text-halo-color': '#000', 'text-halo-width': 1 }}
                         />
                         {/* Individual DC icons */}
                         <Layer
@@ -2129,7 +2089,7 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                             filter={['!', ['has', 'point_count']]}
                             layout={{
                                 'icon-image': 'datacenter',
-                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.5, 6, 0.7, 10, 1.0],
+                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.6, 6, 0.8, 10, 1.0],
                                 'icon-allow-overlap': true,
                                 'text-field': ['step', ['zoom'], '', 6, ['get', 'name']],
                                 'text-font': ['Noto Sans Regular'],
@@ -2150,32 +2110,20 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                 {/* Power Plant positions */}
                 {powerPlantsGeoJSON && (
                     <Source id="power-plants" type="geojson" data={powerPlantsGeoJSON as any} cluster={true} clusterRadius={30} clusterMaxZoom={8}>
-                        {/* Cluster circles */}
+                        {/* Power plant clusters — icon+badge */}
                         <Layer
                             id="power-plants-clusters"
-                            type="circle"
-                            filter={['has', 'point_count']}
-                            paint={{
-                                'circle-color': '#92400e',
-                                'circle-radius': ['step', ['get', 'point_count'], 12, 10, 16, 50, 20],
-                                'circle-opacity': 0.7,
-                                'circle-stroke-width': 1,
-                                'circle-stroke-color': '#f59e0b',
-                            }}
-                        />
-                        <Layer
-                            id="power-plants-cluster-count"
                             type="symbol"
                             filter={['has', 'point_count']}
                             layout={{
+                                'icon-image': ['step', ['get', 'point_count'],
+                                    'pp-cluster-sm', 10, 'pp-cluster-md', 50, 'pp-cluster-lg', 200, 'pp-cluster-xl'],
                                 'text-field': '{point_count_abbreviated}',
-                                'text-font': ['Noto Sans Bold'],
-                                'text-size': 10,
+                                'text-size': ['step', ['get', 'point_count'], 9, 10, 10, 50, 11, 200, 12],
+                                'icon-allow-overlap': true,
                                 'text-allow-overlap': true,
                             }}
-                            paint={{
-                                'text-color': '#fde68a',
-                            }}
+                            paint={{ 'text-color': '#fff', 'text-halo-color': '#000', 'text-halo-width': 1 }}
                         />
                         {/* Individual power plant icons */}
                         <Layer
@@ -2184,7 +2132,7 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                             filter={['!', ['has', 'point_count']]}
                             layout={{
                                 'icon-image': 'power-plant',
-                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.5, 6, 0.7, 10, 1.0],
+                                'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.6, 6, 0.8, 10, 1.0],
                                 'icon-allow-overlap': true,
                                 'text-field': ['step', ['zoom'], '', 6, ['get', 'name']],
                                 'text-font': ['Noto Sans Regular'],
@@ -2246,9 +2194,9 @@ const MaplibreViewer = ({ data, activeLayers, activeFilters, onEntityClick, flyT
                                 'icon-image': ['get', 'iconId'],
                                 'icon-size': [
                                     'interpolate', ['linear'], ['zoom'],
-                                    0, 0.4,
-                                    3, 0.5,
-                                    6, 0.7,
+                                    0, 0.55,
+                                    3, 0.65,
+                                    6, 0.8,
                                     10, 1.0
                                 ],
                                 'icon-allow-overlap': true,

@@ -47,7 +47,7 @@ function makeShadowSvg(
 ): string {
     const pathArr = Array.isArray(paths) ? paths : [paths];
     const pathEls = pathArr.map(p =>
-        `<path d="${p}" fill="white" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>`
+        `<path d="${p}" fill="white" stroke="white" stroke-width="0.8" stroke-linejoin="round"/>`
     ).join('');
     return `data:image/svg+xml;utf8,${encodeURIComponent(
         `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${viewBox}">` +
@@ -60,17 +60,17 @@ function makeShadowSvg(
 // Shadow SVG data URIs
 // ---------------------------------------------------------------------------
 
-// Aircraft shadows (24x24 — slightly larger raster than 20px mains for crisp SDF)
-export const shadowPlane = makeShadowSvg(PLANE_PATH, 24, 24);
-export const shadowHeli = makeShadowSvg(HELI_BODY, 24, 24, '0 0 24 24',
-    '<circle cx="12" cy="12" r="8" fill="none" stroke="white" stroke-width="1.5"/>');
-export const shadowFighter = makeShadowSvg(FIGHTER_OUTLINE, 24, 24);
-export const shadowDrone = makeShadowSvg(DRONE_OUTLINE, 24, 24, '0 0 24 24', DRONE_SHADOW_EXTRAS);
+// Aircraft shadows (32x32 — slightly larger raster than 28px mains for crisp SDF)
+export const shadowPlane = makeShadowSvg(PLANE_PATH, 32, 32);
+export const shadowHeli = makeShadowSvg(HELI_BODY, 32, 32, '0 0 24 24',
+    '<circle cx="12" cy="12" r="8" fill="none" stroke="white" stroke-width="0.8"/>');
+export const shadowFighter = makeShadowSvg(FIGHTER_OUTLINE, 32, 32);
+export const shadowDrone = makeShadowSvg(DRONE_OUTLINE, 32, 32, '0 0 24 24', DRONE_SHADOW_EXTRAS);
 
 // Ship shadows (match main icon aspect ratios)
-export const shadowShipPointed = makeShadowSvg(SHIP_HULL, 16, 32);
-export const shadowShipRounded = makeShadowSvg(SHIP_HULL_ROUNDED, 18, 36);
-export const shadowCarrier = makeShadowSvg(CARRIER_OUTLINE, 22, 22, '0 0 22 22');
+export const shadowShipPointed = makeShadowSvg(SHIP_HULL, 22, 44);
+export const shadowShipRounded = makeShadowSvg(SHIP_HULL_ROUNDED, 24, 48);
+export const shadowCarrier = makeShadowSvg(CARRIER_OUTLINE, 34, 34, '0 0 22 22');
 
 // ---------------------------------------------------------------------------
 // Map: main iconId → shadow icon ID

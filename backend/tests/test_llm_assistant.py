@@ -157,6 +157,34 @@ class TestParseLlmResponse:
         r = parse_llm_response(raw)
         assert len(r["result_entities"]) == 50
 
+    def test_result_entities_filters_unsearchable_types(self):
+        """Entity types not in _SEARCH_CONFIG should be filtered out."""
+        entities = [
+            {"type": "flight", "id": "abc123"},       # searchable (commercial_flights)
+            {"type": "fire", "id": "34.1,-118.2"},     # searchable (firms_fires)
+            {"type": "satellite", "id": "sat001"},     # NOT searchable
+            {"type": "cctv", "id": "cam001"},          # NOT searchable
+            {"type": "ship", "id": "123456"},          # searchable (ships)
+        ]
+        raw = json.dumps({"summary": "ok", "result_entities": entities})
+        r = parse_llm_response(raw)
+        types = [e["type"] for e in r["result_entities"]]
+        assert "flight" in types
+        assert "fire" in types
+        assert "ship" in types
+        assert "satellite" not in types
+        assert "cctv" not in types
+
+    def test_result_entities_accepts_data_key_names(self):
+        """Entity types matching _SEARCH_CONFIG keys (e.g., 'commercial_flights') should pass."""
+        entities = [
+            {"type": "commercial_flights", "id": "abc"},
+            {"type": "ships", "id": "123"},
+        ]
+        raw = json.dumps({"summary": "ok", "result_entities": entities})
+        r = parse_llm_response(raw)
+        assert len(r["result_entities"]) == 2
+
 
 # --- Tool execution tests ---
 

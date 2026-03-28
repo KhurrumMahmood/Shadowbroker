@@ -2,19 +2,52 @@ import { useState, useCallback, useRef } from "react";
 import type { DashboardData, SelectedEntity } from "@/types/dashboard";
 import { toSelectedEntity } from "./useCategoryCycler";
 
-/** Normalize entity types the LLM might return in non-canonical forms */
+/** Normalize entity types the LLM might return in non-canonical forms.
+ *  Covers: singular aliases, plural/category-key forms (what the LLM sees as
+ *  data section headers), and backend _SEARCH_CONFIG entity_type strings. */
 const TYPE_ALIASES: Record<string, string> = {
+  // Singular aliases
   military: "military_flight",
   commercial: "flight",
   commercial_flight: "flight",
+  tracked: "tracked_flight",
   private: "private_flight",
   jet: "private_jet",
   base: "military_base",
   fire: "firms_fire",
   outage: "internet_outage",
+  meshtastic: "meshtastic_node",
+  fimi: "fimi_narrative",
+  // Plural / category-key forms (LLM sees these as section headers)
+  commercial_flights: "flight",
+  military_flights: "military_flight",
+  tracked_flights: "tracked_flight",
+  private_flights: "private_flight",
+  private_jets: "private_jet",
+  ships: "ship",
+  satellites: "satellite",
+  earthquakes: "earthquake",
+  firms_fires: "firms_fire",
+  internet_outages: "internet_outage",
+  datacenters: "datacenter",
+  military_bases: "military_base",
+  power_plants: "power_plant",
+  cctv_cameras: "cctv",
+  kiwisdr_receivers: "kiwisdr",
+  meshtastic_nodes: "meshtastic_node",
+  prediction_markets: "prediction_market",
+  ukraine_alerts: "ukraine_alert",
+  disease_outbreaks: "disease_outbreak",
+  trains: "train",
+  fimi_narratives: "fimi_narrative",
+  correlation_alerts: "correlation",
+  correlations: "correlation",
+  gdelt_incidents: "gdelt_incident",
+  news_articles: "news",
+  uavs: "uav",
 };
 
-/** Entity type → data key mapping for lookup */
+/** Entity type → DashboardData key mapping for lookup */
 const TYPE_TO_DATA_KEY: Record<string, string> = {
   flight: "commercial_flights",
   private_flight: "private_flights",
@@ -32,6 +65,18 @@ const TYPE_TO_DATA_KEY: Record<string, string> = {
   datacenter: "datacenters",
   military_base: "military_bases",
   power_plant: "power_plants",
+  // Types that exist in backend but previously had no frontend mapping
+  prediction_market: "prediction_markets",
+  ukraine_alert: "ukraine_alerts",
+  fimi_narrative: "fimi",
+  train: "trains",
+  meshtastic_node: "meshtastic",
+  correlation: "correlation_alerts",
+  disease_outbreak: "disease_outbreaks",
+  gdelt_incident: "gdelt",
+  news: "news",
+  uav: "uavs",
+  gps_jamming: "gps_jamming",
 };
 
 /** Find a raw entity item in DashboardData by type + id */
@@ -51,10 +96,33 @@ export function findEntityInData(
   if (!Array.isArray(items)) return null;
 
   // Strip "id:" prefix the LLM may include from search result format
-  const idStr = String(id).replace(/^id:/, "");
+  const idStr = String(id).replace(/^id:/, "").trim().toLowerCase();
+
+  // Parse coordinate ID if it looks like "lat,lng" or "lat-lng"
+  const coordMatch = idStr.match(/^([+-]?\d+\.?\d*)[,\-]([+-]?\d+\.?\d*)$/);
+  const coordLat = coordMatch ? parseFloat(coordMatch[1]) : NaN;
+  const coordLng = coordMatch ? parseFloat(coordMatch[2]) : NaN;
+  const hasCoordId = !isNaN(coordLat) && !isNaN(coordLng);
+
   const match = items.find((item: any) => {
-    const itemId = item.icao24 || item.mmsi || item.id || item.name;
-    return String(itemId) === idStr;
+    // Check all common identifier fields (case-insensitive)
+    const candidates = [
+      item.icao24, item.mmsi, item.id, item.node_id,
+      item.slug, item.name, item.title,
+      // GDELT GeoJSON: name is nested in properties
+      item.properties?.name,
+    ];
+    if (candidates.some((c) => c != null && String(c).toLowerCase().trim() === idStr)) return true;
+    // Coordinate-based fallback — numeric comparison avoids float formatting issues
+    if (hasCoordId) {
+      if (item.lat != null && item.lng != null && item.lat === coordLat && item.lng === coordLng) return true;
+      // GeoJSON coordinate fallback (GDELT features store coords in geometry)
+      if (item.geometry?.coordinates) {
+        const [gLng, gLat] = item.geometry.coordinates;
+        if (gLat === coordLat && gLng === coordLng) return true;
+      }
+    }
+    return false;
   });
 
   if (!match) {
@@ -69,6 +137,8 @@ export interface AIResultState {
   total: number;
   results: SelectedEntity[];
   resultIdSet: Set<string>;
+  requested: number;
+  noneResolved: boolean;
 }
 
 export function useAIResultCycler(
@@ -79,6 +149,7 @@ export function useAIResultCycler(
   const [results, setResultsState] = useState<SelectedEntity[]>([]);
   const [index, setIndex] = useState(0);
   const [resultIdSet, setResultIdSet] = useState<Set<string>>(new Set());
+  const [requested, setRequested] = useState(0);
   const dataRef = useRef(data);
   dataRef.current = data;
 
@@ -110,6 +181,7 @@ export function useAIResultCycler(
 
       setResultsState(resolved);
       setResultIdSet(idSet);
+      setRequested(entities.length);
       setIndex(0);
 
       if (resolved.length > 0) {
@@ -148,6 +220,7 @@ export function useAIResultCycler(
   const clear = useCallback(() => {
     setResultsState([]);
     setResultIdSet(new Set());
+    setRequested(0);
     setIndex(0);
     onSelect(null);
   }, [onSelect]);
@@ -158,6 +231,8 @@ export function useAIResultCycler(
     total: results.length,
     results,
     resultIdSet,
+    requested,
+    noneResolved: requested > 0 && results.length === 0,
   };
 
   return { state, setResults, next, prev, clear };

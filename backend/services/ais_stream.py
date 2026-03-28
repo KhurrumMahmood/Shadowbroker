@@ -434,18 +434,25 @@ def stop_ais_stream():
     logger.info("AIS Stream stopping...")
 
 def update_ais_bbox(south: float, west: float, north: float, east: float):
-    """Dynamically update the AIS stream bounding box via proxy stdin."""
+    """Dynamically update the AIS stream bounding box via proxy stdin.
+
+    Sends the user's viewport bbox plus static chokepoint bboxes so that
+    strategic maritime regions always have fresh vessel data.
+    """
     global _proxy_process
     if not _proxy_process or not _proxy_process.stdin:
         return
-    
+
     try:
+        from services.chokepoints import chokepoint_bboxes
+        viewport = [[south, west], [north, east]]
+        bboxes = [viewport] + chokepoint_bboxes()
         cmd = json.dumps({
             "type": "update_bbox",
-            "bboxes": [[[south, west], [north, east]]]
+            "bboxes": bboxes,
         })
         _proxy_process.stdin.write(cmd + "\n")
         _proxy_process.stdin.flush()
-        logger.info(f"Updated AIS bounding box to: S:{south:.2f} W:{west:.2f} N:{north:.2f} E:{east:.2f}")
+        logger.info(f"Updated AIS bounding boxes: viewport + {len(bboxes) - 1} chokepoints")
     except Exception as e:
         logger.error(f"Failed to update AIS bbox: {e}")

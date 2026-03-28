@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plane, AlertTriangle, Activity, Satellite, Cctv, ChevronDown, ChevronUp, Ship, Eye, Anchor, Settings, Sun, Moon, BookOpen, Radio, Play, Pause, Globe, Flame, Wifi, Server, Shield, Zap, ToggleLeft, ToggleRight, Palette, ChevronLeftIcon, ChevronRightIcon, Crosshair, TrainFront } from "lucide-react";
+import { Plane, AlertTriangle, Activity, Satellite, Cctv, ChevronDown, ChevronUp, Ship, Eye, Anchor, Settings, Sun, Moon, BookOpen, Radio, Play, Pause, Globe, Flame, Wifi, Server, Shield, Zap, ToggleLeft, ToggleRight, Palette, ChevronLeftIcon, ChevronRightIcon, Crosshair, TrainFront, Search } from "lucide-react";
 import packageJson from "../../package.json";
 import { useTheme } from "@/lib/ThemeContext";
 
@@ -67,10 +67,11 @@ const POTUS_ICAOS: Record<string, { label: string; type: string }> = {
     'AE5E79': { label: 'Marine One (VH-92A)', type: 'M1' },
 };
 import type { DashboardData, ActiveLayers, SelectedEntity, KiwiSDR } from "@/types/dashboard";
+import { computeViewportCounts, classifyShipCategory, type ViewBounds } from "@/utils/viewportFilter";
 import { PRESETS, type PresetKey } from "@/lib/presets";
 import type { CyclerState } from "@/hooks/useCategoryCycler";
 
-const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, activeLayers, setActiveLayers, activePreset, onPresetSelect, cyclerState, onCycleStart, onCycleNext, onCyclePrev, onSettingsClick, onLegendClick, gibsDate, setGibsDate, gibsOpacity, setGibsOpacity, onEntityClick, onFlyTo, trackedSdr, setTrackedSdr }: { data: DashboardData; activeLayers: ActiveLayers; setActiveLayers: React.Dispatch<React.SetStateAction<ActiveLayers>>; activePreset: PresetKey | null; onPresetSelect: (key: PresetKey) => void; cyclerState: CyclerState; onCycleStart: (layerId: string) => void; onCycleNext: () => void; onCyclePrev: () => void; onSettingsClick?: () => void; onLegendClick?: () => void; gibsDate?: string; setGibsDate?: (d: string) => void; gibsOpacity?: number; setGibsOpacity?: (o: number) => void; onEntityClick?: (entity: SelectedEntity) => void; onFlyTo?: (lat: number, lng: number) => void; trackedSdr?: KiwiSDR | null; setTrackedSdr?: (sdr: KiwiSDR | null) => void }) {
+const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, activeLayers, setActiveLayers, activePreset, onPresetSelect, cyclerState, onCycleStart, onCycleNext, onCyclePrev, onSettingsClick, onLegendClick, gibsDate, setGibsDate, gibsOpacity, setGibsOpacity, onEntityClick, onFlyTo, trackedSdr, setTrackedSdr, focusMode, setFocusMode, viewBounds, onLayerSearch }: { data: DashboardData; activeLayers: ActiveLayers; setActiveLayers: React.Dispatch<React.SetStateAction<ActiveLayers>>; activePreset: PresetKey | null; onPresetSelect: (key: PresetKey) => void; cyclerState: CyclerState; onCycleStart: (layerId: string) => void; onCycleNext: () => void; onCyclePrev: () => void; onSettingsClick?: () => void; onLegendClick?: () => void; gibsDate?: string; setGibsDate?: (d: string) => void; gibsOpacity?: number; setGibsOpacity?: (o: number) => void; onEntityClick?: (entity: SelectedEntity) => void; onFlyTo?: (lat: number, lng: number) => void; trackedSdr?: KiwiSDR | null; setTrackedSdr?: (sdr: KiwiSDR | null) => void; focusMode?: boolean; setFocusMode?: (on: boolean) => void; viewBounds?: ViewBounds | null; onLayerSearch?: (layerId: string, layerName: string) => void }) {
     const [isMinimized, setIsMinimized] = useState(false);
     const { theme, toggleTheme, hudColor, cycleHudColor } = useTheme();
     const [gibsPlaying, setGibsPlaying] = useState(false);
@@ -107,15 +108,22 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
         if (!ships || !ships.length) return { militaryShipCount: 0, cargoShipCount: 0, passengerShipCount: 0, civilianShipCount: 0, trackedYachtCount: 0 };
         let military = 0, cargo = 0, passenger = 0, civilian = 0, trackedYacht = 0;
         for (const s of ships) {
-            if (s.yacht_alert) { trackedYacht++; continue; }
-            const t = s.type;
-            if (t === 'carrier' || t === 'military_vessel') military++;
-            else if (t === 'tanker' || t === 'cargo') cargo++;
-            else if (t === 'passenger') passenger++;
-            else civilian++;
+            switch (classifyShipCategory(s)) {
+                case "military": military++; break;
+                case "cargo": cargo++; break;
+                case "passenger": passenger++; break;
+                case "yacht": trackedYacht++; break;
+                default: civilian++; break;
+            }
         }
         return { militaryShipCount: military, cargoShipCount: cargo, passengerShipCount: passenger, civilianShipCount: civilian, trackedYachtCount: trackedYacht };
     }, [data?.ships]);
+
+    // Viewport-filtered counts for Focus Mode
+    const viewportCounts = useMemo(() => {
+        if (!focusMode || !viewBounds) return null;
+        return computeViewportCounts(data, viewBounds);
+    }, [focusMode, viewBounds, data]);
 
     // Find POTUS fleet planes currently airborne from tracked flights
     const potusFlights = useMemo(() => {
@@ -209,12 +217,13 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
             const matching = (data?.ships ?? []).filter(s => s.country === maF);
             let mil = 0, cargo = 0, passenger = 0, civilian = 0, yacht = 0;
             for (const s of matching) {
-                if (s.yacht_alert) { yacht++; continue; }
-                const t = s.type;
-                if (t === 'carrier' || t === 'military_vessel') mil++;
-                else if (t === 'tanker' || t === 'cargo') cargo++;
-                else if (t === 'passenger') passenger++;
-                else civilian++;
+                switch (classifyShipCategory(s)) {
+                    case "military": mil++; break;
+                    case "cargo": cargo++; break;
+                    case "passenger": passenger++; break;
+                    case "yacht": yacht++; break;
+                    default: civilian++; break;
+                }
             }
             counts["ships_military"] = mil;
             counts["ships_cargo"] = cargo;
@@ -380,7 +389,24 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                 <div
                     className="flex justify-between items-center p-4 pt-2 cursor-pointer hover:bg-[var(--bg-secondary)]/50 transition-colors border-b border-[var(--border-primary)]/50"
                 >
-                    <span className="text-[10px] text-[var(--text-muted)] font-mono tracking-widest" onClick={() => setIsMinimized(!isMinimized)}>DATA LAYERS</span>
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-[var(--text-muted)] font-mono tracking-widest" onClick={() => setIsMinimized(!isMinimized)}>DATA LAYERS</span>
+                        {setFocusMode && (
+                            <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setFocusMode(!focusMode); }}
+                                className={`flex items-center gap-1 px-1.5 py-0.5 rounded border text-[8px] font-mono tracking-wider transition-all ${
+                                    focusMode
+                                        ? 'border-cyan-500/50 text-cyan-400 bg-cyan-950/30 shadow-[0_0_8px_rgba(34,211,238,0.15)]'
+                                        : 'border-[var(--border-primary)] text-[var(--text-muted)] hover:text-cyan-400 hover:border-cyan-500/30'
+                                }`}
+                                title={focusMode ? "Disable viewport focus (show global counts)" : "Enable viewport focus (show counts in current view)"}
+                            >
+                                <Crosshair size={10} />
+                                FOCUS
+                            </button>
+                        )}
+                    </div>
                     <div className="flex items-center gap-2">
                         <button
                             type="button"
@@ -630,26 +656,50 @@ const WorldviewLeftPanel = React.memo(function WorldviewLeftPanel({ data, active
                                                                             </div>
                                                                             <div className="flex items-center gap-2">
                                                                                 {canCycle && (
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={(e) => { e.stopPropagation(); onCycleStart(layer.id); }}
-                                                                                        className={`p-1 rounded border transition-all ${
-                                                                                            isCycling
-                                                                                                ? "border-cyan-500/50 text-cyan-400 bg-cyan-950/30"
-                                                                                                : "border-transparent text-[var(--text-muted)] opacity-0 group-hover:opacity-100 hover:text-cyan-400 hover:border-cyan-800/50"
-                                                                                        }`}
-                                                                                        title="Browse items"
-                                                                                    >
-                                                                                        <Crosshair size={12} />
-                                                                                    </button>
+                                                                                    <>
+                                                                                        {onLayerSearch && (
+                                                                                            <button
+                                                                                                type="button"
+                                                                                                onClick={(e) => { e.stopPropagation(); onLayerSearch(layer.id, layer.name); }}
+                                                                                                className="p-1 rounded border border-transparent text-[var(--text-muted)] opacity-0 group-hover:opacity-100 hover:text-cyan-400 hover:border-cyan-800/50 transition-all"
+                                                                                                title="Search within layer"
+                                                                                            >
+                                                                                                <Search size={12} />
+                                                                                            </button>
+                                                                                        )}
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={(e) => { e.stopPropagation(); onCycleStart(layer.id); }}
+                                                                                            className={`p-1 rounded border transition-all ${
+                                                                                                isCycling
+                                                                                                    ? "border-cyan-500/50 text-cyan-400 bg-cyan-950/30"
+                                                                                                    : "border-transparent text-[var(--text-muted)] opacity-0 group-hover:opacity-100 hover:text-cyan-400 hover:border-cyan-800/50"
+                                                                                            }`}
+                                                                                            title="Browse items"
+                                                                                        >
+                                                                                            <Crosshair size={12} />
+                                                                                        </button>
+                                                                                    </>
                                                                                 )}
                                                                                 {active && (layer.count ?? 0) > 0 && (() => {
                                                                                     const filtered = filteredLayerCounts[layer.id];
+                                                                                    const vpCount = viewportCounts?.[layer.id];
                                                                                     const total = (layer.count ?? 0).toLocaleString();
+                                                                                    // Country pill filter takes priority over viewport
                                                                                     if (filtered != null) {
                                                                                         return (
                                                                                             <span className="text-[10px] font-mono">
                                                                                                 <span className="text-cyan-400">{filtered.toLocaleString()}</span>
+                                                                                                <span className="text-gray-500"> / </span>
+                                                                                                <span className="text-gray-300">{total}</span>
+                                                                                            </span>
+                                                                                        );
+                                                                                    }
+                                                                                    // Focus Mode viewport count
+                                                                                    if (vpCount != null) {
+                                                                                        return (
+                                                                                            <span className="text-[10px] font-mono">
+                                                                                                <span className="text-cyan-400">{vpCount.toLocaleString()}</span>
                                                                                                 <span className="text-gray-500"> / </span>
                                                                                                 <span className="text-gray-300">{total}</span>
                                                                                             </span>

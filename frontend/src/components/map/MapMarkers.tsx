@@ -1,6 +1,7 @@
 import React from "react";
 import { Marker } from "react-map-gl/maplibre";
 import type { ViewState } from "react-map-gl/maplibre";
+import type { CompositeCluster } from "./hooks/useCompositeClusters";
 
 // Shared monospace label style base
 const LABEL_BASE: React.CSSProperties = {
@@ -302,6 +303,39 @@ export function ThreatMarkers({ spreadAlerts, viewState, selectedEntity, onEntit
                     </Marker>
                 );
             })}
+        </>
+    );
+}
+
+// -- Composite cluster mini-tables (cross-layer merged clusters at low zoom) --
+const COMPOSITE_STYLE: React.CSSProperties = {
+    background: 'rgba(15,23,42,0.95)',
+    border: '1px solid rgba(103,232,249,0.5)',
+    borderRadius: '4px',
+    padding: '3px 6px',
+    fontFamily: 'monospace',
+    fontSize: '10px',
+    lineHeight: '14px',
+    pointerEvents: 'auto',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+};
+
+export function CompositeClusterMarkers({ clusters }: { clusters: CompositeCluster[] }) {
+    return (
+        <>
+            {clusters.map((c, i) => (
+                <Marker key={`comp-${i}`} longitude={c.lng} latitude={c.lat} anchor="center" style={{ zIndex: 10 }}>
+                    <div style={COMPOSITE_STYLE}>
+                        {c.rows.map((row) => (
+                            <div key={row.type} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                <span style={{ color: row.color, fontWeight: 'bold', minWidth: '48px' }}>{row.type}</span>
+                                <span style={{ color: '#fff' }}>{row.count.toLocaleString()}</span>
+                            </div>
+                        ))}
+                    </div>
+                </Marker>
+            ))}
         </>
     );
 }

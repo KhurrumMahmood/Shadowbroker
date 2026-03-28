@@ -119,3 +119,41 @@ class TestQueryableFields:
         assert "gdelt:" in _FIELDS_BLOCK
         assert "firms_fires:" in _FIELDS_BLOCK
         assert "disease_outbreaks:" in _FIELDS_BLOCK
+
+
+class TestCompactIdsForResultEntities:
+    """Compact formats must include an 'id' field so the LLM can emit
+    result_entities that the frontend can resolve."""
+
+    def test_fire_compact_has_coordinate_id(self):
+        from services.llm_assistant import _SEARCH_CONFIG
+        compact = _SEARCH_CONFIG["firms_fires"]["compact"]
+        fire = {"lat": 26.5, "lng": 56.3, "frp": 100, "confidence": "high", "acq_date": "2026-03-28"}
+        result = compact(fire)
+        assert "id" in result, "Fire compact format must include an 'id' field"
+        assert result["id"] == "26.5,56.3"
+
+    def test_gdelt_compact_has_coordinate_id(self):
+        from services.llm_assistant import _SEARCH_CONFIG
+        compact = _SEARCH_CONFIG["gdelt"]["compact"]
+        gdelt_item = {
+            "type": "Feature",
+            "properties": {"name": "Test zone", "count": 5, "action_geo_cc": "XX"},
+            "geometry": {"type": "Point", "coordinates": [35.0, 10.0]},
+        }
+        result = compact(gdelt_item)
+        assert "id" in result, "GDELT compact format must include an 'id' field"
+        assert result["id"] == "10.0,35.0"  # lat,lng from GeoJSON [lng,lat]
+
+    def test_fire_search_result_uses_coordinate_id(self):
+        """Search results rendered for the LLM should show coordinate IDs for fires."""
+        data = {
+            "firms_fires": [
+                {"lat": 34.1, "lng": -118.2, "frp": 50, "confidence": "high",
+                 "acq_date": "2026-03-28", "daynight": "D"},
+            ]
+        }
+        result = search_entities("2026-03-28", data)
+        assert "firms_fires" in result
+        # The compact output must have a coordinate-based id
+        assert result["firms_fires"][0].get("id") == "34.1,-118.2"

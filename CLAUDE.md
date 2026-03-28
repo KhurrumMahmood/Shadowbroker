@@ -233,6 +233,20 @@ The `/simplify` skill can also be used for targeted simplification of specific f
 
 Run tests after each stage.
 
+## Autonomous Loop Work (Ralph Wiggum)
+
+For complex, multi-iteration tasks, use the Ralph Wiggum technique (`/ralph-loop:ralph-loop`). Key rules:
+- **One task per loop** — never combine multiple concerns
+- **Always use a progress file** — read it first every iteration, append results after
+- **Cap iterations** — start with 10-20, increase only if demonstrating progress
+- **Wire in feedback** — tests, type checks, linters must all pass before completion promise
+- **Never weaken tests** — if tempted, stop and rethink the approach
+- **Circuit-breaker at 3 failures** — after 3 attempts at the same problem, change strategy entirely
+- **Scope narrowly for this project** — ShadowBroker's 19 feeds + cross-stack architecture breaks wide loops; chain small loops instead
+- **Human leads architecture** — Ralph implements within a design, doesn't create the design
+
+Full reference: `memory/reference_ralph_wiggum.md` | Self-analysis: `memory/feedback_ralph_lessons.md`
+
 ## Related Docs
 
 - `docs/voice.md` — Voice communication architecture, hooks, design decisions, costs

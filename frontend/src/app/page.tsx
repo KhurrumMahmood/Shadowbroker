@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import dynamic from 'next/dynamic';
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import WorldviewLeftPanel from "@/components/WorldviewLeftPanel";
+import LayerSearchPane from "@/components/map/LayerSearchPane";
 
 import NewsFeed from "@/components/NewsFeed";
 import MarketsPanel from "@/components/MarketsPanel";
@@ -213,11 +214,25 @@ export default function Dashboard() {
   // AI assistant
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [intelFeedOpen, setIntelFeedOpen] = useState(false);
+  const [topPanelId, setTopPanelId] = useState<'brief' | 'intel' | 'ai' | null>(null);
   const [intelAlertCount, setIntelAlertCount] = useState(0);
   const [briefOpen, setBriefOpen] = useState(false);
   const [briefData, setBriefData] = useState<BriefData | null>(null);
   const [briefLoading, setBriefLoading] = useState(false);
   const viewBoundsRef = useRef<{ south: number; west: number; north: number; east: number } | null>(null);
+  const [viewBounds, setViewBounds] = useState<{ south: number; west: number; north: number; east: number } | null>(null);
+  const [focusMode, setFocusMode] = useState(false);
+
+  // Only update viewBounds state when values actually change (avoids no-op re-renders during drag)
+  const handleViewBoundsChange = useCallback((b: { south: number; west: number; north: number; east: number }) => {
+    setViewBounds((prev) => {
+      if (prev && prev.south === b.south && prev.west === b.west && prev.north === b.north && prev.east === b.east) return prev;
+      return b;
+    });
+  }, []);
+
+  // Layer search pane state
+  const [layerSearch, setLayerSearch] = useState<{ layerId: string; layerName: string } | null>(null);
 
   // Eavesdrop Mode State
   const [isEavesdropping, setIsEavesdropping] = useState(false);
@@ -282,6 +297,7 @@ export default function Dashboard() {
           boxSelectMode={boxSelectMode}
           onBoxSelectResult={(result) => { setBoxSelectResult(result); setBoxSelectMode(false); }}
           viewBoundsRef={viewBoundsRef}
+          onViewBoundsChange={handleViewBoundsChange}
           aiResultIdSet={aiCycler.state.resultIdSet}
         />
       </ErrorBoundary>
@@ -330,7 +346,7 @@ export default function Dashboard() {
           >
             {/* LEFT PANEL - DATA LAYERS */}
             <ErrorBoundary name="WorldviewLeftPanel">
-              <WorldviewLeftPanel data={data} activeLayers={activeLayers} setActiveLayers={handleManualLayerToggle} activePreset={activePreset} onPresetSelect={handlePresetSelect} cyclerState={cycler.state} onCycleStart={cycler.startCycling} onCycleNext={cycler.next} onCyclePrev={cycler.prev} onSettingsClick={() => setSettingsOpen(true)} onLegendClick={() => setLegendOpen(true)} gibsDate={gibsDate} setGibsDate={setGibsDate} gibsOpacity={gibsOpacity} setGibsOpacity={setGibsOpacity} onEntityClick={setSelectedEntity} onFlyTo={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} trackedSdr={trackedSdr} setTrackedSdr={setTrackedSdr} />
+              <WorldviewLeftPanel data={data} activeLayers={activeLayers} setActiveLayers={handleManualLayerToggle} activePreset={activePreset} onPresetSelect={handlePresetSelect} cyclerState={cycler.state} onCycleStart={cycler.startCycling} onCycleNext={cycler.next} onCyclePrev={cycler.prev} onSettingsClick={() => setSettingsOpen(true)} onLegendClick={() => setLegendOpen(true)} gibsDate={gibsDate} setGibsDate={setGibsDate} gibsOpacity={gibsOpacity} setGibsOpacity={setGibsOpacity} onEntityClick={setSelectedEntity} onFlyTo={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} trackedSdr={trackedSdr} setTrackedSdr={setTrackedSdr} focusMode={focusMode} setFocusMode={setFocusMode} viewBounds={viewBounds} onLayerSearch={(layerId, layerName) => setLayerSearch({ layerId, layerName })} />
             </ErrorBoundary>
           </motion.div>
 
@@ -349,6 +365,21 @@ export default function Dashboard() {
               <span className="text-[7px] font-mono tracking-[0.2em] font-bold text-black" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>LAYERS</span>
             </button>
           </motion.div>
+
+          {/* LAYER SEARCH PANE */}
+          <AnimatePresence>
+            {layerSearch && (
+              <LayerSearchPane
+                key={layerSearch.layerId}
+                layerId={layerSearch.layerId}
+                layerName={layerSearch.layerName}
+                data={data}
+                onFlyTo={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })}
+                onEntityClick={setSelectedEntity}
+                onClose={() => setLayerSearch(null)}
+              />
+            )}
+          </AnimatePresence>
 
           {/* RIGHT SIDEBAR TOGGLE TAB */}
           <motion.div
@@ -543,6 +574,8 @@ export default function Dashboard() {
       <AIAssistantPanel
         isOpen={aiPanelOpen}
         onClose={() => setAiPanelOpen(false)}
+        isTop={topPanelId === 'ai'}
+        onBringToFront={() => setTopPanelId('ai')}
         onApplyLayers={(layers) => {
           setActiveLayers((prev) => ({ ...prev, ...layers }));
           setActivePreset(null);
@@ -570,7 +603,7 @@ export default function Dashboard() {
       {/* Floating AI button — double-border ring for visual separation from HUD */}
       <div
         className={`
-          fixed bottom-5 right-5 z-[601]
+          fixed bottom-5 right-5 ${topPanelId === 'ai' ? 'z-[701]' : 'z-[601]'}
           w-[56px] h-[56px] rounded-xl
           flex items-center justify-center
           border transition-all duration-200
@@ -607,6 +640,8 @@ export default function Dashboard() {
         onFlyTo={(lat, lng, zoom) => setFlyToLocation({ lat, lng, zoom, ts: Date.now() })}
         alertCount={intelAlertCount}
         onAlertCountChange={setIntelAlertCount}
+        isTop={topPanelId === 'intel'}
+        onBringToFront={() => setTopPanelId('intel')}
       />
 
       {/* VIEWPORT BRIEFING PANEL */}
@@ -615,6 +650,8 @@ export default function Dashboard() {
           data={briefData}
           loading={briefLoading}
           onClose={() => setBriefOpen(false)}
+          isTop={topPanelId === 'brief'}
+          onBringToFront={() => setTopPanelId('brief')}
           onEntityClick={(entity) => {
             const found = findEntityInData(entity.type, entity.id, data);
             if (found) {

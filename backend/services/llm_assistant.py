@@ -371,8 +371,8 @@ FIELD RULES:
 - "viewport": fly the map to a location. null = don't move. Zoom 2=global, 5-7=region, 8-10=city, 12-14=local.
 - "highlight_entities": legacy single-highlight field. Prefer result_entities for lists.
 - "result_entities": a browsable result set (max 50). The frontend displays these with prev/next navigation. \
-Use the EXACT id values from the SEARCH RESULTS section above. This is the primary way to show the user \
-a list of matching entities they can cycle through.
+Use the EXACT id values from the SEARCH RESULTS section above. ID formats: flights use icao24, ships use mmsi, \
+fires/GDELT use coordinate ids (e.g. "26.5,56.3"). Omit entities if you don't have a valid id from search results.
 - "filters": set data filters to narrow what's displayed. null = don't change, {{}} = clear all filters. \
 Available filter keys: {', '.join(_FILTER_KEYS)}
 
@@ -581,6 +581,7 @@ _SEARCH_CONFIG = {
             "count": (g.get("properties") or {}).get("count", 0),
             "lat": ((g.get("geometry") or {}).get("coordinates") or [0, 0])[1],
             "lng": ((g.get("geometry") or {}).get("coordinates") or [0, 0])[0],
+            "id": f"{((g.get('geometry') or {}).get('coordinates') or [0, 0])[1]},{((g.get('geometry') or {}).get('coordinates') or [0, 0])[0]}",
         },
         "search_extract": lambda g: {
             "name": (g.get("properties") or {}).get("name", ""),
@@ -595,6 +596,7 @@ _SEARCH_CONFIG = {
             "frp": f.get("frp", 0),
             "confidence": f.get("confidence", ""),
             "acq_date": f.get("acq_date", ""),
+            "id": f"{f.get('lat')},{f.get('lng')}",
         },
     },
     "disease_outbreaks": {
@@ -1223,13 +1225,19 @@ def parse_llm_response(raw: str) -> dict:
     if layers and isinstance(layers, dict):
         result["layers"] = {k: bool(v) for k, v in layers.items() if k in _LAYER_NAMES}
 
-    # Validate result_entities — max 50, must have type and id
+    # Validate result_entities — max 50, must have type and id, must be searchable
+    _searchable_entity_types = {v["entity_type"] for v in _SEARCH_CONFIG.values()}
+    _searchable_data_keys = set(_SEARCH_CONFIG.keys())
     re_list = result.get("result_entities")
     if isinstance(re_list, list):
         validated = []
         for e in re_list[:50]:
             if isinstance(e, dict) and "type" in e and "id" in e:
-                validated.append({"type": str(e["type"]), "id": e["id"]})
+                etype = str(e["type"])
+                # Filter out types the LLM can't have valid IDs for
+                if etype not in _searchable_entity_types and etype not in _searchable_data_keys:
+                    continue
+                validated.append({"type": etype, "id": e["id"]})
         result["result_entities"] = validated
     else:
         result["result_entities"] = []

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Send, Bot, User, Loader2, ChevronLeft, ChevronRight, XCircle, Plus, Trash2, ArrowLeft, Zap, Layers, Radio, Settings2 } from "lucide-react";
+import { X, Send, Bot, User, Loader2, ChevronLeft, ChevronRight, XCircle, Plus, Trash2, ArrowLeft, Zap, Layers, Radio, Settings2, MapPin, Filter, Search } from "lucide-react";
 import { validateAssistantResponse, extractStoredAction } from "@/lib/assistantTypes";
 import type { DashboardData } from "@/types/dashboard";
 import type { AIResultState } from "@/hooks/useAIResultCycler";
@@ -160,6 +160,8 @@ interface AIAssistantPanelProps {
   onAIResultClear?: () => void;
   viewport?: { south: number; west: number; north: number; east: number } | null;
   data: DashboardData;
+  isTop?: boolean;
+  onBringToFront?: () => void;
 }
 
 export default function AIAssistantPanel({
@@ -176,6 +178,8 @@ export default function AIAssistantPanel({
   onAIResultClear,
   viewport,
   data,
+  isTop,
+  onBringToFront,
 }: AIAssistantPanelProps) {
   const [messages, setMessages] = useState<StoredMessage[]>([]);
   const [input, setInput] = useState("");
@@ -184,6 +188,7 @@ export default function AIAssistantPanel({
   const [mode, setMode] = useState<PanelMode>("chat");
   const [conversationId, setConversationId] = useState<string>(generateId);
   const [flashEntity, setFlashEntity] = useState<string | null>(null);
+  const [resultFeedback, setResultFeedback] = useState<string | null>(null);
   const [expandedReasoning, setExpandedReasoning] = useState<Set<number>>(new Set());
   const [prevMode, setPrevMode] = useState<PanelMode>("chat");
   const [activeArtifact, setActiveArtifact] = useState<{ id: string; title?: string; registryName?: string; version?: number; type?: "html" | "react"; useDummyData?: boolean } | null>(null);
@@ -531,7 +536,7 @@ export default function AIAssistantPanel({
   if (!isOpen) return null;
 
   const chipClass =
-    "text-[9px] font-mono px-2 py-0.5 rounded border border-cyan-800/40 text-cyan-400 hover:bg-cyan-950/30 cursor-pointer transition-colors inline-flex items-center gap-1";
+    "text-[10px] font-mono px-2 py-1 rounded border border-cyan-600/60 text-cyan-400 hover:bg-cyan-950/40 cursor-pointer transition-all inline-flex items-center gap-1 animate-[chip-in_0.3s_ease-out]";
 
   const formatLayerLabel = (layers: Record<string, boolean>) => {
     const on = Object.entries(layers).filter(([, v]) => v).map(([k]) => k.replace(/_/g, " ").toUpperCase());
@@ -540,52 +545,78 @@ export default function AIAssistantPanel({
     return `${on.length} LAYERS ON`;
   };
 
-  const renderCoreChips = (action: StoredAction) => (
-    <>
-      {action.viewport && (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onFlyTo(action.viewport!.lat, action.viewport!.lng, action.viewport!.zoom); }}
-          className={chipClass}
-        >
-          {action.viewport_label ? `GO TO ${action.viewport_label.toUpperCase()}` : `FLY TO ${action.viewport.lat.toFixed(1)}, ${action.viewport.lng.toFixed(1)}`}
-        </button>
-      )}
-      {action.layers && (() => {
-        const entries = Object.entries(action.layers!);
-        return <>
-          {entries.length > 3 && (
-            <button type="button" onClick={(e) => { e.stopPropagation(); onApplyLayers(action.layers!); }} className={chipClass}>
-              {formatLayerLabel(action.layers!)}
+  const renderCoreChips = (action: StoredAction) => {
+    const hasChips = action.viewport || action.layers || action.filters || (action.result_entities && action.result_entities.length > 0);
+    if (!hasChips) return null;
+    return (
+      <>
+        {action.viewport && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onFlyTo(action.viewport!.lat, action.viewport!.lng, action.viewport!.zoom); }}
+            className={chipClass}
+          >
+            <MapPin size={9} />
+            {action.viewport_label ? `GO TO ${action.viewport_label.toUpperCase()}` : `FLY TO ${action.viewport.lat.toFixed(1)}, ${action.viewport.lng.toFixed(1)}`}
+          </button>
+        )}
+        {action.layers && (() => {
+          const entries = Object.entries(action.layers!);
+          return <>
+            {entries.length > 3 && (
+              <button type="button" onClick={(e) => { e.stopPropagation(); onApplyLayers(action.layers!); }} className={chipClass}>
+                <Layers size={9} />
+                {formatLayerLabel(action.layers!)}
+              </button>
+            )}
+            {entries.map(([key, enabled]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onApplyLayers({ [key]: enabled }); }}
+                className={`${chipClass} ${enabled ? "border-green-600/60 text-green-400" : "border-red-700/60 text-red-400"}`}
+              >
+                <Layers size={9} />
+                {LAYER_LABELS[key] || key.replace(/_/g, " ").toUpperCase()} {enabled ? "ON" : "OFF"}
+              </button>
+            ))}
+          </>;
+        })()}
+        {action.filters && (
+          <button type="button" onClick={(e) => { e.stopPropagation(); onApplyFilters?.(action.filters!); }} className={chipClass}>
+            <Filter size={9} />
+            {Object.keys(action.filters).length === 0 ? "CLEAR FILTERS" : "APPLY FILTERS"}
+          </button>
+        )}
+        {action.result_entities && action.result_entities.length > 0 && (
+          <span className="inline-flex flex-col items-start gap-0.5">
+            <button type="button" onClick={(e) => {
+              e.stopPropagation();
+              onSetAIResults?.(action.result_entities!);
+              // Check resolution after a tick (state updates async)
+              setTimeout(() => {
+                if (aiResultState?.noneResolved) {
+                  setResultFeedback("0 matched — data may have changed");
+                  setTimeout(() => setResultFeedback(null), 3000);
+                }
+              }, 50);
+            }} className={chipClass}>
+              <Search size={9} />
+              SHOW {action.result_entities.length} RESULTS
             </button>
-          )}
-          {entries.map(([key, enabled]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onApplyLayers({ [key]: enabled }); }}
-              className={`${chipClass} ${enabled ? "border-green-700/50 text-green-400" : "border-red-800/50 text-red-400"}`}
-            >
-              {LAYER_LABELS[key] || key.replace(/_/g, " ").toUpperCase()} {enabled ? "ON" : "OFF"}
-            </button>
-          ))}
-        </>;
-      })()}
-      {action.filters && (
-        <button type="button" onClick={(e) => { e.stopPropagation(); onApplyFilters?.(action.filters!); }} className={chipClass}>
-          {Object.keys(action.filters).length === 0 ? "CLEAR FILTERS" : "APPLY FILTERS"}
-        </button>
-      )}
-      {action.result_entities && action.result_entities.length > 0 && (
-        <button type="button" onClick={(e) => { e.stopPropagation(); onSetAIResults?.(action.result_entities!); }} className={chipClass}>
-          SHOW {action.result_entities.length} RESULTS
-        </button>
-      )}
-    </>
-  );
+            {resultFeedback && (
+              <span className="text-[8px] text-amber-400 font-mono">{resultFeedback}</span>
+            )}
+          </span>
+        )}
+      </>
+    );
+  };
 
   const renderChatActionChips = (action: StoredAction) => (
-    <div className="mt-1.5 pt-1.5 border-t border-cyan-800/30 flex flex-wrap gap-1">
+    <div className="mt-1.5 pt-1.5 border-t border-cyan-800/30">
+      <div className="text-[8px] font-mono text-cyan-600/80 tracking-[0.15em] mb-1">[ACTIONS]</div>
+      <div className="flex flex-wrap gap-1">
       {renderCoreChips(action)}
       {action.highlight_entities?.map((e, i) => {
         const key = `${e.type}:${e.id}`;
@@ -600,6 +631,7 @@ export default function AIAssistantPanel({
           </button>
         );
       })}
+      </div>
     </div>
   );
 
@@ -628,7 +660,8 @@ export default function AIAssistantPanel({
         y: { duration: 0.2 },
         width: { type: "spring", stiffness: 300, damping: 30 },
       }}
-      className="fixed bottom-20 right-6 z-[600] pointer-events-auto max-w-[calc(100vw-3rem)]"
+      onMouseDown={onBringToFront}
+      className={`fixed bottom-20 right-6 ${isTop ? 'z-[700]' : 'z-[600]'} pointer-events-auto max-w-[calc(100vw-3rem)]`}
     >
       <div className="bg-black/90 backdrop-blur-md border border-cyan-800/60 rounded-xl shadow-[0_4px_30px_rgba(0,0,0,0.5)] flex flex-row h-[600px] overflow-hidden">
         {/* LEFT: Artifact pane (only when active) */}

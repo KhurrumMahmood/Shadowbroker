@@ -1,32 +1,32 @@
 // --- SVG icon data URIs for all map markers ---
 // Extracted from MaplibreViewer.tsx — pure data, no JSX
 
-export const svgPlaneCyan = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="cyan" stroke="black"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /></svg>`)}`;
-export const svgPlaneYellow = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="yellow" stroke="black"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /></svg>`)}`;
-export const svgPlaneOrange = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#FF8C00" stroke="black"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /></svg>`)}`;
-export const svgPlanePurple = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#9B59B6" stroke="black"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /></svg>`)}`;
-export const svgFighter = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="yellow" stroke="black"><path d="M12 2L14 8L18 10L14 16L15 22L12 20L9 22L10 16L6 10L10 8L12 2Z"/></svg>`)}`;
-export const svgHeli = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="yellow" stroke="black"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="black" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
-export const svgHeliCyan = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="cyan" stroke="black"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="cyan" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
-export const svgHeliOrange = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#FF8C00" stroke="black"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="#FF8C00" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
-export const svgHeliPurple = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#9B59B6" stroke="black"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="#9B59B6" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
-export const svgTanker = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="yellow" stroke="black"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /><line x1="12" y1="20" x2="12" y2="24" stroke="yellow" stroke-width="2" /></svg>`)}`;
-export const svgRecon = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="yellow" stroke="black"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /><ellipse cx="12" cy="11" rx="5" ry="3" fill="none" stroke="red" stroke-width="1.5"/></svg>`)}`;
-export const svgPlanePink = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="#FF1493" stroke="black"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /></svg>`)}`;
-export const svgPlaneAlertRed = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="#FF2020" stroke="black"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /></svg>`)}`;
-export const svgPlaneDarkBlue = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="#1A3A8A" stroke="#4A80D0"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /></svg>`)}`;
-export const svgPlaneWhiteAlert = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="white" stroke="#ff0000" stroke-width="2"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /></svg>`)}`;
-export const svgHeliPink = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="#FF1493" stroke="black"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="#FF1493" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
-export const svgHeliAlertRed = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="#ff0000" stroke="black"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="#ff0000" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
-export const svgHeliDarkBlue = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="#000080" stroke="#4A80D0"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="#4A80D0" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
-export const svgHeliBlue = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="#3b82f6" stroke="black"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="#3b82f6" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
-export const svgHeliLime = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="#32CD32" stroke="black"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="#32CD32" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
-export const svgHeliWhiteAlert = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="white" stroke="#666"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="#999" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
-export const svgPlaneBlack = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#222" stroke="#444"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /></svg>`)}`;
-export const svgHeliBlack = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#222" stroke="#444"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="#444" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
+export const svgPlaneCyan = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="cyan" stroke="black"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /></svg>`)}`;
+export const svgPlaneYellow = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="yellow" stroke="black"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /></svg>`)}`;
+export const svgPlaneOrange = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="#FF8C00" stroke="black"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /></svg>`)}`;
+export const svgPlanePurple = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="#9B59B6" stroke="black"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /></svg>`)}`;
+export const svgFighter = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="yellow" stroke="black"><path d="M12 2L14 8L18 10L14 16L15 22L12 20L9 22L10 16L6 10L10 8L12 2Z"/></svg>`)}`;
+export const svgHeli = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="yellow" stroke="black"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="black" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
+export const svgHeliCyan = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="cyan" stroke="black"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="cyan" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
+export const svgHeliOrange = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="#FF8C00" stroke="black"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="#FF8C00" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
+export const svgHeliPurple = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="#9B59B6" stroke="black"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="#9B59B6" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
+export const svgTanker = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="yellow" stroke="black"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /><line x1="12" y1="20" x2="12" y2="24" stroke="yellow" stroke-width="2" /></svg>`)}`;
+export const svgRecon = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="yellow" stroke="black"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /><ellipse cx="12" cy="11" rx="5" ry="3" fill="none" stroke="red" stroke-width="1.5"/></svg>`)}`;
+export const svgPlanePink = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="#FF1493" stroke="black"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /></svg>`)}`;
+export const svgPlaneAlertRed = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="#FF2020" stroke="black"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /></svg>`)}`;
+export const svgPlaneDarkBlue = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="#1A3A8A" stroke="#4A80D0"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /></svg>`)}`;
+export const svgPlaneWhiteAlert = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="white" stroke="#ff0000" stroke-width="2"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /></svg>`)}`;
+export const svgHeliPink = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="#FF1493" stroke="black"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="#FF1493" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
+export const svgHeliAlertRed = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="#ff0000" stroke="black"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="#ff0000" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
+export const svgHeliDarkBlue = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="#000080" stroke="#4A80D0"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="#4A80D0" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
+export const svgHeliBlue = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="#3b82f6" stroke="black"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="#3b82f6" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
+export const svgHeliLime = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="#32CD32" stroke="black"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="#32CD32" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
+export const svgHeliWhiteAlert = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="white" stroke="#666"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="#999" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
+export const svgPlaneBlack = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="#222" stroke="#444"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /></svg>`)}`;
+export const svgHeliBlack = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="#222" stroke="#444"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="#444" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
 // Top-down quadcopter: elongated body + 4 rotor circles on arms (inspired by Recraft drone-1.svg)
 export const svgDrone = `data:image/svg+xml;utf8,${encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24">` +
     `<line x1="10" y1="10" x2="6" y2="6" stroke="#333" stroke-width="1.2"/>` +
     `<line x1="14" y1="10" x2="18" y2="6" stroke="#333" stroke-width="1.2"/>` +
     `<line x1="10" y1="14" x2="6" y2="18" stroke="#333" stroke-width="1.2"/>` +
@@ -38,29 +38,29 @@ export const svgDrone = `data:image/svg+xml;utf8,${encodeURIComponent(
     `<ellipse cx="12" cy="12" rx="2.5" ry="5" fill="orange" stroke="#333" stroke-width="0.8"/>` +
     `</svg>`
 )}`;
-export const svgPowerPlant = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="#78350f" stroke="#f59e0b" stroke-linejoin="round" stroke-linecap="round"/></svg>`)}`;
-export const svgDataCenter = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="1.5"><rect x="3" y="3" width="18" height="6" rx="1" fill="#2e1065"/><rect x="3" y="11" width="18" height="6" rx="1" fill="#2e1065"/><circle cx="7" cy="6" r="1" fill="#a78bfa"/><circle cx="7" cy="14" r="1" fill="#a78bfa"/><line x1="11" y1="6" x2="17" y2="6" stroke="#a78bfa" stroke-width="1"/><line x1="11" y1="14" x2="17" y2="14" stroke="#a78bfa" stroke-width="1"/><line x1="12" y1="19" x2="12" y2="22" stroke="#a78bfa" stroke-width="1.5"/></svg>`)}`;
-export const svgShipGray = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="12" height="24" viewBox="0 0 24 24" fill="none"><path d="M6 20 L6 8 L12 2 L18 8 L18 20 C18 22 6 22 6 20 Z" fill="gray" stroke="#000" stroke-width="1"/><polygon points="12,6 16,16 8,16" fill="#fff" stroke="#000" stroke-width="1"/></svg>`)}`;
-export const svgShipRed = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="32" viewBox="0 0 24 24" fill="none"><path d="M6 22 L6 6 L12 2 L18 6 L18 22 Z" fill="#ff2222" stroke="#000" stroke-width="1"/><rect x="8" y="15" width="8" height="4" fill="#880000" stroke="#000" stroke-width="1"/><rect x="8" y="7" width="8" height="6" fill="#444" stroke="#000" stroke-width="1"/></svg>`)}`;
-export const svgShipYellow = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="14" height="34" viewBox="0 0 24 24" fill="none"><path d="M7 22 L7 6 L12 1 L17 6 L17 22 Z" fill="yellow" stroke="#000" stroke-width="1"/><rect x="9" y="8" width="6" height="8" fill="#555" stroke="#000" stroke-width="1"/><circle cx="12" cy="18" r="1.5" fill="#000"/><line x1="12" y1="18" x2="12" y2="24" stroke="#000" stroke-width="1.5"/></svg>`)}`;
-export const svgShipBlue = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="32" viewBox="0 0 24 24" fill="none"><path d="M6 22 L6 6 L12 2 L18 6 L18 22 Z" fill="#3b82f6" stroke="#000" stroke-width="1"/></svg>`)}`;
-export const svgShipWhite = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="36" viewBox="0 0 24 24" fill="none"><path d="M5 21 L5 8 L12 2 L19 8 L19 21 C19 23 5 23 5 21 Z" fill="white" stroke="#000" stroke-width="1"/><rect x="7" y="10" width="10" height="8" fill="#90cdf4" stroke="#000" stroke-width="1"/><circle cx="12" cy="14" r="2" fill="yellow" stroke="#000"/></svg>`)}`;
-export const svgShipPink = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="36" viewBox="0 0 24 24" fill="none"><path d="M5 21 L5 8 L12 2 L19 8 L19 21 C19 23 5 23 5 21 Z" fill="#FF69B4" stroke="#000" stroke-width="1"/><rect x="7" y="10" width="10" height="8" fill="#ff8dc7" stroke="#000" stroke-width="1"/><circle cx="12" cy="14" r="2" fill="white" stroke="#000"/></svg>`)}`;
+export const svgPowerPlant = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="#78350f" stroke="#f59e0b" stroke-linejoin="round" stroke-linecap="round"/></svg>`)}`;
+export const svgDataCenter = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="1.5"><rect x="3" y="3" width="18" height="6" rx="1" fill="#2e1065"/><rect x="3" y="11" width="18" height="6" rx="1" fill="#2e1065"/><circle cx="7" cy="6" r="1" fill="#a78bfa"/><circle cx="7" cy="14" r="1" fill="#a78bfa"/><line x1="11" y1="6" x2="17" y2="6" stroke="#a78bfa" stroke-width="1"/><line x1="11" y1="14" x2="17" y2="14" stroke="#a78bfa" stroke-width="1"/><line x1="12" y1="19" x2="12" y2="22" stroke="#a78bfa" stroke-width="1.5"/></svg>`)}`;
+export const svgShipGray = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="36" viewBox="0 0 24 24" fill="none"><path d="M6 20 L6 8 L12 2 L18 8 L18 20 C18 22 6 22 6 20 Z" fill="gray" stroke="#000" stroke-width="1"/><polygon points="12,6 16,16 8,16" fill="#fff" stroke="#000" stroke-width="1"/></svg>`)}`;
+export const svgShipRed = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="40" viewBox="0 0 24 24" fill="none"><path d="M6 22 L6 6 L12 2 L18 6 L18 22 Z" fill="#ff2222" stroke="#000" stroke-width="1"/><rect x="8" y="15" width="8" height="4" fill="#880000" stroke="#000" stroke-width="1"/><rect x="8" y="7" width="8" height="6" fill="#444" stroke="#000" stroke-width="1"/></svg>`)}`;
+export const svgShipYellow = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="42" viewBox="0 0 24 24" fill="none"><path d="M7 22 L7 6 L12 1 L17 6 L17 22 Z" fill="yellow" stroke="#000" stroke-width="1"/><rect x="9" y="8" width="6" height="8" fill="#555" stroke="#000" stroke-width="1"/><circle cx="12" cy="18" r="1.5" fill="#000"/><line x1="12" y1="18" x2="12" y2="24" stroke="#000" stroke-width="1.5"/></svg>`)}`;
+export const svgShipBlue = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="40" viewBox="0 0 24 24" fill="none"><path d="M6 22 L6 6 L12 2 L18 6 L18 22 Z" fill="#3b82f6" stroke="#000" stroke-width="1"/></svg>`)}`;
+export const svgShipWhite = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="22" height="44" viewBox="0 0 24 24" fill="none"><path d="M5 21 L5 8 L12 2 L19 8 L19 21 C19 23 5 23 5 21 Z" fill="white" stroke="#000" stroke-width="1"/><rect x="7" y="10" width="10" height="8" fill="#90cdf4" stroke="#000" stroke-width="1"/><circle cx="12" cy="14" r="2" fill="yellow" stroke="#000"/></svg>`)}`;
+export const svgShipPink = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="22" height="44" viewBox="0 0 24 24" fill="none"><path d="M5 21 L5 8 L12 2 L19 8 L19 21 C19 23 5 23 5 21 Z" fill="#FF69B4" stroke="#000" stroke-width="1"/><rect x="7" y="10" width="10" height="8" fill="#ff8dc7" stroke="#000" stroke-width="1"/><circle cx="12" cy="14" r="2" fill="white" stroke="#000"/></svg>`)}`;
 // Top-down carrier: pointed bow, wide stern, flight deck stripes + island (inspired by Recraft aircraft-carrier-2.svg)
 export const svgCarrier = `data:image/svg+xml;utf8,${encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 22 22">` +
     `<path d="M11 2 L4 8 L3 18 L4 21 L18 21 L19 18 L18 8 Z" fill="#555" stroke="#333" stroke-width="0.8"/>` +
     `<rect x="6" y="10" width="10" height="2" fill="#ff8c00" opacity="0.7"/>` +
     `<rect x="5" y="14" width="12" height="2" fill="#ff8c00" opacity="0.7"/>` +
     `<rect x="15" y="8" width="2" height="4" fill="#888" stroke="#333" stroke-width="0.5"/>` +
     `</svg>`
 )}`;
-export const svgCctv = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="cyan" stroke-width="2"><path d="M16.75 12h3.632a1 1 0 0 1 .894 1.447l-2.034 4.069a1 1 0 0 1-.894.553H5.652a1 1 0 0 1-.894-.553L2.724 13.447A1 1 0 0 1 3.618 12h3.632M14 12V8a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v4a4 4 0 1 0 8 0Z" /></svg>`)}`;
-export const svgRadioTower = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.5"><line x1="12" y1="10" x2="12" y2="23" stroke="#f59e0b" stroke-width="2"/><line x1="8" y1="23" x2="16" y2="23" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/><line x1="9" y1="16" x2="15" y2="16" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="9" r="2" fill="#f59e0b" stroke="none"/><path d="M8 6a5.5 5.5 0 0 1 8 0" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round"/><path d="M5.5 3.5a9 9 0 0 1 13 0" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/></svg>`)}`;
-export const svgWarning = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="yellow" stroke="black"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>`)}`;
+export const svgCctv = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="cyan" stroke-width="2"><path d="M16.75 12h3.632a1 1 0 0 1 .894 1.447l-2.034 4.069a1 1 0 0 1-.894.553H5.652a1 1 0 0 1-.894-.553L2.724 13.447A1 1 0 0 1 3.618 12h3.632M14 12V8a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v4a4 4 0 1 0 8 0Z" /></svg>`)}`;
+export const svgRadioTower = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.5"><line x1="12" y1="10" x2="12" y2="23" stroke="#f59e0b" stroke-width="2"/><line x1="8" y1="23" x2="16" y2="23" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/><line x1="9" y1="16" x2="15" y2="16" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="9" r="2" fill="#f59e0b" stroke="none"/><path d="M8 6a5.5 5.5 0 0 1 8 0" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round"/><path d="M5.5 3.5a9 9 0 0 1 13 0" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/></svg>`)}`;
+export const svgWarning = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="yellow" stroke="black"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>`)}`;
 export const svgThreat = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="#ffff00" stroke="#ff0000" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>`)}`;
-export const svgTriangleYellow = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#ffaa00" stroke="#000" stroke-width="1"><path d="M1 21h22L12 2 1 21z"/></svg>`)}`;
-export const svgTriangleRed = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#ff0000" stroke="#fff" stroke-width="1"><path d="M1 21h22L12 2 1 21z"/></svg>`)}`;
+export const svgTriangleYellow = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="#ffaa00" stroke="#000" stroke-width="1"><path d="M1 21h22L12 2 1 21z"/></svg>`)}`;
+export const svgTriangleRed = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="#ff0000" stroke="#fff" stroke-width="1"><path d="M1 21h22L12 2 1 21z"/></svg>`)}`;
 
 // --- Aircraft type-specific SVG paths (top-down silhouettes) ---
 // Airliner: wide swept wings with engine pods, narrow fuselage
@@ -96,7 +96,7 @@ export const svgFireClusterMed = makeFireSvg('#ff3300', '#ff8800', 40);
 export const svgFireClusterLarge = makeFireSvg('#cc0000', '#ff3300', 48);
 export const svgFireClusterXL = makeFireSvg('#880000', '#cc0000', 56);
 
-export function makeAircraftSvg(type: 'airliner' | 'turboprop' | 'bizjet' | 'generic', fill: string, stroke = 'black', size = 20) {
+export function makeAircraftSvg(type: 'airliner' | 'turboprop' | 'bizjet' | 'generic', fill: string, stroke = 'black', size = 28) {
     const paths: Record<string, string> = { airliner: AIRLINER_PATH, turboprop: TURBOPROP_PATH, bizjet: BIZJET_PATH, generic: "M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" };
     const p = paths[type] || paths.generic;
     // Airliner gets engine pod circles
@@ -121,43 +121,43 @@ export const svgAirlinerCyan = makeAircraftSvg('airliner', 'cyan');
 export const svgAirlinerOrange = makeAircraftSvg('airliner', '#FF8C00');
 export const svgAirlinerPurple = makeAircraftSvg('airliner', '#9B59B6');
 export const svgAirlinerYellow = makeAircraftSvg('airliner', 'yellow');
-export const svgAirlinerPink = makeAircraftSvg('airliner', '#FF1493', 'black', 22);
-export const svgAirlinerRed = makeAircraftSvg('airliner', '#FF2020', 'black', 22);
-export const svgAirlinerDarkBlue = makeAircraftSvg('airliner', '#1A3A8A', '#4A80D0', 22);
-export const svgAirlinerBlue = makeAircraftSvg('airliner', '#3b82f6', 'black', 22);
-export const svgAirlinerLime = makeAircraftSvg('airliner', '#32CD32', 'black', 22);
-export const svgAirlinerBlack = makeAircraftSvg('airliner', '#222', '#555', 22);
-export const svgAirlinerWhite = makeAircraftSvg('airliner', 'white', '#666', 22);
+export const svgAirlinerPink = makeAircraftSvg('airliner', '#FF1493', 'black', 30);
+export const svgAirlinerRed = makeAircraftSvg('airliner', '#FF2020', 'black', 30);
+export const svgAirlinerDarkBlue = makeAircraftSvg('airliner', '#1A3A8A', '#4A80D0', 30);
+export const svgAirlinerBlue = makeAircraftSvg('airliner', '#3b82f6', 'black', 30);
+export const svgAirlinerLime = makeAircraftSvg('airliner', '#32CD32', 'black', 30);
+export const svgAirlinerBlack = makeAircraftSvg('airliner', '#222', '#555', 30);
+export const svgAirlinerWhite = makeAircraftSvg('airliner', 'white', '#666', 30);
 
 export const svgTurbopropCyan = makeAircraftSvg('turboprop', 'cyan');
 export const svgTurbopropOrange = makeAircraftSvg('turboprop', '#FF8C00');
 export const svgTurbopropPurple = makeAircraftSvg('turboprop', '#9B59B6');
 export const svgTurbopropYellow = makeAircraftSvg('turboprop', 'yellow');
-export const svgTurbopropPink = makeAircraftSvg('turboprop', '#FF1493', 'black', 22);
-export const svgTurbopropRed = makeAircraftSvg('turboprop', '#FF2020', 'black', 22);
-export const svgTurbopropDarkBlue = makeAircraftSvg('turboprop', '#1A3A8A', '#4A80D0', 22);
-export const svgTurbopropBlue = makeAircraftSvg('turboprop', '#3b82f6', 'black', 22);
-export const svgTurbopropLime = makeAircraftSvg('turboprop', '#32CD32', 'black', 22);
-export const svgTurbopropBlack = makeAircraftSvg('turboprop', '#222', '#555', 22);
-export const svgTurbopropWhite = makeAircraftSvg('turboprop', 'white', '#666', 22);
+export const svgTurbopropPink = makeAircraftSvg('turboprop', '#FF1493', 'black', 30);
+export const svgTurbopropRed = makeAircraftSvg('turboprop', '#FF2020', 'black', 30);
+export const svgTurbopropDarkBlue = makeAircraftSvg('turboprop', '#1A3A8A', '#4A80D0', 30);
+export const svgTurbopropBlue = makeAircraftSvg('turboprop', '#3b82f6', 'black', 30);
+export const svgTurbopropLime = makeAircraftSvg('turboprop', '#32CD32', 'black', 30);
+export const svgTurbopropBlack = makeAircraftSvg('turboprop', '#222', '#555', 30);
+export const svgTurbopropWhite = makeAircraftSvg('turboprop', 'white', '#666', 30);
 
 export const svgBizjetCyan = makeAircraftSvg('bizjet', 'cyan');
 export const svgBizjetOrange = makeAircraftSvg('bizjet', '#FF8C00');
 export const svgBizjetPurple = makeAircraftSvg('bizjet', '#9B59B6');
 export const svgBizjetYellow = makeAircraftSvg('bizjet', 'yellow');
-export const svgBizjetPink = makeAircraftSvg('bizjet', '#FF1493', 'black', 22);
-export const svgBizjetRed = makeAircraftSvg('bizjet', '#FF2020', 'black', 22);
-export const svgBizjetDarkBlue = makeAircraftSvg('bizjet', '#1A3A8A', '#4A80D0', 22);
-export const svgBizjetBlue = makeAircraftSvg('bizjet', '#3b82f6', 'black', 22);
-export const svgBizjetLime = makeAircraftSvg('bizjet', '#32CD32', 'black', 22);
-export const svgBizjetBlack = makeAircraftSvg('bizjet', '#222', '#555', 22);
-export const svgBizjetWhite = makeAircraftSvg('bizjet', 'white', '#666', 22);
+export const svgBizjetPink = makeAircraftSvg('bizjet', '#FF1493', 'black', 30);
+export const svgBizjetRed = makeAircraftSvg('bizjet', '#FF2020', 'black', 30);
+export const svgBizjetDarkBlue = makeAircraftSvg('bizjet', '#1A3A8A', '#4A80D0', 30);
+export const svgBizjetBlue = makeAircraftSvg('bizjet', '#3b82f6', 'black', 30);
+export const svgBizjetLime = makeAircraftSvg('bizjet', '#32CD32', 'black', 30);
+export const svgBizjetBlack = makeAircraftSvg('bizjet', '#222', '#555', 30);
+export const svgBizjetWhite = makeAircraftSvg('bizjet', 'white', '#666', 30);
 
 // Grey variants for grounded/parked aircraft (altitude 0)
 export const svgAirlinerGrey = makeAircraftSvg('airliner', '#555', '#333');
 export const svgTurbopropGrey = makeAircraftSvg('turboprop', '#555', '#333');
 export const svgBizjetGrey = makeAircraftSvg('bizjet', '#555', '#333');
-export const svgHeliGrey = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#555" stroke="#333"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="#555" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
+export const svgHeliGrey = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="#555" stroke="#333"><path d="M10 6L10 14L8 16L8 18L10 17L12 22L14 17L16 18L16 16L14 14L14 6C14 4 13 2 12 2C11 2 10 4 10 6Z"/><circle cx="12" cy="12" r="8" fill="none" stroke="#555" stroke-dasharray="2 2" stroke-width="1"/></svg>`)}`;
 
 // Grey icon map for grounded aircraft
 export const GROUNDED_ICON_MAP: Record<string, string> = { heli: 'svgHeliGrey', turboprop: 'svgTurbopropGrey', bizjet: 'svgBizjetGrey', airliner: 'svgAirlinerGrey' };
@@ -209,6 +209,42 @@ export const svgShipClusterSm = makeShipClusterSvg(32);
 export const svgShipClusterMd = makeShipClusterSvg(40);
 export const svgShipClusterLg = makeShipClusterSvg(48);
 export const svgShipClusterXl = makeShipClusterSvg(56);
+
+// ---------------------------------------------------------------------------
+// Entity-type cluster silhouettes — consistent icon+badge clustering for all layers
+// ---------------------------------------------------------------------------
+
+// Lightning bolt (power plant)
+const CLUSTER_POWERPLANT_PATH = 'M1 -10 L-5 0 L-1 0 L-3 10 L5 -2 L1 -2 Z';
+// Server rack (datacenter)
+const CLUSTER_DATACENTER_PATH = 'M-6 -9 L6 -9 L6 9 L-6 9 Z M-4 -7 L4 -7 L4 -3 L-4 -3 Z M-4 -1 L4 -1 L4 3 L-4 3 Z M-3 -6 L-1.5 -6 M-3 0 L-1.5 0';
+// Seismograph zigzag (earthquake)
+const CLUSTER_EARTHQUAKE_PATH = 'M-10 0 L-6 0 L-4 -8 L-1 6 L2 -10 L5 4 L7 -3 L10 0';
+// Camera lens (CCTV)
+const CLUSTER_CCTV_PATH = 'M-8 -4 L-3 -4 L-3 -6 L8 -6 L8 6 L-3 6 L-3 4 L-8 4 Z M4 0 A3 3 0 1 1 4 0.01 Z';
+// Radio tower with signal arcs (KiwiSDR)
+const CLUSTER_RADIO_PATH = 'M0 -10 L0 8 M-4 8 L4 8 M-2 4 L2 4 M0 -10 L0 -8 M-4 -6 A5 5 0 0 1 4 -6 M-7 -8 A8 8 0 0 1 7 -8';
+// Diamond mesh node (meshtastic)
+const CLUSTER_MESH_PATH = 'M0 -10 L8 0 L0 10 L-8 0 Z M0 -5 L4 0 L0 5 L-4 0 Z';
+
+export function makePowerPlantClusterSvg(size: number, color = '#f59e0b'): string {
+    return makeClusterSvg(CLUSTER_POWERPLANT_PATH, size, color, 1.1);
+}
+export function makeDatacenterClusterSvg(size: number, color = '#a78bfa'): string {
+    return makeClusterSvg(CLUSTER_DATACENTER_PATH, size, color, 1.0);
+}
+export function makeEarthquakeClusterSvg(size: number, color = '#ffc800'): string {
+    return makeClusterSvg(CLUSTER_EARTHQUAKE_PATH, size, color, 1.0);
+}
+export function makeCctvClusterSvg(size: number, color = '#22c55e'): string {
+    return makeClusterSvg(CLUSTER_CCTV_PATH, size, color, 0.9);
+}
+export function makeRadioClusterSvg(size: number, color = '#f59e0b'): string {
+    return makeClusterSvg(CLUSTER_RADIO_PATH, size, color, 1.0);
+}
+export function makeMeshClusterSvg(size: number, color = '#14b8a6'): string {
+    return makeClusterSvg(CLUSTER_MESH_PATH, size, color, 1.0);
+}
 
 // ---------------------------------------------------------------------------
 // Differentiated Ship Type SVGs — distinct silhouette per vessel class
@@ -286,12 +322,12 @@ export function makeShipSvg(
 }
 
 // Pre-built ship type SVGs (default palette: dark fill, cyan stroke, steel details)
-export const svgShipCargo = makeShipSvg('cargo', '#3b82f6', '#000', '#1e3a5f', 16, 32);
-export const svgShipTanker = makeShipSvg('tanker', '#3b82f6', '#000', '#1e3a5f', 16, 34);
-export const svgShipMilitary = makeShipSvg('military', '#94a3b8', '#000', '#67e8f9', 14, 34);
-export const svgShipPassenger = makeShipSvg('passenger', 'white', '#000', '#90cdf4', 18, 36);
-export const svgShipYacht = makeShipSvg('yacht', '#f0f0f0', '#000', '#67e8f9', 16, 32);
-export const svgShipCarrier = makeShipSvg('carrier', '#6b7280', '#000', '#f59e0b', 22, 22);
+export const svgShipCargo = makeShipSvg('cargo', '#3b82f6', '#000', '#1e3a5f', 20, 40);
+export const svgShipTanker = makeShipSvg('tanker', '#3b82f6', '#000', '#1e3a5f', 20, 42);
+export const svgShipMilitary = makeShipSvg('military', '#94a3b8', '#000', '#67e8f9', 18, 42);
+export const svgShipPassenger = makeShipSvg('passenger', 'white', '#000', '#90cdf4', 22, 44);
+export const svgShipYacht = makeShipSvg('yacht', '#f0f0f0', '#000', '#67e8f9', 20, 40);
+export const svgShipCarrier = makeShipSvg('carrier', '#6b7280', '#000', '#f59e0b', 28, 28);
 
 // ---------------------------------------------------------------------------
 // GPS Jamming Icon — signal arcs with diagonal slash, red/orange on dark
@@ -315,8 +351,8 @@ export const svgJammingIcon = `data:image/svg+xml;utf8,${encodeURIComponent(
 export const FIGHTER_PATH = "M12 1 L13 5 L13.5 8 L18 11 L20 12 L18 13 L13.5 14 L14 18 L15.5 21 L14 20.5 L12 22 L10 20.5 L8.5 21 L10 18 L10.5 14 L6 13 L4 12 L6 11 L10.5 8 L11 5 Z";
 
 export const svgFighterImproved = `data:image/svg+xml;utf8,${encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="yellow" stroke="black"><path d="${FIGHTER_PATH}"/></svg>`
+    `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="yellow" stroke="black"><path d="${FIGHTER_PATH}"/></svg>`
 )}`;
 export const svgFighterCyan = `data:image/svg+xml;utf8,${encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="cyan" stroke="black"><path d="${FIGHTER_PATH}"/></svg>`
+    `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="cyan" stroke="black"><path d="${FIGHTER_PATH}"/></svg>`
 )}`;

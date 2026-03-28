@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Shield, AlertTriangle, Bell, MapPin } from "lucide-react";
+import { X, Shield, AlertTriangle, Bell, MapPin, ChevronDown, Copy, Check } from "lucide-react";
 
 interface AlertItem {
   id: string;
@@ -14,6 +14,8 @@ interface AlertItem {
   lng: number | null;
   created_at: number;
   significance: number | null;
+  signal_score?: number | null;
+  routine_score?: number | null;
 }
 
 interface IntelFeedPanelProps {
@@ -22,6 +24,8 @@ interface IntelFeedPanelProps {
   onFlyTo?: (lat: number, lng: number, zoom: number) => void;
   alertCount: number;
   onAlertCountChange: (count: number) => void;
+  isTop?: boolean;
+  onBringToFront?: () => void;
 }
 
 const SEVERITY_STYLES = {
@@ -84,12 +88,18 @@ export default function IntelFeedPanel({
   onFlyTo,
   alertCount,
   onAlertCountChange,
+  isTop,
+  onBringToFront,
 }: IntelFeedPanelProps) {
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const dismissedRef = useRef(dismissed);
   dismissedRef.current = dismissed;
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [detailCache, setDetailCache] = useState<Record<string, Record<string, unknown>>>({});
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const fetchAlerts = useCallback(async () => {
     try {
@@ -122,6 +132,28 @@ export default function IntelFeedPanel({
     });
   };
 
+  const toggleExpand = useCallback(async (id: string) => {
+    if (expandedId === id) { setExpandedId(null); return; }
+    setExpandedId(id);
+    if (!detailCache[id]) {
+      setDetailLoading(true);
+      try {
+        const res = await fetch(`/api/alerts/${id}`);
+        if (res.ok) {
+          const detail = await res.json();
+          setDetailCache((prev) => ({ ...prev, [id]: detail.data || {} }));
+        }
+      } catch { /* silent */ }
+      finally { setDetailLoading(false); }
+    }
+  }, [expandedId, detailCache]);
+
+  const handleCopy = useCallback((alert: AlertItem) => {
+    navigator.clipboard.writeText(JSON.stringify(alert, null, 2));
+    setCopiedId(alert.id);
+    setTimeout(() => setCopiedId(null), 1500);
+  }, []);
+
   const visibleAlerts = alerts.filter((a) => !dismissed.has(a.id));
 
   if (!isOpen) return null;
@@ -131,7 +163,8 @@ export default function IntelFeedPanel({
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
-      className="absolute top-20 right-4 z-[500] w-[380px] max-w-[90vw] pointer-events-auto"
+      onMouseDown={onBringToFront}
+      className={`absolute top-20 right-4 ${isTop ? 'z-[700]' : 'z-[500]'} w-[380px] max-w-[90vw] pointer-events-auto`}
     >
       <div className="bg-black/95 backdrop-blur-md border border-cyan-800/60 rounded-xl shadow-[0_4px_30px_rgba(0,0,0,0.6)] flex flex-col max-h-[70vh]">
         {/* Header */}
@@ -179,7 +212,8 @@ export default function IntelFeedPanel({
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, x: 20 }}
-                  className={`rounded-lg border ${style.border} ${style.bg} ${style.glow} p-3`}
+                  className={`rounded-lg border ${style.border} ${style.bg} ${style.glow} p-3 cursor-pointer transition-colors hover:bg-white/[0.03]`}
+                  onClick={() => toggleExpand(alert.id)}
                 >
                   {/* Alert header */}
                   <div className="flex items-start justify-between gap-2 mb-1.5">
@@ -208,14 +242,17 @@ export default function IntelFeedPanel({
                         </span>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleDismiss(alert.id)}
-                      className="text-[var(--text-muted)] hover:text-red-400 transition-colors flex-shrink-0"
-                      title="Dismiss"
-                    >
-                      <X size={10} />
-                    </button>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <ChevronDown size={10} className={`text-[var(--text-muted)] transition-transform ${expandedId === alert.id ? 'rotate-180' : ''}`} />
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleDismiss(alert.id); }}
+                        className="text-[var(--text-muted)] hover:text-red-400 transition-colors"
+                        title="Dismiss"
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Title */}
@@ -228,15 +265,93 @@ export default function IntelFeedPanel({
                     {alert.description}
                   </div>
 
+                  {/* Expanded detail section */}
+                  <AnimatePresence>
+                    {expandedId === alert.id && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="border-t border-cyan-800/30 pt-2 mt-1 space-y-2">
+                          {/* Significance breakdown */}
+                          {alert.signal_score != null && alert.routine_score != null && (
+                            <div>
+                              <div className="text-[8px] font-mono text-[var(--text-muted)] mb-1 tracking-wider">SIGNIFICANCE BREAKDOWN</div>
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden flex">
+                                  {(() => {
+                                    const total = alert.signal_score + alert.routine_score;
+                                    const signalPct = total > 0 ? (alert.signal_score / total) * 100 : 50;
+                                    const routinePct = total > 0 ? (alert.routine_score / total) * 100 : 50;
+                                    return (
+                                      <>
+                                        <div className="h-full bg-cyan-500/70 rounded-l-full" style={{ width: `${signalPct}%` }} />
+                                        <div className="h-full bg-gray-600/70 rounded-r-full" style={{ width: `${routinePct}%` }} />
+                                      </>
+                                    );
+                                  })()}
+                                </div>
+                              </div>
+                              <div className="flex justify-between text-[7px] font-mono mt-0.5">
+                                <span className="text-cyan-400">SIGNAL: {alert.signal_score}/50</span>
+                                <span className="text-gray-500">ROUTINE: {alert.routine_score}/50</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Detail data from /api/alerts/{id} */}
+                          {detailLoading && expandedId === alert.id && (
+                            <div className="text-[8px] font-mono text-[var(--text-muted)] animate-pulse">LOADING DETAIL...</div>
+                          )}
+                          {detailCache[alert.id] && Object.keys(detailCache[alert.id]).length > 0 && (
+                            <div>
+                              <div className="text-[8px] font-mono text-[var(--text-muted)] mb-1 tracking-wider">DETAIL</div>
+                              <div className="space-y-1">
+                                {Object.entries(detailCache[alert.id]).map(([key, val]) => (
+                                  <div key={key} className="flex gap-2 text-[8px] font-mono">
+                                    <span className="text-cyan-600 min-w-[80px] flex-shrink-0">{key.replace(/_/g, " ").toUpperCase()}</span>
+                                    <span className="text-gray-300 break-all">
+                                      {Array.isArray(val)
+                                        ? (val as unknown[]).map((v, i) => (
+                                            <span key={i} className="inline-block bg-cyan-950/40 border border-cyan-800/30 rounded px-1 py-0.5 mr-1 mb-0.5">
+                                              {String(v)}
+                                            </span>
+                                          ))
+                                        : typeof val === "object" && val !== null
+                                          ? JSON.stringify(val)
+                                          : String(val)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Copy button */}
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleCopy(alert); }}
+                            className="flex items-center gap-1 text-[8px] font-mono text-[var(--text-muted)] hover:text-cyan-400 transition-colors"
+                          >
+                            {copiedId === alert.id ? <Check size={8} /> : <Copy size={8} />}
+                            {copiedId === alert.id ? "COPIED" : "COPY JSON"}
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
                   {/* Footer */}
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between mt-1">
                     <span className="text-[8px] font-mono text-[var(--text-muted)]">
                       {timeAgo(alert.created_at)}
                     </span>
                     {alert.lat != null && alert.lng != null && onFlyTo && (
                       <button
                         type="button"
-                        onClick={() => onFlyTo(alert.lat!, alert.lng!, 8)}
+                        onClick={(e) => { e.stopPropagation(); onFlyTo(alert.lat!, alert.lng!, 8); }}
                         className="flex items-center gap-1 text-[8px] font-mono text-cyan-400 hover:text-cyan-300 transition-colors"
                       >
                         <MapPin size={8} />
