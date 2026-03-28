@@ -373,6 +373,7 @@ async def live_data_slow(request: Request,
         "trending_markets": d.get("trending_markets", []),
         "fimi": _f(d.get("fimi", [])),
         "meshtastic": _f(d.get("meshtastic", [])),
+        "correlation_alerts": d.get("correlation_alerts", []),
         "freshness": dict(source_timestamps),
     }
     bbox_tag = f"{s},{w},{n},{e}" if has_bbox else "full"

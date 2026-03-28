@@ -6,6 +6,7 @@ No LLM calls — pure Python pattern matching on entity data.
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta
 
 from services.agent.alerts import Alert, AlertSeverity
 from services.agent.datasource import DataSource, _haversine_km
@@ -473,6 +474,403 @@ def check_vip_movement(ds: DataSource) -> list[Alert]:
 
 
 # ---------------------------------------------------------------------------
+# 9. Prediction Market Signal
+# ---------------------------------------------------------------------------
+
+# Conflict regions mapped from market title keywords to coordinates
+_CONFLICT_REGIONS: dict[str, tuple[float, float]] = {
+    "ukraine": (48.5, 31.5),
+    "russia": (55.7, 37.6),
+    "taiwan": (23.5, 121.0),
+    "china": (35.0, 105.0),
+    "iran": (32.0, 53.0),
+    "korea": (38.0, 127.0),
+    "north korea": (39.0, 126.0),
+    "hormuz": (26.5, 56.3),
+    "gaza": (31.4, 34.4),
+    "israel": (31.8, 35.2),
+    "syria": (35.0, 38.0),
+}
+
+
+def check_prediction_market_signal(ds: DataSource) -> list[Alert]:
+    """Alert when CONFLICT prediction markets spike AND military flights are elevated nearby.
+
+    Filters: CONFLICT category only (excludes POLITICS/FINANCE/CRYPTO to avoid
+    election-cycle false positives). Requires >5 military flights within 500km
+    (NATO baseline is ~2-3, so >5 is genuinely elevated).
+    """
+    markets = ds.query("prediction_markets", limit=200)
+    mil_flights = ds.query("military_flights", limit=500)
+
+    if not markets or not mil_flights:
+        return []
+
+    # Filter to CONFLICT category with significant movement
+    conflict_markets = [
+        m for m in markets
+        if str(m.get("category", "")).upper() == "CONFLICT"
+        and abs(m.get("delta_pct", 0)) > 10
+    ]
+
+    if not conflict_markets:
+        return []
+
+    matched_regions: list[dict] = []
+
+    for market in conflict_markets:
+        title_lower = market.get("title", "").lower()
+        for keyword, (rlat, rlng) in _CONFLICT_REGIONS.items():
+            if keyword not in title_lower:
+                continue
+
+            origin = {"lat": rlat, "lng": rlng}
+            nearby_count = _count_nearby(origin, mil_flights, 500)
+
+            if nearby_count <= 5:
+                continue
+
+            matched_regions.append({
+                "market_title": market.get("title", "Unknown"),
+                "delta_pct": round(market.get("delta_pct", 0), 1),
+                "consensus_pct": market.get("consensus_pct"),
+                "region": keyword,
+                "military_flights_nearby": nearby_count,
+            })
+            break  # One region match per market
+
+    if not matched_regions:
+        return []
+
+    severity = AlertSeverity.CRITICAL if len(matched_regions) >= 2 else AlertSeverity.ELEVATED
+
+    lat, lng = _CONFLICT_REGIONS[matched_regions[0]["region"]]
+
+    market_summaries = [
+        f"{r['market_title']} (delta {r['delta_pct']:+.1f}pp, {r['military_flights_nearby']} mil flights)"
+        for r in matched_regions
+    ]
+
+    return [Alert(
+        alert_type="prediction_market_signal",
+        severity=severity,
+        title=f"Market Signal — {len(matched_regions)} conflict market(s) spiking",
+        description=(
+            f"CONFLICT prediction market(s) moving >10pp with elevated military "
+            f"activity: {'; '.join(market_summaries[:3])}"
+        ),
+        lat=lat,
+        lng=lng,
+        data={
+            "matched_regions": matched_regions,
+            "indicators": [
+                f"Market: {r['market_title']} delta {r['delta_pct']:+.1f}pp"
+                for r in matched_regions
+            ] + [
+                f"Military flights: {r['military_flights_nearby']} near {r['region']}"
+                for r in matched_regions
+            ],
+        },
+    )]
+
+
+# ---------------------------------------------------------------------------
+# 10. Black Sea Escalation
+# ---------------------------------------------------------------------------
+
+# Black Sea zone bounding box
+_BLACK_SEA_LAT_MIN, _BLACK_SEA_LAT_MAX = 43.0, 48.0
+_BLACK_SEA_LNG_MIN, _BLACK_SEA_LNG_MAX = 30.0, 42.0
+_BLACK_SEA_CENTER = {"lat": 45.5, "lng": 36.0}
+
+_MILITARY_SHIP_TYPES = {"military", "carrier", "destroyer", "frigate"}
+
+
+def _in_black_sea(item: dict) -> bool:
+    """Check if an item's coordinates fall within the Black Sea zone."""
+    raw_lat = item.get("lat") or item.get("latitude")
+    raw_lng = item.get("lng") or item.get("lon") or item.get("longitude")
+    if raw_lat is None or raw_lng is None:
+        return False
+    try:
+        lat, lng = float(raw_lat), float(raw_lng)
+    except (ValueError, TypeError):
+        return False
+    return (_BLACK_SEA_LAT_MIN <= lat <= _BLACK_SEA_LAT_MAX
+            and _BLACK_SEA_LNG_MIN <= lng <= _BLACK_SEA_LNG_MAX)
+
+
+def check_black_sea_escalation(ds: DataSource) -> list[Alert]:
+    """Alert when Ukraine air raids + military flights/ships converge in Black Sea.
+
+    Requires active air raids (>0) in the Black Sea zone AND at least one of:
+    - Military flights > 3 within 500km of zone center
+    - Military-type ships > 1 in zone (NOT commercial vessels)
+    """
+    ukraine_alerts = ds.query("ukraine_alerts", limit=200)
+    mil_flights = ds.query("military_flights", limit=500)
+    ships = ds.query("ships", limit=500)
+
+    if not ukraine_alerts:
+        return []
+
+    # Count air raids in Black Sea zone
+    raids_in_zone = [a for a in ukraine_alerts if _in_black_sea(a)]
+    if not raids_in_zone:
+        return []
+
+    # Count military flights near zone center
+    mil_flight_count = _count_nearby(_BLACK_SEA_CENTER, mil_flights, 500)
+
+    # Count military-type ships only (red team: commercial traffic always exceeds thresholds)
+    mil_ships_in_zone = [
+        s for s in ships
+        if _in_black_sea(s) and s.get("type", "").lower() in _MILITARY_SHIP_TYPES
+    ]
+
+    has_mil_flights = mil_flight_count > 3
+    has_mil_ships = len(mil_ships_in_zone) > 1
+
+    if not has_mil_flights and not has_mil_ships:
+        return []
+
+    # Determine severity
+    source_types = ["air_raids"]
+    if has_mil_flights:
+        source_types.append("military_flights")
+    if has_mil_ships:
+        source_types.append("military_ships")
+
+    severity = AlertSeverity.CRITICAL if len(source_types) >= 3 else AlertSeverity.ELEVATED
+
+    indicators = [
+        f"Air raids: {len(raids_in_zone)} active in Black Sea zone",
+        f"Military flights: {mil_flight_count} within 500km",
+        f"Military ships: {len(mil_ships_in_zone)} in zone",
+    ]
+
+    raid_lat, raid_lng = _centroid(raids_in_zone)
+    if not any(_has_position(r) for r in raids_in_zone):
+        raid_lat, raid_lng = _BLACK_SEA_CENTER["lat"], _BLACK_SEA_CENTER["lng"]
+
+    return [Alert(
+        alert_type="black_sea_escalation",
+        severity=severity,
+        title=f"Black Sea Escalation — {len(source_types)} source types converging",
+        description=(
+            f"{len(raids_in_zone)} air raid(s) active in Black Sea zone with "
+            f"{mil_flight_count} military flights and {len(mil_ships_in_zone)} military vessel(s)."
+        ),
+        lat=round(raid_lat, 2),
+        lng=round(raid_lng, 2),
+        data={
+            "source_types": source_types,
+            "raid_count": len(raids_in_zone),
+            "military_flight_count": mil_flight_count,
+            "military_ship_count": len(mil_ships_in_zone),
+            "indicators": indicators,
+        },
+    )]
+
+
+# ---------------------------------------------------------------------------
+# 11. Disinformation Divergence
+# ---------------------------------------------------------------------------
+
+def _is_gdelt_stale() -> bool:
+    """Check if GDELT data is stale or missing (staleness gate).
+
+    Reads source_timestamps from the store. If GDELT hasn't been updated
+    in >30 minutes, considers it stale to prevent false "manufactured" labels.
+    """
+    try:
+        from services.fetchers._store import source_timestamps
+        gdelt_ts = source_timestamps.get("gdelt")
+        if not gdelt_ts:
+            return True
+        last_update = datetime.fromisoformat(gdelt_ts)
+        return datetime.utcnow() - last_update > timedelta(minutes=30)
+    except Exception:
+        return True
+
+
+def check_disinformation_divergence(ds: DataSource) -> list[Alert]:
+    """Alert when FIMI major waves diverge from GDELT event coverage.
+
+    High FIMI + low GDELT = "manufactured" crisis (ELEVATED)
+    High FIMI + high GDELT = "amplified" real event (NORMAL, informational)
+
+    Staleness gate: skips entirely if GDELT data is empty or >30min stale,
+    to prevent ALL FIMI being labeled "manufactured" when GDELT is down.
+    """
+    fimi = ds.query("fimi", limit=200)
+    gdelt = ds.query("gdelt", limit=500)
+
+    if not fimi:
+        return []
+
+    # Staleness gate — skip if GDELT is unreliable
+    if not gdelt or _is_gdelt_stale():
+        return []
+
+    # Filter to major waves only
+    major_waves = [f for f in fimi if f.get("is_major_wave")]
+    if not major_waves:
+        return []
+
+    # Group FIMI by target country
+    by_country: dict[str, list[dict]] = {}
+    for f in major_waves:
+        country = f.get("target_country", "").strip()
+        if country:
+            by_country.setdefault(country, []).append(f)
+
+    if not by_country:
+        return []
+
+    def count_gdelt_for_country(country: str) -> int:
+        """Count GDELT events mentioning a country (handles GeoJSON and flat formats)."""
+        country_lower = country.lower()
+        count = 0
+        for g in gdelt:
+            props = g.get("properties", {})
+            headlines = props.get("_headlines_list", [])
+            text = " ".join([
+                str(props.get("name", "")),
+                str(props.get("action_geo_cc", "")),
+                " ".join(str(h) for h in headlines),
+                str(g.get("country", "")),
+                str(g.get("country_code", "")),
+                str(g.get("action_geo", "")),
+            ]).lower()
+            if country_lower in text:
+                count += 1
+        return count
+
+    alerts: list[Alert] = []
+    for country, narratives in by_country.items():
+        gdelt_count = count_gdelt_for_country(country)
+        actors = list({n.get("actor", "Unknown") for n in narratives if n.get("actor")})
+
+        if gdelt_count < 5:
+            classification = "manufactured"
+            severity = AlertSeverity.ELEVATED
+        elif gdelt_count > 20:
+            classification = "amplified"
+            severity = AlertSeverity.NORMAL
+        else:
+            continue  # Ambiguous zone — don't alert
+
+        indicators = [
+            f"FIMI narratives: {len(narratives)} major wave(s) targeting {country}",
+            f"GDELT events: {gdelt_count} mentioning {country}",
+            f"Classification: {classification}",
+            f"Actors: {', '.join(actors[:5])}",
+        ]
+        narrative_titles = [n.get("title", "Untitled") for n in narratives[:5]]
+
+        alerts.append(Alert(
+            alert_type="disinformation_divergence",
+            severity=severity,
+            title=f"Disinfo Divergence — {classification} crisis ({country})",
+            description=(
+                f"{len(narratives)} FIMI major wave(s) targeting {country} with "
+                f"{gdelt_count} GDELT events. Classification: {classification}."
+            ),
+            data={
+                "country": country,
+                "classification": classification,
+                "fimi_count": len(narratives),
+                "gdelt_count": gdelt_count,
+                "actors": actors,
+                "narrative_titles": narrative_titles,
+                "indicators": indicators,
+            },
+        ))
+
+    return alerts
+
+
+# ---------------------------------------------------------------------------
+# 12. Supply Chain Cascade
+# ---------------------------------------------------------------------------
+
+def check_supply_chain_cascade(ds: DataSource) -> list[Alert]:
+    """Alert when internet outages + train disruptions + fires co-locate.
+
+    Requires internet outage + 2 of {disrupted trains, fire hotspots} within 200km.
+    Train data covers Amtrak (US) and Finnish DigiTraffic — geographic bias noted.
+    """
+    outages = ds.query("internet_outages", limit=200)
+    trains = ds.query("trains", limit=500)
+    fires = ds.query("firms_fires", limit=500)
+
+    if not outages:
+        return []
+
+    radius = 200  # km
+
+    # Filter to disrupted trains (stopped or delayed)
+    disrupted_trains = [
+        t for t in trains
+        if _has_position(t)
+        and (
+            t.get("speed", 1) == 0
+            or "delay" in str(t.get("status", "")).lower()
+            or "stop" in str(t.get("status", "")).lower()
+        )
+    ]
+
+    alerts: list[Alert] = []
+    for outage in outages:
+        if not _has_position(outage):
+            continue
+
+        nearby_trains = _count_nearby(outage, disrupted_trains, radius)
+        nearby_fires = _count_nearby(outage, fires, radius)
+
+        if nearby_trains == 0 and nearby_fires == 0:
+            continue  # Need outage + at least 1 other source
+
+        source_types = ["internet_outage"]
+        if nearby_trains > 0:
+            source_types.append("train_disruption")
+        if nearby_fires > 0:
+            source_types.append("fire_hotspot")
+
+        severity = AlertSeverity.CRITICAL if len(source_types) >= 3 else AlertSeverity.ELEVATED
+
+        indicators = [
+            f"Internet outage at ({outage['lat']:.1f}, {outage['lng']:.1f})",
+            f"Disrupted trains: {nearby_trains} within {radius}km",
+            f"Fire hotspots: {nearby_fires} within {radius}km",
+        ]
+
+        outage_name = outage.get("name", outage.get("country", "Unknown region"))
+
+        alerts.append(Alert(
+            alert_type="supply_chain_cascade",
+            severity=severity,
+            title=f"Supply Chain Cascade — {outage_name}",
+            description=(
+                f"Internet outage co-located with {nearby_trains} disrupted train(s) "
+                f"and {nearby_fires} fire hotspot(s) within {radius}km."
+            ),
+            lat=outage["lat"],
+            lng=outage["lng"],
+            data={
+                "source_types": source_types,
+                "outage_name": outage_name,
+                "disrupted_trains": nearby_trains,
+                "fire_hotspots": nearby_fires,
+                "indicators": indicators,
+            },
+        ))
+
+    return alerts
+
+
+# ---------------------------------------------------------------------------
 # Convenience: run all checkers
 # ---------------------------------------------------------------------------
 ALL_CHECKERS = [
@@ -484,6 +882,10 @@ ALL_CHECKERS = [
     check_under_reported_crisis,
     check_ew_detection,
     check_vip_movement,
+    check_prediction_market_signal,
+    check_black_sea_escalation,
+    check_disinformation_divergence,
+    check_supply_chain_cascade,
 ]
 
 

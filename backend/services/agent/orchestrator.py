@@ -35,6 +35,8 @@ _DOMAIN_LAYER_MAP: dict[str, dict[str, bool]] = {
     "economic": {"global_incidents": True, "prediction_markets": True},
     "infrastructure": {"datacenters": True, "power_plants": True, "internet_outages": True, "trains": True},
     "disinformation": {"fimi": True, "global_incidents": True},
+    "cyber": {"internet_outages": True, "datacenters": True},
+    "thermal": {"firms": True},
 }
 from services.agent.artifacts import get_artifact_store, Artifact
 from services.agent.artifact_registry import get_artifact_registry, extract_tags_from_query

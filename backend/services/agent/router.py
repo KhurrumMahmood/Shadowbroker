@@ -78,6 +78,14 @@ _DOMAIN_KEYWORDS: dict[str, list[str]] = {
         "fake news", "information warfare", "euvsdisinfo", "narrative",
         "foreign interference", "manipulation",
     ],
+    "cyber": [
+        "shodan", "exposed", "vulnerability", "port scan", "iot",
+        "cve", "cyber", "internet facing", "open port", "banner grab",
+    ],
+    "thermal": [
+        "thermal", "swir", "heat signature", "fire analysis",
+        "thermal anomaly", "burn", "hotspot analysis",
+    ],
 }
 
 # Compile domain patterns (word boundary matching for short terms)
@@ -117,6 +125,8 @@ _DOMAIN_TOOL_HINTS: dict[str, list[str]] = {
     "economic": ["web_search", "query_data"],
     "intelligence": ["query_data", "proximity_search", "anomaly_scan"],
     "disinformation": ["query_data", "web_search"],
+    "cyber": ["search_shodan", "web_search", "proximity_search"],
+    "thermal": ["analyze_thermal", "query_data", "proximity_search"],
 }
 
 

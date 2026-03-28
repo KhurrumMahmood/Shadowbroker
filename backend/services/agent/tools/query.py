@@ -211,6 +211,18 @@ _SEARCH_CONFIG = {
             "_source": n.get("_source", "meshtastic"),
         },
     },
+    "correlation_alerts": {
+        "fields": ["type", "severity", "sources", "grid_cell", "indicators"],
+        "entity_type": "correlation",
+        "compact": lambda c: {
+            "type": c.get("type", ""),
+            "severity": c.get("severity", ""),
+            "indicators": c.get("indicators", 0),
+            "sources": c.get("sources", []),
+            "lat": c.get("lat"), "lng": c.get("lng"),
+            "_source": c.get("_source", "correlation_engine"),
+        },
+    },
 }
 
 _QUERYABLE_FIELDS = {
@@ -233,6 +245,7 @@ _QUERYABLE_FIELDS = {
     "fimi": ["title", "primary_actor", "target_country", "threat_actors"],
     "trains": ["name", "operator", "country", "origin", "destination", "status"],
     "meshtastic": ["long_name", "short_name", "node_id", "hardware"],
+    "correlation_alerts": ["type", "severity", "sources", "grid_cell", "indicators"],
 }
 
 # Also used by scenario fixtures that have additional categories

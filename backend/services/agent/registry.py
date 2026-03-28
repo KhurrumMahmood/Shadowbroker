@@ -74,7 +74,7 @@ class ToolRegistry:
 
 
 def create_default_registry() -> ToolRegistry:
-    """Create a registry with all 9 tools (3 old + 6 new) registered."""
+    """Create a registry with all 11 tools (3 old + 8 new) registered."""
     from services.agent.tools.query import (
         handle_query_data, handle_aggregate_data, handle_web_search,
         _QUERYABLE_FIELDS,
@@ -326,6 +326,48 @@ def create_default_registry() -> ToolRegistry:
         categories=["all", "geointel", "sigint"],
     ))
 
+    # -- analyze_thermal --
+    reg.register(ToolDef(
+        name="analyze_thermal",
+        description=(
+            "Analyze a location for thermal anomalies using Sentinel-2 SWIR bands "
+            "and FIRMS fire data corroboration. Returns confidence score, severity, "
+            "and nearby fire hotspots. Use when investigating suspicious fires, "
+            "industrial activity, or conflict damage at a specific location."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "lat": {"type": "number", "description": "Latitude of point to analyze"},
+                "lng": {"type": "number", "description": "Longitude of point to analyze"},
+            },
+            "required": ["lat", "lng"],
+        },
+        handler=_handle_analyze_thermal,
+        categories=["all", "geointel", "sigint"],
+    ))
+
+    # -- search_shodan --
+    reg.register(ToolDef(
+        name="search_shodan",
+        description=(
+            "Search Shodan for internet-exposed devices. Requires SHODAN_API_KEY. "
+            "Use for cyber threat assessment, infrastructure exposure analysis, "
+            "or finding vulnerable IoT devices. Query syntax: 'port:554 country:US', "
+            "'apache city:London', 'webcam', 'scada'."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Shodan search query"},
+                "limit": {"type": "integer", "description": "Max results (default 20, max 100)"},
+            },
+            "required": ["query"],
+        },
+        handler=_handle_search_shodan,
+        categories=["all", "osint", "sigint"],
+    ))
+
     return reg
 
 
@@ -398,5 +440,22 @@ def _handle_cross_correlate(args: dict, ds) -> str:
         lat=args["lat"],
         lng=args["lng"],
         radius_km=args.get("radius_km", 100),
+    )
+    return json.dumps(result, default=str)
+
+
+def _handle_analyze_thermal(args: dict, ds) -> str:
+    from services.thermal_sentinel import analyze_thermal
+
+    result = analyze_thermal(lat=args["lat"], lng=args["lng"])
+    return json.dumps(result, default=str)
+
+
+def _handle_search_shodan(args: dict, ds) -> str:
+    from services.shodan_connector import search_shodan
+
+    result = search_shodan(
+        query=args["query"],
+        limit=args.get("limit", 20),
     )
     return json.dumps(result, default=str)

@@ -43,12 +43,16 @@ def _normalize_gdelt(gdelt: list[dict]) -> list[dict]:
 
 
 def compute_coverage_gaps(
-    gdelt: list[dict], news: list[dict]
+    gdelt: list[dict], news: list[dict], fimi: list[dict] | None = None
 ) -> list[dict]:
     """Find regions with GDELT conflict events but zero news coverage.
 
     Buckets both GDELT events and news articles into geographic grid cells,
     then identifies cells where GDELT events exist but news articles don't.
+
+    When FIMI data is provided, enriches gaps with disinformation context:
+    fimi_targeting (bool) and fimi_actors (list) for countries being targeted
+    by FIMI narratives in coverage gap regions.
     """
     if not gdelt:
         return []
@@ -62,17 +66,42 @@ def compute_coverage_gaps(
             news_flat.append({"lat": nlat, "lon": nlon})
     news_grid = grid_cluster(news_flat, COVERAGE_GAP_CELL_DEGREES)
 
+    # Build FIMI country lookup if available
+    fimi_by_country: dict[str, list[str]] = {}
+    if fimi:
+        for f in fimi:
+            country = f.get("target_country", "").strip().lower()
+            actor = f.get("actor", "Unknown")
+            if country:
+                fimi_by_country.setdefault(country, []).append(actor)
+
     gaps = []
     for cell, events in gdelt_grid.items():
         news_in_cell = news_grid.get(cell, [])
         if len(events) >= COVERAGE_GAP_MIN_GDELT and len(news_in_cell) == 0:
-            gaps.append({
+            gap = {
                 "lat": cell[0],
                 "lon": cell[1],
                 "gdelt_count": len(events),
                 "news_count": 0,
                 "top_event_codes": _top_event_codes(events),
-            })
+            }
+
+            # Enrich with FIMI context if available
+            matching_actors: list[str] = []
+            if fimi_by_country:
+                gap_countries = {
+                    e.get("action_geo", "").split(",")[0].strip().lower()
+                    for e in events if e.get("action_geo")
+                }
+                for gc in gap_countries:
+                    for fimi_country, actors in fimi_by_country.items():
+                        if fimi_country in gc or gc in fimi_country:
+                            matching_actors.extend(actors)
+            gap["fimi_targeting"] = len(matching_actors) > 0
+            gap["fimi_actors"] = list(set(matching_actors))[:5]
+
+            gaps.append(gap)
 
     gaps.sort(key=lambda g: g["gdelt_count"], reverse=True)
     return gaps
@@ -159,18 +188,42 @@ def compute_cross_domain_correlations(
     return correlations
 
 
+def _count_market_matches(news_item: dict, market_signals: list[dict]) -> int:
+    """Count prediction markets whose key terms appear in a news item's text."""
+    if not market_signals:
+        return 0
+    news_text = (news_item.get("title", "") + " " + news_item.get("description", "")).lower()
+    count = 0
+    for m in market_signals:
+        terms = [w for w in m.get("title", "").lower().split() if len(w) > 3]
+        if any(term in news_text for term in terms):
+            count += 1
+    return count
+
+
 def populate_machine_assessments(
     news: list[dict],
     gdelt: list[dict],
     fires: list[dict],
     outages: list[dict],
+    prediction_markets: list[dict] | None = None,
 ) -> None:
     """Enrich news items in-place with cross-domain correlation data.
 
-    Fills the machine_assessment field with nearby GDELT events, fires, and outages.
+    Fills the machine_assessment field with nearby GDELT events, fires, outages,
+    and matching prediction market signals.
     """
     gdelt_grid = grid_cluster(gdelt, 2.0) if gdelt else {}
     fire_grid = grid_cluster(fires, 3.0, lat_key="lat", lon_key="lng") if fires else {}
+
+    # Pre-filter high-confidence prediction markets for keyword matching
+    market_signals: list[dict] = []
+    if prediction_markets:
+        market_signals = [
+            m for m in prediction_markets
+            if str(m.get("category", "")).upper() in ("CONFLICT", "POLITICS")
+            and m.get("consensus_pct", 0) > 70
+        ]
 
     for item in news:
         nlat_f, nlon_f = _news_coords(item)
@@ -199,11 +252,15 @@ def populate_machine_assessments(
             if haversine(nlat_f, nlon_f, olat, olon) <= ASSESSMENT_RADIUS_KM:
                 outages_nearby += 1
 
-        if gdelt_nearby > 0 or fires_nearby > 0 or outages_nearby > 0:
+        # Check prediction market keyword matches
+        matching_markets = _count_market_matches(item, market_signals)
+
+        if gdelt_nearby > 0 or fires_nearby > 0 or outages_nearby > 0 or matching_markets > 0:
             item["machine_assessment"] = {
                 "gdelt_nearby": gdelt_nearby,
                 "fires_nearby": fires_nearby,
                 "outages_nearby": outages_nearby,
+                "market_signals": matching_markets,
             }
 
 
@@ -218,9 +275,11 @@ def post_process_slow_data(store: dict) -> None:
     military = store.get("military_flights", [])
     fires = store.get("firms_fires", [])
     outages = store.get("internet_outages", [])
+    fimi = store.get("fimi", [])
+    prediction_markets = store.get("prediction_markets", [])
 
     try:
-        store["coverage_gaps"] = compute_coverage_gaps(gdelt, news)
+        store["coverage_gaps"] = compute_coverage_gaps(gdelt, news, fimi=fimi)
         logger.info(f"Post-processing: {len(store['coverage_gaps'])} coverage gaps detected")
     except Exception:
         logger.exception("Coverage gap computation failed")
@@ -236,7 +295,7 @@ def post_process_slow_data(store: dict) -> None:
         store["correlations"] = []
 
     try:
-        populate_machine_assessments(news, gdelt, fires, outages)
+        populate_machine_assessments(news, gdelt, fires, outages, prediction_markets=prediction_markets)
         assessed = sum(1 for n in news if n.get("machine_assessment") is not None)
         logger.info(f"Post-processing: {assessed}/{len(news)} news items assessed")
     except Exception:

@@ -23,30 +23,33 @@ def hormuz_ds(hormuz_data):
 
 class TestRegistryHasAllTools:
 
-    def test_registry_has_9_tools(self):
+    def test_registry_has_11_tools(self):
         from services.agent.registry import create_default_registry
 
         reg = create_default_registry()
         names = {t.name for t in reg.list_tools()}
-        assert len(names) == 9
+        assert len(names) == 11
         # Old tools
         assert "query_data" in names
         assert "aggregate_data" in names
         assert "web_search" in names
-        # New tools
+        # Analysis tools
         assert "proximity_search" in names
         assert "corridor_analysis" in names
         assert "temporal_compare" in names
         assert "anomaly_scan" in names
         assert "pattern_detect" in names
         assert "cross_correlate" in names
+        # On-demand tools
+        assert "analyze_thermal" in names
+        assert "search_shodan" in names
 
     def test_schemas_have_valid_format(self):
         from services.agent.registry import create_default_registry
 
         reg = create_default_registry()
         schemas = reg.get_tool_schemas()
-        assert len(schemas) == 9
+        assert len(schemas) == 11
         for schema in schemas:
             assert schema["type"] == "function"
             fn = schema["function"]

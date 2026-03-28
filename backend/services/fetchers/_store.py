@@ -42,6 +42,7 @@ latest_data = {
     "fimi": [],
     "trains": [],
     "meshtastic": [],
+    "correlation_alerts": [],
 }
 
 # Per-source freshness timestamps

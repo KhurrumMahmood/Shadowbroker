@@ -18,7 +18,7 @@ from cachetools import TTLCache
 
 logger = logging.getLogger(__name__)
 
-# Cache by rounded lat/lng (0.05° grid ~= 5km), TTL 30 minutes
+# Cache by rounded lat/lng (0.01° grid ~= 1km), TTL 30 minutes
 _thermal_cache = TTLCache(maxsize=100, ttl=1800)
 
 # FIRMS corroboration radius in km
@@ -108,19 +108,17 @@ def _try_swir_analysis(lat: float, lng: float, scenes: list[dict]) -> dict | Non
     Returns thermal index dict or None if rasterio unavailable.
     """
     try:
-        import rasterio  # noqa: F401
+        import rasterio
         import planetary_computer
         from pystac_client import Client
     except ImportError:
         return None
 
-    # Find scene with SWIR bands
-    swir_scene_id = None
-    for s in scenes:
-        if s.get("has_swir_bands"):
-            swir_scene_id = s["scene_id"]
-            break
-
+    # Find first scene with SWIR bands
+    swir_scene_id = next(
+        (s["scene_id"] for s in scenes if s.get("has_swir_bands")),
+        None,
+    )
     if not swir_scene_id:
         return None
 
@@ -141,7 +139,7 @@ def _try_swir_analysis(lat: float, lng: float, scenes: list[dict]) -> dict | Non
         if not b11_asset or not b12_asset:
             return None
 
-        # Read a small window around the target point
+        # Read a small 10x10 pixel window around the target point
         with rasterio.open(b12_asset.href) as src:
             row, col = src.index(lng, lat)
             window = rasterio.windows.Window(
@@ -150,9 +148,6 @@ def _try_swir_analysis(lat: float, lng: float, scenes: list[dict]) -> dict | Non
             b12 = src.read(1, window=window).astype(float)
 
         with rasterio.open(b11_asset.href) as src:
-            window = rasterio.windows.Window(
-                max(0, col - 5), max(0, row - 5), 10, 10
-            )
             b11 = src.read(1, window=window).astype(float)
 
         if b12.size == 0 or b11.size == 0:
